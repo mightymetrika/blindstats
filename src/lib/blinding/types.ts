@@ -8,6 +8,10 @@ export type NeutralLabelScheme = "Group_<letters>";
 
 export type MappingAssignmentMethod = "web_crypto_random_permutation";
 
+export type DatasetCell = string | null;
+
+export type DatasetRow = Record<string, DatasetCell>;
+
 export type BlindingMappingEntry = {
   original: string;
   blinded: string;
