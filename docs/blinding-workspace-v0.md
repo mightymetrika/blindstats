@@ -1,9 +1,9 @@
 # Blinding Workspace v0
 
-**Status:** Design specification  
-**Project:** blindstats  
-**Scope:** First real application slice  
-**Date:** 2026-09-01
+**Status:** Implemented browser-local prototype<br>
+**Project:** blindstats<br>
+**Scope:** First real application slice<br>
+**Date:** 2026-09-02
 
 ---
 
@@ -842,6 +842,10 @@ The automated test suite must also pass.
 
 The production application build and lint checks must remain clean.
 
+As of 2026-09-02, the browser-local v0 workflow has been implemented and manually
+exercised end to end with downloaded artifacts. Automated tests, lint, and the
+production build were clean at the implementation checkpoint.
+
 ---
 
 ## 19. Design decisions intentionally deferred
@@ -875,7 +879,7 @@ The anticipated sequence after the local blinding workspace is:
 
 ```text
 Slice 1
-Browser-local blinding engine
+Browser-local blinding engine + workspace UI
 CSV -> blinded CSV + receipt + key
 
         ↓

@@ -81,9 +81,21 @@ auditable, and useful before expanding the platform.
 
 blindstats is in **early development**.
 
-The current repository contains the initial application foundation. The blinding,
-permissions, audit, file-storage, and unblinding systems have not yet been
-implemented.
+The repository now includes a functional browser-local Blinding Workspace v0.
+The current prototype can:
+
+- read and validate a UTF-8, comma-delimited CSV locally in the browser;
+- blind one selected categorical column using securely randomized neutral labels;
+- preserve unrelated data, row order, column order, and missing selected values;
+- generate a blinded CSV and SHA-256 artifact hashes; and
+- generate a public blinding receipt and a separate private blinding key.
+
+The current prototype does **not** yet implement accounts, role-based separation,
+persistent study records, cloud storage, analysis locking, or controlled multi-user
+unblinding. The local operator can access both the source data and private key.
+
+See [`docs/blinding-workspace-v0.md`](docs/blinding-workspace-v0.md) for the
+current v0 scope and integrity requirements.
 
 **Do not use the current software to store or transfer sensitive, confidential,
 regulated, or client research data.**
@@ -96,6 +108,12 @@ The application is being developed with:
 - [TypeScript](https://www.typescriptlang.org/)
 - [React](https://react.dev/)
 - [Tailwind CSS](https://tailwindcss.com/)
+- [Papa Parse](https://www.papaparse.com/) for CSV parsing and serialization
+- [Vitest](https://vitest.dev/) for automated testing
+
+The v0 blinding workflow uses browser Web Crypto for secure randomized mappings,
+SHA-256 hashing, and transformation identifiers. Research data and private keys
+remain browser-local in the current prototype.
 
 A relational PostgreSQL architecture is currently anticipated for study,
 membership, permission, workflow, and audit metadata. Specific database,
@@ -124,6 +142,7 @@ Then open `http://localhost:3000`.
 ### Validate
 
 ```bash
+npm test
 npm run lint
 npm run build
 ```

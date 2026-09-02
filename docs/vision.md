@@ -272,6 +272,18 @@ Current foundation:
 - React
 - Tailwind CSS
 - Next.js App Router
+- Papa Parse for CSV parsing and serialization
+- Vitest for automated unit and integration testing
+
+The current browser-local prototype implements the first blinding slice: strict CSV
+parsing, secure categorical label randomization, blinded artifact generation,
+SHA-256 hashing, public receipt/private key separation, and a local browser UI for
+selecting a CSV, choosing one categorical column, generating the package, and
+downloading the three generated artifacts.
+
+This prototype intentionally does not create the future multi-user security
+boundary. The local operator can access both the source data and private key, and
+research data are not persisted by the application.
 
 ### Relational data
 
@@ -371,7 +383,7 @@ The following remain intentionally unresolved:
 
 - exact user and study roles;
 - authorization rules;
-- blinding-transformation specification;
+- blinding-transformation specifications beyond the implemented v0 categorical mapping;
 - state-machine implementation;
 - PostgreSQL ORM;
 - authentication provider;
@@ -380,7 +392,6 @@ The following remain intentionally unresolved:
 - artifact-retention policy;
 - audit-event schema;
 - unblinding authorization requirements;
-- testing framework;
 - deployment architecture;
 - CI/CD;
 - preregistration or repository integrations; and
