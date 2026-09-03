@@ -16,6 +16,8 @@ import {
 } from "@/lib/blinding/csv";
 import { getDistinctNonmissingCategories } from "@/lib/blinding/mapping";
 
+const CATEGORY_PREVIEW_LIMIT = 8;
+
 type WorkspaceError = {
   stage: "file" | "generation";
   message: string;
@@ -96,17 +98,30 @@ export function BlindingWorkspace() {
   );
   const [isGenerating, setIsGenerating] = useState(false);
 
-  const selectedCategories = useMemo(() => {
+  const selectedColumnInspection = useMemo(() => {
     if (!parsed || !selectedColumn) {
-      return [];
+      return {
+        categories: [] as string[],
+        missingCount: 0,
+      };
     }
 
-    return getDistinctNonmissingCategories(
-      parsed.rows.map((row) => row[selectedColumn]),
-    );
+    const values = parsed.rows.map((row) => row[selectedColumn]);
+
+    return {
+      categories: getDistinctNonmissingCategories(values),
+      missingCount: values.filter((value) => value === null).length,
+    };
   }, [parsed, selectedColumn]);
 
+  const selectedCategories = selectedColumnInspection.categories;
   const categoryCount = selectedCategories.length;
+  const missingCount = selectedColumnInspection.missingCount;
+  const categoryPreview = selectedCategories.slice(0, CATEGORY_PREVIEW_LIMIT);
+  const additionalCategoryCount = Math.max(
+    categoryCount - categoryPreview.length,
+    0,
+  );
   const selectedColumnIsEligible =
     Boolean(parsed && selectedColumn) && categoryCount >= 2;
   const canGenerate =
@@ -335,7 +350,7 @@ export function BlindingWorkspace() {
             <StageHeading
               number={2}
               title="Select variable"
-              description="Choose exactly one column to replace with randomized neutral Group_* labels."
+              description="Choose exactly one column to replace with randomized neutral group labels (Group_A, Group_B, …)."
             />
 
             <div className="mt-6">
@@ -361,21 +376,70 @@ export function BlindingWorkspace() {
               </select>
 
               {selectedColumn ? (
-                <div className="mt-4 flex flex-wrap items-center gap-3">
-                  <span className="rounded-full bg-slate-100 px-3 py-1.5 text-sm text-slate-700">
-                    {categoryCount.toLocaleString()} distinct nonmissing{" "}
-                    {categoryCount === 1 ? "category" : "categories"}
-                  </span>
+                <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="rounded-full bg-white px-3 py-1.5 text-sm text-slate-700 ring-1 ring-slate-200">
+                      {categoryCount.toLocaleString()} distinct nonmissing{" "}
+                      {categoryCount === 1 ? "category" : "categories"}
+                    </span>
+                    <span className="rounded-full bg-white px-3 py-1.5 text-sm text-slate-700 ring-1 ring-slate-200">
+                      {missingCount.toLocaleString()} missing{" "}
+                      {missingCount === 1 ? "cell" : "cells"}
+                    </span>
 
-                  {selectedColumnIsEligible ? (
-                    <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-800">
-                      Eligible for blinding
-                    </span>
-                  ) : (
-                    <span className="rounded-full bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-800">
-                      At least 2 categories required
-                    </span>
-                  )}
+                    {selectedColumnIsEligible ? (
+                      <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-800">
+                        Meets v0 requirements
+                      </span>
+                    ) : (
+                      <span className="rounded-full bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-800">
+                        At least 2 categories required
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="mt-5">
+                    <h3 className="text-sm font-semibold text-slate-900">
+                      Observed categories
+                    </h3>
+                    <p className="mt-1 text-xs leading-5 text-slate-500">
+                      Previewed in first-observed source order.
+                    </p>
+
+                    {categoryPreview.length > 0 ? (
+                      <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+                        {categoryPreview.map((category) => (
+                          <li
+                            key={category}
+                            className="min-w-0 rounded-lg border border-slate-200 bg-white px-3 py-2"
+                          >
+                            <code className="block whitespace-pre-wrap break-all font-mono text-xs leading-5 text-slate-700">
+                              {category}
+                            </code>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="mt-3 text-sm text-slate-600">
+                        No nonmissing category values were found.
+                      </p>
+                    )}
+
+                    {additionalCategoryCount > 0 ? (
+                      <p className="mt-3 text-sm text-slate-600">
+                        {additionalCategoryCount.toLocaleString()} additional{" "}
+                        {additionalCategoryCount === 1
+                          ? "category is"
+                          : "categories are"}{" "}
+                        not shown.
+                      </p>
+                    ) : null}
+
+                    <p className="mt-3 text-xs leading-5 text-slate-500">
+                      Missing counts refer to empty CSV cells. Text values such
+                      as NA or N/A remain observed categories.
+                    </p>
+                  </div>
                 </div>
               ) : null}
             </div>
