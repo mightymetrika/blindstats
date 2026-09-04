@@ -274,12 +274,18 @@ Current foundation:
 - Next.js App Router
 - Papa Parse for CSV parsing and serialization
 - Vitest for automated unit and integration testing
+- Testing Library with jsdom for minimal React UI workflow testing
 
 The current browser-local prototype implements the first blinding slice: strict CSV
 parsing, secure categorical label randomization, blinded artifact generation,
 SHA-256 hashing, public receipt/private key separation, and a local browser UI for
 selecting a CSV, choosing one categorical column, generating the package, and
 downloading the three generated artifacts.
+
+Automated testing is layered. Core transformation and integrity behavior is
+covered extensively with Node-based Vitest tests, while the React interface has
+a deliberately small component-test layer focused on stable workflow invariants
+rather than visual snapshots.
 
 This prototype intentionally does not create the future multi-user security
 boundary. The local operator can access both the source data and private key, and

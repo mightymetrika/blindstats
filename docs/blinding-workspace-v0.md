@@ -3,7 +3,7 @@
 **Status:** Implemented browser-local prototype<br>
 **Project:** blindstats<br>
 **Scope:** First real application slice<br>
-**Date:** 2026-09-02
+**Date:** 2026-09-03
 
 ---
 
@@ -748,11 +748,16 @@ public formats.
 
 ## 17. Automated testing requirements
 
-This slice introduces enough deterministic application logic that automated
-tests are justified.
+This slice contains enough deterministic application logic that automated
+testing is part of the implementation.
 
-The test framework should be selected at implementation time based on the
-current Next.js/TypeScript environment.
+Vitest is the current test runner. Core blinding and integrity tests run in the
+Node environment. A small React component-test layer uses Testing Library with
+jsdom for browser-workflow behavior.
+
+The UI tests intentionally focus on stable workflow invariants rather than
+visual layout, Tailwind classes, exact explanatory wording, or broad snapshot
+coverage.
 
 At minimum the blinding engine should test the following.
 
@@ -814,6 +819,22 @@ Include fixtures for:
 - more than two categories; and
 - nonselected numeric and text columns.
 
+### UI workflow tests
+
+The current component-test layer protects a deliberately small set of workflow
+invariants:
+
+- a valid CSV and valid selected column make package generation available;
+- a selected column with fewer than two nonmissing categories cannot generate a
+  package;
+- the UI passes the original uploaded bytes and selected column to the
+  `createBlindedPackage()` core boundary; and
+- changing the selected column or source file invalidates previously generated
+  artifacts.
+
+More detailed visual and presentation behavior should remain manually reviewed
+unless it becomes a stable product requirement.
+
 ---
 
 ## 18. Manual acceptance criteria
@@ -842,9 +863,11 @@ The automated test suite must also pass.
 
 The production application build and lint checks must remain clean.
 
-As of 2026-09-02, the browser-local v0 workflow has been implemented and manually
-exercised end to end with downloaded artifacts. Automated tests, lint, and the
-production build were clean at the implementation checkpoint.
+As of 2026-09-03, the browser-local v0 workflow has been implemented and manually
+exercised end to end with downloaded artifacts. The automated suite includes
+core/integration tests plus a minimal React UI workflow layer. At this
+implementation checkpoint, all 77 tests across 10 test files passed, lint was
+clean, and the production build succeeded.
 
 ---
 

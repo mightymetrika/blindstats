@@ -110,6 +110,7 @@ The application is being developed with:
 - [Tailwind CSS](https://tailwindcss.com/)
 - [Papa Parse](https://www.papaparse.com/) for CSV parsing and serialization
 - [Vitest](https://vitest.dev/) for automated testing
+- [Testing Library](https://testing-library.com/) for React UI workflow tests
 
 The v0 blinding workflow uses browser Web Crypto for secure randomized mappings,
 SHA-256 hashing, and transformation identifiers. Research data and private keys
