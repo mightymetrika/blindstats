@@ -56,3 +56,26 @@ export type BlindingKey = {
   blindedArtifactSha256: string;
   mapping: BlindingMappingEntry[];
 };
+
+export type AnalysisLockReceiptType = "analysis_lock";
+
+export type AnalysisLockBlindingReference = {
+  transformationId: string;
+  blindingReceiptSha256: string;
+  blindedArtifactSha256: string;
+};
+
+export type AnalysisArtifactReference = {
+  filename: string;
+  sha256: string;
+  byteLength: number;
+};
+
+export type AnalysisLockReceipt = {
+  schemaVersion: BlindingSchemaVersion;
+  receiptType: AnalysisLockReceiptType;
+  lockId: string;
+  createdAt: string;
+  blinding: AnalysisLockBlindingReference;
+  analysisArtifact: AnalysisArtifactReference;
+};

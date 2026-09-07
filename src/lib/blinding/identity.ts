@@ -3,6 +3,11 @@ export type TransformationIdentity = {
   createdAt: string;
 };
 
+export type AnalysisLockIdentity = {
+  lockId: string;
+  createdAt: string;
+};
+
 function requireRandomUuid(): () => string {
   const randomUUID = globalThis.crypto?.randomUUID;
 
@@ -13,15 +18,28 @@ function requireRandomUuid(): () => string {
   return randomUUID.bind(globalThis.crypto);
 }
 
+function canonicalTimestamp(createdAt: Date, label: string): string {
+  if (Number.isNaN(createdAt.getTime())) {
+    throw new RangeError(`${label} timestamp must be a valid date.`);
+  }
+
+  return createdAt.toISOString();
+}
+
 export function createTransformationIdentity(
   createdAt: Date = new Date(),
 ): TransformationIdentity {
-  if (Number.isNaN(createdAt.getTime())) {
-    throw new RangeError("Transformation timestamp must be a valid date.");
-  }
-
   return {
     transformationId: requireRandomUuid()(),
-    createdAt: createdAt.toISOString(),
+    createdAt: canonicalTimestamp(createdAt, "Transformation"),
+  };
+}
+
+export function createAnalysisLockIdentity(
+  createdAt: Date = new Date(),
+): AnalysisLockIdentity {
+  return {
+    lockId: requireRandomUuid()(),
+    createdAt: canonicalTimestamp(createdAt, "Analysis lock"),
   };
 }

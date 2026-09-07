@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { createTransformationIdentity } from "./identity";
+import {
+  createAnalysisLockIdentity,
+  createTransformationIdentity,
+} from "./identity";
 
 describe("createTransformationIdentity", () => {
   it("creates a Web-Crypto UUID and ISO-8601 timestamp", () => {
@@ -39,3 +42,23 @@ describe("createTransformationIdentity", () => {
     );
   });
 });
+
+describe("createAnalysisLockIdentity", () => {
+  it("creates a fresh Web-Crypto UUID and canonical timestamp for an analysis lock", () => {
+    const identity = createAnalysisLockIdentity(
+      new Date("2026-09-07T22:30:00.000Z"),
+    );
+
+    expect(identity.lockId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+    );
+    expect(identity.createdAt).toBe("2026-09-07T22:30:00.000Z");
+  });
+
+  it("rejects an invalid analysis-lock timestamp", () => {
+    expect(() => createAnalysisLockIdentity(new Date("invalid"))).toThrow(
+      RangeError,
+    );
+  });
+});
+
