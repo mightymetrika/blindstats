@@ -31,22 +31,24 @@ Analyst blinding provides one way to reduce that influence.
 blindstats is intended to make that process easier to implement, document, and
 reproduce.
 
-## Version 1
+## First-release workflow
 
-The first version of blindstats will focus on one end-to-end workflow:
+The first public release is being built as a browser-local, file-mediated
+workflow:
 
-1. Create a study and research team.
-2. Assign roles and access permissions.
-3. Upload a study dataset.
-4. Designate variables or labels to be blinded.
-5. Generate a reproducibly blinded dataset.
-6. Provide the blinded analyst access to the appropriate blinded materials.
-7. Submit and lock the blinded analysis code and report.
-8. Authorize unblinding.
-9. Release the appropriate mappings and unblinded materials.
-10. Produce an audit record documenting the process.
+1. Create a blinded dataset with a public blinding receipt and separate private
+   key.
+2. Give the blinded analyst the blinded dataset and public receipt while keeping
+   the private key separate.
+3. Conduct the analysis while blinded.
+4. Lock an exact pre-unblinding analysis artifact and generate an analysis-lock
+   receipt linked to the blinded dataset.
+5. Complete documented unblinding and generate the corresponding audit artifact.
 
-The exact workflow and role definitions are still being designed.
+This initial workflow does not require accounts, a database, or server-side file
+storage. Later versions are expected to add stronger role separation,
+authentication, persistent study records, controlled file access, and durable
+server-side audit history.
 
 ## Design principles
 
@@ -81,21 +83,31 @@ auditable, and useful before expanding the platform.
 
 blindstats is in **early development**.
 
-The repository now includes a functional browser-local Blinding Workspace v0.
-The current prototype can:
+The repository now includes a functional browser-local workflow for creating a
+blinded package and locking an exact pre-unblinding analysis artifact. The
+current prototype can:
 
 - read and validate a UTF-8, comma-delimited CSV locally in the browser;
 - blind one selected categorical column using securely randomized neutral labels;
 - preserve unrelated data, row order, column order, and missing selected values;
-- generate a blinded CSV and SHA-256 artifact hashes; and
-- generate a public blinding receipt and a separate private blinding key.
+- generate a blinded CSV, public blinding receipt, and separate private blinding
+  key;
+- accept the exact public receipt, blinded CSV, and one nonempty analysis
+  artifact in a later browser session;
+- verify that the blinded CSV matches the SHA-256 recorded in the public receipt;
+  and
+- generate an analysis-lock receipt linking the exact blinded dataset and exact
+  analysis-artifact bytes.
 
-The current prototype does **not** yet implement accounts, role-based separation,
-persistent study records, cloud storage, analysis locking, or controlled multi-user
-unblinding. The local operator can access both the source data and private key.
+Documented unblinding is the next major first-release stage. The current
+prototype does **not** yet implement accounts, role-based separation, persistent
+study records, cloud storage, or controlled multi-user access. The person
+creating the blinded package can access both the source data and private key.
 
 See [`docs/blinding-workspace-v0.md`](docs/blinding-workspace-v0.md) for the
-current v0 scope and integrity requirements.
+original blinding-workspace scope and
+[`docs/analysis-lock-v0.md`](docs/analysis-lock-v0.md) for the current
+analysis-lock contract.
 
 **Do not use the current software to store or transfer sensitive, confidential,
 regulated, or client research data.**
@@ -112,9 +124,10 @@ The application is being developed with:
 - [Vitest](https://vitest.dev/) for automated testing
 - [Testing Library](https://testing-library.com/) for React UI workflow tests
 
-The v0 blinding workflow uses browser Web Crypto for secure randomized mappings,
-SHA-256 hashing, and transformation identifiers. Research data and private keys
-remain browser-local in the current prototype.
+The browser-local workflow uses Web Crypto for secure randomized mappings,
+SHA-256 hashing, transformation identifiers, and analysis-lock identifiers.
+Research data, analysis artifacts, and private keys remain browser-local in the
+current prototype.
 
 A relational PostgreSQL architecture is currently anticipated for study,
 membership, permission, workflow, and audit metadata. Specific database,

@@ -64,9 +64,12 @@ The resulting audit history is a core product output.
 These records are the project's "receipts": evidence describing the sequence and
 integrity of the blinded-analysis workflow.
 
-## 4. Version 1 workflow
+## 4. Longer-term server-backed workflow
 
-The initial workflow is expected to include the following conceptual stages.
+The broader version 1 product direction is expected to include the following
+conceptual stages. The immediate first public release implements a smaller
+browser-local, file-mediated form of the same scientific workflow before
+accounts, persistence, and server-side authorization are introduced.
 
 ### 4.1 Study setup
 
@@ -122,8 +125,10 @@ in the browser is not sufficient authorization.
 The analyst conducts the analysis while remaining blinded to the protected
 mapping.
 
-Early versions of blindstats should support storing submitted analysis artifacts
-rather than executing arbitrary R or Python code.
+The current browser-local first-release workflow accepts an analysis artifact
+only when the analyst is ready to lock an exact pre-unblinding version. It hashes
+the exact file bytes locally rather than executing, interpreting, or storing the
+artifact on a blindstats server.
 
 Potential artifacts include:
 
@@ -131,28 +136,41 @@ Potential artifacts include:
 - Python scripts;
 - Quarto or R Markdown files;
 - notebooks;
-- analysis documentation; and
-- blinded results reports.
+- analysis documentation;
+- blinded results reports; and
+- archives containing multiple related files.
+
+Later server-backed versions may store submitted analysis artifacts under
+controlled access.
 
 ### 4.6 Analysis lock
 
 Before unblinding, designated blinded analysis artifacts are finalized.
 
-"Locking" should eventually establish a durable record of the exact artifact
-that existed before unblinding.
+The current browser-local implementation defines a file-mediated analysis lock.
+It:
 
-Potential mechanisms include:
+- verifies that the exact blinded artifact matches the SHA-256 recorded in its
+  public blinding receipt;
+- hashes the exact bytes of one nonempty analysis artifact;
+- creates a fresh lock identifier; and
+- generates an analysis-lock receipt linking the public blinding receipt, blinded
+  artifact, and analysis artifact.
+
+In this first-release workflow, "lock" means that the declared pre-unblinding
+artifact is identified exactly and linked cryptographically to the blinded
+dataset. It does not make the researcher's local file immutable, and its
+browser-generated timestamp is not an independently trusted timestamp.
+
+Later server-backed versions may strengthen the lock with mechanisms such as:
 
 - immutable or append-only artifact records;
-- timestamps;
-- file hashes or checksums; and
+- server-trusted timestamps;
+- persistent artifact storage; and
 - explicit study-state transitions.
 
-The exact implementation is not yet specified.
-
-The core requirement is that an analysis cannot be silently replaced after
-unblinding while continuing to appear as though it were the analysis finalized
-under blinding.
+The core requirement remains that a later revision cannot silently continue to
+appear as though it were the exact analysis artifact documented under blinding.
 
 ### 4.7 Unblinding authorization
 
@@ -276,11 +294,18 @@ Current foundation:
 - Vitest for automated unit and integration testing
 - Testing Library with jsdom for minimal React UI workflow testing
 
-The current browser-local prototype implements the first blinding slice: strict CSV
-parsing, secure categorical label randomization, blinded artifact generation,
-SHA-256 hashing, public receipt/private key separation, and a local browser UI for
-selecting a CSV, choosing one categorical column, generating the package, and
-downloading the three generated artifacts.
+The current browser-local prototype implements two connected first-release
+stages:
+
+1. **Create blinded package:** strict CSV parsing, secure categorical label
+   randomization, blinded artifact generation, SHA-256 hashing, public
+   receipt/private key separation, and local artifact downloads.
+2. **Lock blinded analysis:** accept the public blinding receipt, exact blinded
+   CSV, and one analysis artifact; verify the blinded-artifact hash; hash the
+   exact analysis bytes; and generate a linked analysis-lock receipt.
+
+A minimal workflow selector allows these stages to be opened independently so
+saved artifacts can move between researchers, computers, and browser sessions.
 
 Automated testing is layered. Core transformation and integrity behavior is
 covered extensively with Node-based Vitest tests, while the React interface has
@@ -288,8 +313,8 @@ a deliberately small component-test layer focused on stable workflow invariants
 rather than visual snapshots.
 
 This prototype intentionally does not create the future multi-user security
-boundary. The local operator can access both the source data and private key, and
-research data are not persisted by the application.
+boundary. The person creating the blinded package can access both the source
+data and private key, and research files are not persisted by the application.
 
 ### Relational data
 
@@ -406,19 +431,28 @@ The following remain intentionally unresolved:
 These decisions should be made from concrete requirements rather than selected
 in advance.
 
-## 11. Version 1 success
+## 11. Release path and success
 
-A successful initial release should allow a small research team to complete one
-clear workflow:
+The immediate first public release should allow researchers to complete one
+clear browser-local, file-mediated workflow:
 
-1. establish a study and access roles;
-2. upload source data;
-3. define and apply a reproducible blinding plan;
-4. give an analyst the blinded artifact without revealing the protected mapping;
-5. submit and lock the blinded analysis artifacts;
-6. explicitly authorize unblinding;
-7. reveal the appropriate mapping and materials; and
-8. inspect an audit record demonstrating what occurred and when.
+1. create a reproducibly blinded dataset;
+2. retain the private blinding key separately from the blinded analyst;
+3. give the analyst the blinded dataset and public blinding receipt;
+4. conduct the analysis while blinded;
+5. lock an exact pre-unblinding analysis artifact and produce a linked
+   analysis-lock receipt;
+6. complete documented unblinding using the corresponding private key and lock
+   artifacts; and
+7. retain the generated receipts as an audit trail for the workflow.
 
-If blindstats can perform that workflow clearly and reliably, broader research
-platform functionality can be evaluated from a strong foundation.
+This release does not need accounts, a relational database, or server-side file
+storage to demonstrate the scientific workflow.
+
+A later server-backed version should strengthen the same workflow with study
+records, authentication, roles and permissions, controlled artifact access,
+persistent state transitions, and durable audit history.
+
+If blindstats can perform the file-mediated workflow clearly and reliably, those
+stronger controls and broader research-platform functionality can be added from
+a tested foundation.

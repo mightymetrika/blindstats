@@ -1,5 +1,5 @@
-import { BlindingWorkspace } from "@/components/blinding/BlindingWorkspace";
+import { BlindedAnalysisWorkflow } from "@/components/blinding/BlindedAnalysisWorkflow";
 
 export default function Home() {
-  return <BlindingWorkspace />;
+  return <BlindedAnalysisWorkflow />;
 }
