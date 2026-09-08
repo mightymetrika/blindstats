@@ -8,6 +8,11 @@ export type AnalysisLockIdentity = {
   createdAt: string;
 };
 
+export type UnblindingIdentity = {
+  unblindingId: string;
+  createdAt: string;
+};
+
 function requireRandomUuid(): () => string {
   const randomUUID = globalThis.crypto?.randomUUID;
 
@@ -41,5 +46,14 @@ export function createAnalysisLockIdentity(
   return {
     lockId: requireRandomUuid()(),
     createdAt: canonicalTimestamp(createdAt, "Analysis lock"),
+  };
+}
+
+export function createUnblindingIdentity(
+  createdAt: Date = new Date(),
+): UnblindingIdentity {
+  return {
+    unblindingId: requireRandomUuid()(),
+    createdAt: canonicalTimestamp(createdAt, "Unblinding"),
   };
 }

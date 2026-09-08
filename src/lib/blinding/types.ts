@@ -79,3 +79,27 @@ export type AnalysisLockReceipt = {
   blinding: AnalysisLockBlindingReference;
   analysisArtifact: AnalysisArtifactReference;
 };
+
+export type UnblindingReceiptType = "unblinding";
+
+export type UnblindingArtifactReferences = {
+  sourceArtifactSha256: string;
+  blindingReceiptSha256: string;
+  blindedArtifactSha256: string;
+  blindingKeySha256: string;
+  analysisLockReceiptSha256: string;
+  analysisArtifact: AnalysisArtifactReference;
+  unblindedArtifactSha256: string;
+};
+
+export type UnblindingReceipt = {
+  schemaVersion: BlindingSchemaVersion;
+  receiptType: UnblindingReceiptType;
+  unblindingId: string;
+  createdAt: string;
+  transformationId: string;
+  lockId: string;
+  selectedColumn: string;
+  artifacts: UnblindingArtifactReferences;
+  releasedMapping: BlindingMappingEntry[];
+};

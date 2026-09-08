@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   createAnalysisLockIdentity,
   createTransformationIdentity,
+  createUnblindingIdentity,
 } from "./identity";
 
 describe("createTransformationIdentity", () => {
@@ -62,3 +63,21 @@ describe("createAnalysisLockIdentity", () => {
   });
 });
 
+describe("createUnblindingIdentity", () => {
+  it("creates a fresh Web-Crypto UUID and canonical timestamp for unblinding", () => {
+    const identity = createUnblindingIdentity(
+      new Date("2026-09-08T02:15:00.000Z"),
+    );
+
+    expect(identity.unblindingId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+    );
+    expect(identity.createdAt).toBe("2026-09-08T02:15:00.000Z");
+  });
+
+  it("rejects an invalid unblinding timestamp", () => {
+    expect(() => createUnblindingIdentity(new Date("invalid"))).toThrow(
+      RangeError,
+    );
+  });
+});
