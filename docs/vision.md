@@ -2,25 +2,22 @@
 
 ## 1. Purpose
 
-blindstats is an open-source research software project for building auditable
+blindstats is an open-source research software project for auditable
 analyst-blinding workflows.
 
 Its initial purpose is to help research teams separate statistical analysis
 decisions from knowledge of substantively meaningful study labels.
 
-The core version 1 workflow is:
+The flagship workflow is:
 
 > **Analyst blinding → locked analysis → documented unblinding**
 
-This narrow workflow is the flagship product. Broader research-platform
-functionality should be added only after this workflow is useful, understandable,
-and reliable.
+Broader research-platform functionality should be added only after this workflow
+is useful, understandable, and reliable.
 
 ## 2. The problem
 
-Applied statistical analysis frequently involves legitimate choices.
-
-Examples include:
+Applied statistical analysis frequently involves legitimate choices, including:
 
 - model specification;
 - transformations;
@@ -36,222 +33,256 @@ groups, hypotheses, outcomes, or other important study labels, those choices can
 be influenced by whether they produce favorable or unfavorable findings.
 
 Analyst blinding cannot remove all researcher judgment and is not a substitute
-for preregistration, appropriate study design, transparent reporting, or
-replication.
+for appropriate study design, preregistration when relevant, transparent
+reporting, replication, or other research-integrity practices.
 
-It can, however, help separate some analysis decisions from knowledge of their
-substantive consequences.
+It can help separate some analysis decisions from knowledge of their substantive
+consequences.
 
 ## 3. Product thesis
 
-A useful analyst-blinding system needs more than renamed columns.
+A useful analyst-blinding system needs more than renamed labels.
 
-It should provide a controlled workflow that can answer questions such as:
+It should help research teams answer questions such as:
 
 - What information was blinded?
 - How was it blinded?
-- Who knew the true mapping?
-- Who received the blinded data?
-- When did they receive it?
-- Which analysis artifacts were finalized while the analyst remained blinded?
-- When were those artifacts locked?
-- Who authorized unblinding?
-- When did unblinding occur?
-- What mapping was ultimately revealed?
+- Which artifact represented the blinded data?
+- Which analysis artifact was finalized before unblinding?
+- Which receipt documented that lock?
+- When and by whom was unblinding authorized?
+- What mapping was ultimately released?
 
 The resulting audit history is a core product output.
 
-These records are the project's "receipts": evidence describing the sequence and
-integrity of the blinded-analysis workflow.
+These records are the project's **receipts**: evidence describing the workflow
+artifacts and their relationships.
 
-## 4. Longer-term server-backed workflow
+## 4. Current browser-local protocol
 
-The broader version 1 product direction is expected to include the following
-conceptual stages. The immediate first public release implements a smaller
-browser-local, file-mediated form of the same scientific workflow before
-accounts, persistence, and server-side authorization are introduced.
+The current schema-`0.3` prototype implements the scientific workflow without
+requiring accounts, a database, or server-side research-file storage.
 
-### 4.1 Study setup
+### 4.1 Create blinded package
+
+Input:
+
+- original UTF-8 comma-delimited CSV.
+
+Outputs:
+
+- blinded CSV;
+- public blinding receipt; and
+- unblinding secret.
+
+The selected categorical values are randomly permuted to neutral
+`Group_<letters>` labels using secure browser randomness.
+
+The mapping is encrypted with AES-GCM using a fresh 256-bit key and 96-bit IV.
+The public receipt contains the sealed mapping. The separate unblinding secret
+contains the decryption key.
+
+### 4.2 Blinded analysis
+
+The analyst conducts the substantive analysis outside blindstats using blinded
+materials.
+
+The file-mediated role model is:
+
+- study owner retains the unblinding secret;
+- analyst receives the blinded data and public receipt.
+
+The software currently supports but does not enforce that separation.
+
+### 4.3 Analysis lock
+
+Inputs:
+
+- exact public blinding receipt; and
+- one analysis artifact.
+
+Output:
+
+- analysis-lock receipt.
+
+The lock identifies the exact public-receipt bytes and exact analysis-artifact
+bytes by SHA-256.
+
+The blinded-artifact identity is carried forward from the public receipt rather
+than requiring the blinded CSV to be supplied again.
+
+### 4.4 Documented unblinding
+
+Inputs:
+
+- exact public blinding receipt;
+- unblinding secret; and
+- analysis-lock receipt.
+
+Output:
+
+- unblinding receipt containing the released mapping.
+
+blindstats verifies the receipt/lock relationship and uses authenticated AES-GCM
+decryption to open the sealed mapping.
+
+The final receipt records the mapping and the linked artifact identities.
+
+### 4.5 What v0 does not establish
+
+The browser-local protocol provides verifiable artifact relationships, not a
+certification of researcher behavior.
+
+It does not prove:
+
+- that protected information was never accessed outside the workflow;
+- that the unblinding secret was withheld until locking;
+- that the locked artifact was the only analysis performed;
+- that a particular dataset was actually used by external analysis software; or
+- that browser-generated timestamps establish trusted chronology.
+
+Those limitations are important inputs to the later platform architecture.
+
+## 5. Longer-term server-backed workflow
+
+The future platform should strengthen the same scientific protocol rather than
+replace it.
+
+### 5.1 Studies and roles
 
 An authorized user creates a study and establishes its research team.
 
-Team members receive roles or permissions controlling which study information
-they may access.
+Exact roles remain to be designed, but responsibilities will likely include:
 
-Exact roles have not yet been finalized, but likely responsibilities include:
-
-- study ownership or administration;
-- access to unblinded study information; and
+- study ownership/administration;
+- authorization to access unblinded information; and
 - blinded analysis.
 
-### 4.2 Source-data upload
+Permissions must ultimately be enforced server-side. Hiding information in the
+browser is not authorization.
 
-An authorized user provides the original study dataset.
+### 5.2 Source data and artifacts
 
-The source dataset remains distinct from any blinded derivative.
+The system may eventually accept or connect to original research data and other
+study artifacts.
 
-The system should retain sufficient metadata to identify the source artifact and
-its relationship to later versions without exposing restricted information to
-users who are not authorized to see it.
+Before blindstats stores research files, requirements must be defined for:
 
-### 4.3 Blinding plan
+- data classification;
+- encryption at rest and in transit;
+- key management;
+- access logging;
+- retention and deletion;
+- backups and disaster recovery;
+- geographic/data-residency constraints where relevant;
+- institutional and contractual requirements; and
+- incident response.
 
-Authorized users identify which variables or labels should be blinded and define
-the permitted transformation.
+The project should not assume that all research data belong in blindstats merely
+because storage becomes technically possible.
 
-The initial transformation system should remain deliberately narrow.
+### 5.3 Blinding
 
-Likely early operations include:
+Authorized users define a blinding plan.
 
-- replacing meaningful categorical labels with neutral labels; and
-- reproducibly permuting categorical mappings where methodologically
-  appropriate.
+The system generates a blinded derivative while protecting the true mapping from
+blinded analysts.
 
-The transformation should be reproducible and its mapping should be protected
-from blinded analysts.
+The current encrypted mapping + separate secret provides a useful protocol model.
+A server-backed version should replace manual secret-file separation with
+controlled key access or controlled decryption.
 
-### 4.4 Blinded artifact
+### 5.4 Analysis lock
 
-blindstats generates a blinded derivative of the source dataset.
+Before unblinding, designated analysis artifacts are finalized.
 
-The analyst receives only the information permitted by the study's blinding
-plan and the analyst's role.
-
-Permissions must ultimately be enforced server-side. Merely hiding information
-in the browser is not sufficient authorization.
-
-### 4.5 Blinded analysis
-
-The analyst conducts the analysis while remaining blinded to the protected
-mapping.
-
-The current browser-local first-release workflow accepts an analysis artifact
-only when the analyst is ready to lock an exact pre-unblinding version. It hashes
-the exact file bytes locally rather than executing, interpreting, or storing the
-artifact on a blindstats server.
-
-Potential artifacts include:
-
-- R scripts;
-- Python scripts;
-- Quarto or R Markdown files;
-- notebooks;
-- analysis documentation;
-- blinded results reports; and
-- archives containing multiple related files.
-
-Later server-backed versions may store submitted analysis artifacts under
-controlled access.
-
-### 4.6 Analysis lock
-
-Before unblinding, designated blinded analysis artifacts are finalized.
-
-The current browser-local implementation defines a file-mediated analysis lock.
-It:
-
-- verifies that the exact blinded artifact matches the SHA-256 recorded in its
-  public blinding receipt;
-- hashes the exact bytes of one nonempty analysis artifact;
-- creates a fresh lock identifier; and
-- generates an analysis-lock receipt linking the public blinding receipt, blinded
-  artifact, and analysis artifact.
-
-In this first-release workflow, "lock" means that the declared pre-unblinding
-artifact is identified exactly and linked cryptographically to the blinded
-dataset. It does not make the researcher's local file immutable, and its
-browser-generated timestamp is not an independently trusted timestamp.
-
-Later server-backed versions may strengthen the lock with mechanisms such as:
+A server-backed lock may strengthen v0 through:
 
 - immutable or append-only artifact records;
 - server-trusted timestamps;
-- persistent artifact storage; and
-- explicit study-state transitions.
+- persistent artifact storage;
+- explicit study-state transitions; and
+- auditable authorization events.
 
-The core requirement remains that a later revision cannot silently continue to
-appear as though it were the exact analysis artifact documented under blinding.
+A later revision should never silently continue to appear as the exact artifact
+that was locked earlier.
 
-### 4.7 Unblinding authorization
+### 5.5 Unblinding authorization
 
-Unblinding should be an explicit action performed only by users with the
-appropriate authority.
+Unblinding should be an explicit state transition performed only after the
+required authorization.
 
-The workflow should record:
+The platform should be able to record:
 
-- who authorized the action;
-- when authorization occurred; and
-- the study state at the time.
+- who authorized unblinding;
+- when authorization occurred;
+- what study state existed at the time; and
+- which protected mapping or key material was released.
 
-More complex multi-party authorization can be considered later if justified.
+Multi-party authorization can be considered if concrete research use cases
+justify it.
 
-### 4.8 Unblinding
+### 5.6 Unblinding
 
-After authorization, the appropriate mapping and unblinded materials become
-available to authorized team members.
+After authorization, the mapping becomes available to permitted users.
 
-Simple substitutions should be deterministic.
+In a mature platform, the analyst may never need direct access to an encryption
+key file. The platform can perform controlled decryption after authorization and
+record that event.
 
-For example, converting a neutral label such as `Group_A` back to `Treatment`
-should be handled by reproducible application logic rather than generative AI.
+### 5.7 Audit record
 
-### 4.9 Audit record
-
-The study should retain an audit history describing important workflow events.
-
-Potential events include:
+Potential durable audit events include:
 
 - study creation;
-- membership or permission changes;
-- source-file upload;
+- membership/permission changes;
+- source-artifact registration;
 - blinding-plan creation;
 - blinded-artifact generation;
-- file access or release;
+- artifact access/release;
 - analysis submission;
 - analysis locking;
 - unblinding authorization; and
 - final unblinding.
 
-The audit system must be designed carefully so that the audit records themselves
-do not leak restricted or blinded information.
+Audit records must themselves be designed so they do not leak protected
+information.
 
-## 5. Artifact and file model
+## 6. Artifact and data architecture
 
-Research files are a central part of the workflow.
-
-The application should conceptually separate:
+Research artifacts have two conceptually distinct layers:
 
 1. **Artifact metadata**
    - identity;
-   - ownership;
    - study relationship;
+   - ownership;
    - type;
    - timestamps;
-   - access rules;
    - hashes;
+   - permissions; and
    - workflow state.
 
 2. **Artifact contents**
    - datasets;
    - scripts;
    - reports;
+   - notebooks;
    - archives; and
    - other research files.
 
-The likely architecture is to store metadata and relationships in a relational
-database while storing file contents in private object storage.
+A relational database remains the preferred direction for study, membership,
+permission, artifact, state, and audit metadata.
 
-Sensitive files should not become publicly accessible application assets.
+Private object storage is a likely fit for file contents if and when blindstats
+takes custody of research files.
 
-Controlled project-file sharing may later become useful beyond the blinding
-workflow, but it should emerge from the same permissions, artifact, and audit
-architecture rather than becoming a separate version 1 product.
+Storage and database choices should follow requirements rather than precede them.
 
-## 6. Conceptual domain model
+## 7. Conceptual domain model
 
 The exact schema has not been designed.
 
-Current conceptual entities include:
+Current working concepts include:
 
 - User
 - Team
@@ -260,12 +291,11 @@ Current conceptual entities include:
 - StudyMembership or StudyRole
 - FileArtifact
 - BlindingPlan
-- BlindingMapping
+- BlindingMapping or SealedMapping
 - AnalysisSubmission
+- AnalysisLock
 - AuditEvent
 - UnblindingEvent
-
-These names are working concepts, not commitments to database table names.
 
 Possible study states include:
 
@@ -276,10 +306,10 @@ Possible study states include:
 - unblinded; and
 - archived.
 
-The eventual state machine should be designed explicitly rather than inferred
-from scattered boolean fields.
+The eventual state machine should be explicit rather than inferred from scattered
+flags.
 
-## 7. Technical direction
+## 8. Technical direction
 
 ### Application
 
@@ -290,169 +320,149 @@ Current foundation:
 - React
 - Tailwind CSS
 - Next.js App Router
-- Papa Parse for CSV parsing and serialization
-- Vitest for automated unit and integration testing
-- Testing Library with jsdom for minimal React UI workflow testing
+- Papa Parse
+- Web Crypto
+- Vitest
+- Testing Library with jsdom
 
-The current browser-local prototype implements two connected first-release
-stages:
-
-1. **Create blinded package:** strict CSV parsing, secure categorical label
-   randomization, blinded artifact generation, SHA-256 hashing, public
-   receipt/private key separation, and local artifact downloads.
-2. **Lock blinded analysis:** accept the public blinding receipt, exact blinded
-   CSV, and one analysis artifact; verify the blinded-artifact hash; hash the
-   exact analysis bytes; and generate a linked analysis-lock receipt.
-
-A minimal workflow selector allows these stages to be opened independently so
-saved artifacts can move between researchers, computers, and browser sessions.
-
-Automated testing is layered. Core transformation and integrity behavior is
-covered extensively with Node-based Vitest tests, while the React interface has
-a deliberately small component-test layer focused on stable workflow invariants
-rather than visual snapshots.
-
-This prototype intentionally does not create the future multi-user security
-boundary. The person creating the blinded package can access both the source
-data and private key, and research files are not persisted by the application.
+The current prototype implements all three browser-local workflow stages and
+keeps integrity-critical operations in testable TypeScript functions outside the
+React presentation layer.
 
 ### Relational data
 
-PostgreSQL is currently preferred for application metadata because the core
-domain consists primarily of relationships among users, teams, studies,
-memberships, permissions, artifacts, and workflow events.
+PostgreSQL is currently preferred because the domain is strongly relational:
+users, teams, studies, memberships, permissions, artifacts, workflow states, and
+audit events.
 
-Neon is a likely PostgreSQL provider.
-
-No ORM has been selected yet.
-
-Prisma and Drizzle are candidates and should be compared against actual project
-requirements before one is adopted.
+No PostgreSQL provider or ORM should be treated as final until persistence
+requirements are ready for implementation.
 
 ### File storage
 
-A storage provider has not yet been selected.
+A storage provider has not been selected.
 
-Requirements should be defined before choosing one.
-
-Likely requirements include:
+Requirements should be defined first. Likely requirements include:
 
 - private objects by default;
 - server-controlled authorization;
+- encryption and key management;
 - temporary or signed access where appropriate;
-- deletion and retention controls;
-- artifact integrity verification; and
-- compatibility with the application's audit model.
+- retention and deletion controls;
+- artifact integrity verification;
+- audit compatibility; and
+- operational reliability appropriate to the intended data classes.
 
 ### Authentication and authorization
 
-An authentication provider has not yet been selected.
-
 Authentication answers who the user is.
 
-Authorization determines what that authenticated user may do within a
-particular team or study.
+Authorization determines what that authenticated user may do within a particular
+study.
 
-The authorization model is therefore a core application responsibility even if
+Authorization therefore remains a core blindstats responsibility even if identity
 authentication is delegated to an external provider.
 
 ### AI
 
 AI is not required for the core blinding workflow.
 
-Future AI-assisted features might help rewrite blinded prose after unblinding or
-assist with other research workflows.
+Integrity-critical operations such as mapping, hashing, encryption/decryption,
+permissions, locking, and unblinding authorization must not depend on a
+generative model.
 
-Such functionality should remain optional and reviewable.
+Future AI-assisted features should remain optional and reviewable.
 
-Integrity-critical operations such as storing mappings, applying deterministic
-mappings, enforcing permissions, locking artifacts, and authorizing unblinding
-must not depend on a generative model.
+## 9. Security, privacy, and open-source principles
 
-## 8. Security and integrity principles
+The project may eventually handle sensitive research files, so security and
+privacy cannot be treated as implementation details added after the platform is
+built.
 
-The intended use case may eventually involve sensitive research files.
-
-Development should therefore favor:
+Development should favor:
 
 - least-privilege access;
-- server-side authorization;
-- explicit permission checks;
-- private file storage;
+- explicit authorization checks;
+- private storage;
+- cryptographically appropriate secret management;
 - clear study-state transitions;
-- reproducible blinding operations;
+- reproducible transformations;
 - durable audit events;
-- artifact hashes where appropriate;
-- explicit unblinding authorization;
-- careful secret management; and
-- logs that do not expose protected values.
+- artifact integrity checks;
+- careful logs that avoid protected values;
+- explicit retention/deletion behavior; and
+- conservative claims about what the software guarantees.
 
-These are architectural goals.
+Open-source development is part of the trust strategy. Public code can invite
+scrutiny from researchers, statisticians, security engineers, privacy
+practitioners, and software developers with different expertise.
 
-The current application does **not** yet implement the controls required to
-claim that it is suitable for sensitive, regulated, confidential, or client
-research data.
+Open source is not a security control by itself. Suitability for sensitive or
+regulated research depends on the architecture, deployment, governance, and
+operational practices surrounding the code.
 
-## 9. Deliberately out of scope for version 1
+The current application does **not** implement the controls required to claim
+suitability for sensitive, regulated, confidential, or client research data.
+
+## 10. Deliberately out of scope for the first public release
 
 The following should not be added merely because they fit the long-term vision:
 
 - full electronic data capture;
 - a general-purpose survey platform;
 - arbitrary R or Python execution;
-- a hosted publication or DOI repository;
+- a hosted publication/DOI repository;
 - comprehensive project management;
 - a general cloud-storage product;
 - advanced AI-generated analysis;
-- every possible blinding transformation;
-- MongoDB without a demonstrated document-oriented requirement; and
-- integrations whose requirements have not yet emerged from the core workflow.
+- every possible blinding transformation; and
+- integrations whose requirements have not emerged from the core workflow.
 
-## 10. Open architecture questions
+The first release should remain focused on making the blind-lock-unblind protocol
+clear and useful.
 
-The following remain intentionally unresolved:
+## 11. Open architecture questions
 
-- exact user and study roles;
+Important unresolved questions include:
+
+- exact user/study roles;
 - authorization rules;
-- blinding-transformation specifications beyond the implemented v0 categorical mapping;
 - state-machine implementation;
-- PostgreSQL ORM;
+- PostgreSQL provider and ORM;
 - authentication provider;
 - object-storage provider;
-- encryption and key-management approach;
+- server-side encryption and key-management architecture;
+- research-data classifications the hosted product should accept;
 - artifact-retention policy;
 - audit-event schema;
 - unblinding authorization requirements;
 - deployment architecture;
 - CI/CD;
-- preregistration or repository integrations; and
+- preregistration/repository integrations; and
 - future AI features.
 
-These decisions should be made from concrete requirements rather than selected
-in advance.
+These decisions should be made from concrete requirements.
 
-## 11. Release path and success
+## 12. Release path and success
 
-The immediate first public release should allow researchers to complete one
-clear browser-local, file-mediated workflow:
+The first public release should demonstrate one clear scientific workflow:
 
-1. create a reproducibly blinded dataset;
-2. retain the private blinding key separately from the blinded analyst;
-3. give the analyst the blinded dataset and public blinding receipt;
-4. conduct the analysis while blinded;
-5. lock an exact pre-unblinding analysis artifact and produce a linked
-   analysis-lock receipt;
-6. complete documented unblinding using the corresponding private key and lock
-   artifacts; and
-7. retain the generated receipts as an audit trail for the workflow.
+1. create a blinded dataset;
+2. keep the unblinding secret separate from the blinded analyst;
+3. conduct the analysis while blinded;
+4. lock an exact pre-unblinding analysis artifact;
+5. release the secret after the lock;
+6. authenticate and decrypt the sealed mapping; and
+7. retain the linked receipts as an audit trail.
 
-This release does not need accounts, a relational database, or server-side file
-storage to demonstrate the scientific workflow.
+The browser-local prototype now demonstrates that workflow without accounts,
+persistent study records, or server-side research-file storage.
 
-A later server-backed version should strengthen the same workflow with study
-records, authentication, roles and permissions, controlled artifact access,
-persistent state transitions, and durable audit history.
+The next major architectural progression is:
 
-If blindstats can perform the file-mediated workflow clearly and reliably, those
-stronger controls and broader research-platform functionality can be added from
-a tested foundation.
+> **documented voluntary workflow → increasingly stronger technical safeguards and
+> role separation**
+
+Success means preserving the clarity of the current protocol while adding only
+the infrastructure needed to enforce roles, manage protected artifacts, and
+produce a more durable audit history.

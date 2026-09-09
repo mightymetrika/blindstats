@@ -1,137 +1,118 @@
 # Analysis Lock v0
 
-**Status:** Core contract for first-release workflow  
-**Project:** blindstats  
-**Date:** 2026-09-07
+**Status:** Implemented browser-local prototype
+**Project:** blindstats
+**Artifact schema:** `0.3`
+**Updated:** 2026-09-08
 
 ## 1. Purpose
 
-The analysis-lock step extends the browser-local blinding prototype into a
-file-mediated blinded-analysis workflow.
+The analysis-lock stage identifies the exact analysis artifact that the researcher
+declares finalized before unblinding.
 
-The first-release workflow is:
+The complete browser-local workflow is:
 
 > **Blind → analyze while blinded → lock an exact analysis artifact → unblind → document**
 
-The lock step does not inspect, execute, or interpret the analysis file. It
-identifies the exact bytes that the researcher declares to be the
-pre-unblinding analysis artifact and links those bytes to the exact blinded
-dataset and public blinding receipt used in the workflow.
-
-This allows a draft manuscript, report, script, notebook, archive, or other
-research artifact to be documented without requiring blindstats to understand
-the file format.
+The lock does not execute, interpret, or judge the analysis. It records exact
+artifact identity and links that artifact to the exact public blinding receipt
+under which it was locked.
 
 ## 2. Human workflow
 
-A minimal file-mediated workflow is:
+The intended file-mediated workflow is:
 
-1. The study owner creates the blinded package.
-2. The owner retains the private blinding key.
-3. The owner gives the analyst:
+1. A study owner creates the blinded package.
+2. The owner retains the unblinding secret.
+3. The analyst receives:
    - the blinded CSV; and
    - the public blinding receipt.
-4. The analyst works outside blindstats while blinded.
-5. When the analyst is ready to finalize the pre-unblinding version, the
-   analyst provides blindstats with:
-   - the exact public blinding receipt;
-   - the exact blinded CSV; and
-   - one analysis artifact to lock.
-6. blindstats verifies that the blinded CSV matches the public receipt.
-7. blindstats hashes the exact bytes of all files needed to establish the lock
-   relationship.
-8. blindstats creates an analysis-lock receipt.
-9. A later unblinding step will require a valid lock receipt before producing
-   the unblinding release and unblinding receipt.
+4. The analyst conducts the analysis while blinded.
+5. When ready to lock the pre-unblinding version, the analyst supplies blindstats
+   with:
+   - the exact public blinding receipt; and
+   - one analysis artifact.
+6. blindstats creates an analysis-lock receipt.
+7. The owner may then release the unblinding secret.
+8. The analyst can use the public receipt, released secret, and analysis-lock
+   receipt to complete documented unblinding.
 
 No account, database, or server-side file storage is required for this v0
 workflow.
 
-## 3. What "lock" means in v0
+## 3. Why the blinded dataset is not an input
 
-In v0, locking means:
+The analyst may legitimately sort, filter, merge, derive variables, convert file
+formats, or otherwise create analytic datasets while remaining blinded.
 
-- an exact analysis-file byte sequence is identified by SHA-256;
-- that hash is linked to a verified blinded artifact;
-- the blinded artifact is linked to the public blinding receipt that created
-  it; and
-- the lock receives its own identifier.
+Requiring a byte-identical blinded CSV at lock time would therefore be brittle and
+would not establish that those exact bytes were the data actually analyzed.
 
-If the analysis file changes by even one byte, it no longer matches the
-analysis artifact recorded in the lock receipt.
+Instead:
 
-The lock does not make a local file immutable. The researcher may create a
-later revision, but that revision is a different artifact and will have a
-different hash.
+- the public receipt already identifies the blinded CSV generated during the
+  blinding stage by SHA-256; and
+- the analysis-lock receipt carries that blinded-artifact identity forward from
+  the validated public receipt.
 
-## 4. Analysis artifact scope
+The lock's strongest direct claims are about the exact public receipt and exact
+analysis artifact supplied to blindstats.
 
-v0 locks exactly one analysis artifact per lock receipt.
+## 4. What "lock" means in v0
 
-The artifact may be any nonempty file. blindstats does not infer file type from
-the extension and does not execute or parse the file contents.
+In the current browser-local workflow, locking means:
 
-Examples include:
+- the exact public blinding-receipt bytes are identified by SHA-256;
+- one exact analysis artifact is identified by SHA-256 and byte length;
+- the public receipt's transformation ID and blinded-artifact SHA-256 are carried
+  into the lock receipt; and
+- the lock receives its own UUID.
 
-- DOCX manuscript draft;
-- PDF report;
-- R script;
-- Python script;
-- Quarto or R Markdown source;
-- notebook; or
-- ZIP archive containing multiple related analysis files.
+If the analysis artifact changes by even one byte, it no longer has the SHA-256
+recorded in that lock receipt.
 
-Researchers who need to lock several files together can place them in an
-archive and lock the archive as one exact artifact. Multi-artifact manifests
-can be considered later if needed.
+The lock does **not**:
+
+- make the researcher's local file immutable;
+- prevent later revisions;
+- prove that the locked artifact was the only analysis performed;
+- prove that a particular dataset was actually used outside blindstats; or
+- provide a trusted timestamp.
+
+A later revision is simply a different artifact with a different hash.
 
 ## 5. Required inputs
 
-The lock operation requires:
-
 ### 5.1 Public blinding receipt
 
-The exact receipt bytes generated during the blinding step.
+The exact schema-`0.3` receipt bytes generated during blinding.
 
-The receipt must:
+The parser validates the expected receipt structure, transformation metadata,
+artifact hashes, sealed-mapping parameters, and algorithm metadata.
 
-- be valid UTF-8 JSON;
-- use the supported `0.1` schema;
-- have the expected categorical-label-permutation structure;
-- contain valid SHA-256 digests;
-- contain a canonical ISO-8601 creation timestamp;
-- contain at least two categories; and
-- contain no unexpected top-level fields.
+### 5.2 Analysis artifact
 
-Strict structure validation helps fail closed if the wrong file is supplied or
-if a private mapping is accidentally included in a purported public receipt.
+One nonempty file representing the analysis version being declared locked.
 
-### 5.2 Blinded artifact
+Examples include:
 
-The exact blinded CSV supplied to the analyst.
-
-blindstats computes its SHA-256 hash and requires that it match
-`blindedArtifact.sha256` in the public blinding receipt.
-
-The lock operation fails if the hashes do not match.
-
-### 5.3 Analysis artifact
-
-One nonempty file representing the version of the analysis that is being
-declared locked.
+- manuscript or report;
+- R or Python script;
+- Quarto or R Markdown source;
+- notebook; or
+- ZIP archive containing a set of related analysis files.
 
 The filename must not be blank.
 
-The analysis file itself is not copied into the lock receipt. Only identifying
-metadata and its SHA-256 digest are recorded.
+blindstats hashes the file bytes; it does not execute or interpret the contents.
 
 ## 6. Analysis-lock receipt
 
-The v0 receipt has this conceptual shape:
+Conceptually:
 
 ```json
 {
-  "schemaVersion": "0.1",
+  "schemaVersion": "0.3",
   "receiptType": "analysis_lock",
   "lockId": "uuid",
   "createdAt": "ISO-8601 timestamp",
@@ -148,105 +129,93 @@ The v0 receipt has this conceptual shape:
 }
 ```
 
-### 6.1 `lockId`
+### 6.1 `blindingReceiptSha256`
 
-A fresh Web-Crypto UUID for the lock operation.
+SHA-256 of the exact public-receipt bytes supplied to the lock operation.
 
-### 6.2 `blindingReceiptSha256`
+This means reformatting otherwise equivalent JSON creates a different receipt
+artifact and therefore a different exact-byte identity.
 
-SHA-256 of the exact public blinding-receipt bytes supplied to the lock step.
+### 6.2 `blindedArtifactSha256`
 
-This links the lock to a particular public receipt artifact, not merely to a
-reconstructed set of receipt fields.
+The blinded-artifact hash already recorded in the validated public blinding
+receipt.
 
-### 6.3 `blindedArtifactSha256`
+The lock operation does not recompute this value from a newly supplied dataset.
 
-SHA-256 of the exact blinded-dataset bytes supplied to the lock step.
+### 6.3 Analysis-artifact identity
 
-This value must match the blinded-artifact hash already recorded in the public
-blinding receipt.
+The lock records:
 
-### 6.4 `analysisArtifact.sha256`
+- filename;
+- SHA-256; and
+- byte length.
 
-SHA-256 of the exact bytes of the analysis artifact being locked.
+The SHA-256 is the primary exact-content identity. The byte length is additional
+descriptive/integrity metadata.
 
-### 6.5 `analysisArtifact.byteLength`
+## 7. Validation behavior
 
-The number of bytes in the exact analysis artifact.
+The lock operation fails closed if, for example:
 
-This is descriptive metadata and does not replace the SHA-256 digest.
-
-## 7. Validation rules
-
-The core lock operation must fail if:
-
-- the public blinding receipt is empty;
-- the public blinding receipt is not valid UTF-8 JSON;
-- the public blinding receipt does not match the supported v0 schema;
-- the public receipt has unexpected fields;
-- the blinded artifact is empty;
-- the blinded artifact hash does not match the public receipt;
+- the public receipt is empty, malformed, or unsupported;
+- the public receipt has unexpected structure;
 - the analysis filename is blank;
 - the analysis artifact is empty;
 - SHA-256 hashing is unavailable; or
 - secure UUID generation is unavailable.
 
-The operation must not silently repair or reinterpret supplied artifacts.
+The operation does not silently repair or reinterpret supplied artifacts.
 
 ## 8. Timestamp interpretation
 
-`createdAt` is a browser-generated local workflow timestamp encoded as a
-canonical ISO-8601 value.
+`createdAt` is a browser-generated canonical ISO-8601 timestamp.
 
-In the browser-local v0 workflow it is not an independently trusted timestamp
-and should not be described as cryptographic proof of when the lock occurred.
+It is not independently trusted and should not be described as cryptographic
+proof that the lock occurred at a particular real-world time.
 
-The lock receipt documents the version the researcher declared locked when
-using the workflow. Stronger timestamp attestation can be considered in later
-server-backed versions if it becomes necessary.
-
-The v0 implementation should not reject a lock merely because its local
-timestamp appears earlier than the blinding-receipt timestamp. File-mediated
-workflows may occur on different computers with clock skew, and comparing
-untrusted local clocks would create brittleness without providing meaningful
-assurance.
+The v0 implementation does not reject otherwise valid workflows merely because
+local timestamps appear out of chronological order. Different computers may have
+clock skew, and comparing untrusted local clocks would add brittleness without
+meaningful assurance.
 
 ## 9. Research-integrity interpretation
 
-blindstats does not certify researcher honesty or prove that nobody viewed or
-retained information outside the workflow.
+The analysis-lock receipt provides a concrete artifact-level record:
 
-Instead, the analysis-lock receipt makes the intended workflow easier to
-conduct and provides concrete, verifiable links among the artifacts that were
-processed through blindstats.
+> this exact analysis artifact was declared locked under this exact public
+> blinding receipt.
 
-Later releases may add authentication, permissions, persistent study states,
-server-side audit events, or stronger role separation. Those features can
-increase assurance, but they do not eliminate the human component of research
-integrity.
+That record supports an auditable workflow. It does not certify researcher
+honesty or prove that information was never viewed outside the workflow.
+
+Later server-backed versions can increase assurance through:
+
+- authenticated users;
+- server-enforced roles and permissions;
+- persistent study states;
+- controlled secret release;
+- durable server-side audit events;
+- trusted server timestamps; and
+- controlled or immutable artifact storage.
+
+Those controls strengthen the workflow without eliminating the human component of
+research integrity.
 
 ## 10. Security and privacy
 
-The v0 lock operation remains browser-local.
+The current lock operation is browser-local.
 
-The analysis artifact, blinded dataset, and public receipt should not be
-transmitted to a blindstats server by this workflow.
+The analysis artifact and public receipt are processed locally by this workflow.
+The generated lock receipt contains hashes and basic identifying metadata, not the
+analysis-file contents.
 
-The analysis-lock receipt contains hashes and basic identifying metadata, not
-the contents of the analysis file.
+The current prototype is not a secure research-file storage or transfer service
+and should not be treated as appropriate infrastructure for sensitive or
+regulated data.
 
-## 11. Next implementation step
+## 11. Current completion state
 
-After the core analysis-lock contract is implemented and tested, the next
-slice should add a small browser UI that:
-
-1. accepts the public blinding receipt;
-2. accepts the blinded CSV;
-3. accepts one analysis artifact;
-4. verifies the artifact chain;
-5. creates the lock receipt; and
-6. downloads the analysis-lock receipt.
-
-The following slice should then implement documented unblinding that verifies
-the private key and analysis-lock receipt before releasing the mapping or
-unblinded artifact.
+As of 2026-09-08, Analysis Lock v0 is implemented in both the core TypeScript
+workflow and the browser UI and has passed automated tests, lint, production
+TypeScript/build validation, and manual browser acceptance.
