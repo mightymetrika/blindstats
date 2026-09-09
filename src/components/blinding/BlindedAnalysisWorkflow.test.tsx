@@ -16,12 +16,16 @@ vi.mock("./AnalysisLockWorkspace", () => ({
   AnalysisLockWorkspace: () => <div>Analysis lock workspace</div>,
 }));
 
+vi.mock("./UnblindingWorkspace", () => ({
+  UnblindingWorkspace: () => <div>Unblinding workspace</div>,
+}));
+
 afterEach(() => {
   cleanup();
 });
 
 describe("BlindedAnalysisWorkflow", () => {
-  it("switches between the two file-mediated workflow stages", async () => {
+  it("switches among the three file-mediated workflow stages", async () => {
     const user = userEvent.setup();
 
     render(<BlindedAnalysisWorkflow />);
@@ -31,6 +35,9 @@ describe("BlindedAnalysisWorkflow", () => {
     ).toBeInTheDocument();
     expect(
       screen.queryByText("Analysis lock workspace"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Unblinding workspace"),
     ).not.toBeInTheDocument();
 
     await user.click(
@@ -42,6 +49,22 @@ describe("BlindedAnalysisWorkflow", () => {
     expect(
       screen.getByText("Analysis lock workspace"),
     ).toBeInTheDocument();
+    expect(
+      screen.queryByText("Create blinded package workspace"),
+    ).not.toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole("button", {
+        name: "Unblind",
+      }),
+    );
+
+    expect(
+      screen.getByText("Unblinding workspace"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("Analysis lock workspace"),
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByText("Create blinded package workspace"),
     ).not.toBeInTheDocument();

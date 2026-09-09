@@ -73,7 +73,7 @@ function createMockPackage(
     "2,Group_B",
   ].join("\n");
   const receiptText = '{"kind":"receipt"}\n';
-  const keyText = '{"kind":"key"}\n';
+  const secretText = '{"kind":"secret"}\n';
 
   return {
     source: {
@@ -90,7 +90,7 @@ function createMockPackage(
       sha256: BLINDED_HASH,
     },
     receipt: {
-      schemaVersion: "0.1",
+      schemaVersion: "0.3",
       transformationId: TRANSFORMATION_ID,
       createdAt: "2026-09-03T23:00:00.000Z",
       transformationType: "categorical_label_permutation",
@@ -104,37 +104,36 @@ function createMockPackage(
       blindedArtifact: {
         sha256: BLINDED_HASH,
       },
+      sealedMapping: {
+        algorithm: "AES-GCM",
+        keyLength: 256,
+        tagLength: 128,
+        encoding: "hex",
+        aadScheme: "blindstats_blinding_mapping_aad_v1",
+        ivHex: "01".repeat(12),
+        ciphertextHex: "02".repeat(48),
+      },
       algorithm: {
         neutralLabelScheme: "Group_<letters>",
         mappingAssignment: "web_crypto_random_permutation",
       },
     },
-    key: {
-      schemaVersion: "0.1",
+    secret: {
+      schemaVersion: "0.3",
+      secretType: "unblinding_secret",
       transformationId: TRANSFORMATION_ID,
-      createdAt: "2026-09-03T23:00:00.000Z",
-      transformationType: "categorical_label_permutation",
-      selectedColumn,
-      sourceArtifactSha256: SOURCE_HASH,
-      blindedArtifactSha256: BLINDED_HASH,
-      mapping: [
-        {
-          original: "Treatment",
-          blinded: "Group_A",
-        },
-        {
-          original: "Control",
-          blinded: "Group_B",
-        },
-      ],
+      keyAlgorithm: "AES-GCM",
+      keyLength: 256,
+      encoding: "hex",
+      keyHex: "03".repeat(32),
     },
     receiptArtifact: {
       text: receiptText,
       bytes: encode(receiptText),
     },
-    keyArtifact: {
-      text: keyText,
-      bytes: encode(keyText),
+    secretArtifact: {
+      text: secretText,
+      bytes: encode(secretText),
     },
   };
 }
@@ -175,7 +174,7 @@ function downloadButtons(): HTMLElement[] {
       name: "Download receipt",
     }),
     screen.getByRole("button", {
-      name: "Download private key",
+      name: "Download unblinding secret",
     }),
   ];
 }

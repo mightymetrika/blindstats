@@ -2,61 +2,58 @@ import { describe, expect, it } from "vitest";
 
 import {
   BLINDING_SCHEMA_VERSION,
-  type BlindingKey,
   type BlindingReceipt,
+  type UnblindingSecret,
 } from "./types";
 
 describe("blinding core types", () => {
-  it("supports linked public receipt and private key metadata", () => {
-    const transformationId = "test-transformation-id";
-    const createdAt = "2026-09-01T23:00:00.000Z";
-    const sourceHash = "source-sha256";
-    const blindedHash = "blinded-sha256";
+  it("uses schema 0.3 for encrypted mapping release", () => {
+    expect(BLINDING_SCHEMA_VERSION).toBe("0.3");
 
     const receipt: BlindingReceipt = {
-      schemaVersion: BLINDING_SCHEMA_VERSION,
-      transformationId,
-      createdAt,
-      transformationType: "categorical_label_permutation",
+      schemaVersion: "0.3",
+      transformationId: "t1",
+      createdAt: "2026-09-08T23:00:00.000Z",
+      transformationType:
+        "categorical_label_permutation",
       selectedColumn: "treatment",
       categoryCount: 2,
       rowCount: 4,
       columnCount: 2,
       sourceArtifact: {
-        sha256: sourceHash,
+        sha256: "a".repeat(64),
       },
       blindedArtifact: {
-        sha256: blindedHash,
+        sha256: "b".repeat(64),
+      },
+      sealedMapping: {
+        algorithm: "AES-GCM",
+        keyLength: 256,
+        tagLength: 128,
+        encoding: "hex",
+        aadScheme:
+          "blindstats_blinding_mapping_aad_v1",
+        ivHex: "01".repeat(12),
+        ciphertextHex: "02".repeat(48),
       },
       algorithm: {
         neutralLabelScheme: "Group_<letters>",
-        mappingAssignment: "web_crypto_random_permutation",
+        mappingAssignment:
+          "web_crypto_random_permutation",
       },
     };
 
-    const key: BlindingKey = {
-      schemaVersion: BLINDING_SCHEMA_VERSION,
-      transformationId,
-      createdAt,
-      transformationType: "categorical_label_permutation",
-      selectedColumn: "treatment",
-      sourceArtifactSha256: sourceHash,
-      blindedArtifactSha256: blindedHash,
-      mapping: [
-        {
-          original: "Treatment",
-          blinded: "Group_B",
-        },
-        {
-          original: "Control",
-          blinded: "Group_A",
-        },
-      ],
+    const secret: UnblindingSecret = {
+      schemaVersion: "0.3",
+      secretType: "unblinding_secret",
+      transformationId: "t1",
+      keyAlgorithm: "AES-GCM",
+      keyLength: 256,
+      encoding: "hex",
+      keyHex: "03".repeat(32),
     };
 
-    expect(key.transformationId).toBe(receipt.transformationId);
-    expect(key.sourceArtifactSha256).toBe(receipt.sourceArtifact.sha256);
-    expect(key.blindedArtifactSha256).toBe(receipt.blindedArtifact.sha256);
     expect(receipt).not.toHaveProperty("mapping");
+    expect(secret).not.toHaveProperty("mapping");
   });
 });

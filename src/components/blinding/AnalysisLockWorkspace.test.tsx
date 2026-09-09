@@ -25,7 +25,6 @@ vi.mock("@/lib/blinding/analysis-lock", () => ({
 }));
 
 const RECEIPT_TEXT = '{"kind":"public-receipt"}\n';
-const BLINDED_TEXT = "id,group\n1,Group_A\n2,Group_B\n";
 const ANALYSIS_TEXT = "Methods and results drafted under blinding.\n";
 
 const LOCK_ID = "7d5a4f1f-59d7-4c62-9821-3e2ae6a1bf33";
@@ -68,10 +67,10 @@ function createMockPackage(
 
   return {
     receipt: {
-      schemaVersion: "0.1",
+      schemaVersion: "0.3",
       receiptType: "analysis_lock",
       lockId: LOCK_ID,
-      createdAt: "2026-09-07T23:30:00.000Z",
+      createdAt: "2026-09-08T23:30:00.000Z",
       blinding: {
         transformationId: TRANSFORMATION_ID,
         blindingReceiptSha256: "a".repeat(64),
@@ -103,10 +102,6 @@ async function uploadRequiredFiles(
     ),
   );
   await user.upload(
-    screen.getByLabelText("Blinded CSV"),
-    createFile("study_blinded.csv", BLINDED_TEXT, "text/csv"),
-  );
-  await user.upload(
     screen.getByLabelText("Analysis artifact"),
     createFile(analysisFilename, ANALYSIS_TEXT),
   );
@@ -136,11 +131,10 @@ afterEach(() => {
 });
 
 describe("AnalysisLockWorkspace workflow", () => {
-  it("keeps lock creation unavailable until all three required artifacts are supplied", async () => {
+  it("keeps lock creation unavailable until the public receipt and analysis artifact are supplied", async () => {
     const user = userEvent.setup();
 
     render(<AnalysisLockWorkspace />);
-
     expect(createButton()).toBeDisabled();
 
     await user.upload(
@@ -154,12 +148,6 @@ describe("AnalysisLockWorkspace workflow", () => {
     expect(createButton()).toBeDisabled();
 
     await user.upload(
-      screen.getByLabelText("Blinded CSV"),
-      createFile("study_blinded.csv", BLINDED_TEXT, "text/csv"),
-    );
-    expect(createButton()).toBeDisabled();
-
-    await user.upload(
       screen.getByLabelText("Analysis artifact"),
       createFile("analysis.docx", ANALYSIS_TEXT),
     );
@@ -167,11 +155,10 @@ describe("AnalysisLockWorkspace workflow", () => {
     expect(createButton()).toBeEnabled();
   });
 
-  it("passes exact uploaded bytes and the analysis filename to the core lock boundary", async () => {
+  it("passes exact receipt and analysis bytes plus the filename to the core lock boundary", async () => {
     const user = userEvent.setup();
 
     render(<AnalysisLockWorkspace />);
-
     expect(downloadButton()).toBeDisabled();
 
     await uploadRequiredFiles(user);
@@ -181,12 +168,10 @@ describe("AnalysisLockWorkspace workflow", () => {
 
     const [
       receiptBytes,
-      blindedBytes,
       analysisArtifact,
     ] = mockedCreateAnalysisLockPackage.mock.calls[0];
 
     expect(new TextDecoder().decode(receiptBytes)).toBe(RECEIPT_TEXT);
-    expect(new TextDecoder().decode(blindedBytes)).toBe(BLINDED_TEXT);
     expect(analysisArtifact.filename).toBe("analysis.docx");
     expect(new TextDecoder().decode(analysisArtifact.bytes)).toBe(
       ANALYSIS_TEXT,
@@ -196,11 +181,10 @@ describe("AnalysisLockWorkspace workflow", () => {
     expect(downloadButton()).toBeEnabled();
   });
 
-  it("invalidates a generated lock when any required input is replaced", async () => {
+  it("invalidates a generated lock when either required input is replaced", async () => {
     const user = userEvent.setup();
 
     render(<AnalysisLockWorkspace />);
-
     await uploadRequiredFiles(user);
     await user.click(createButton());
     await screen.findByText("Analysis lock created successfully.");
@@ -215,20 +199,6 @@ describe("AnalysisLockWorkspace workflow", () => {
     mockedCreateAnalysisLockPackage.mockResolvedValueOnce(
       createMockPackage("analysis-revised.docx"),
     );
-    await user.click(createButton());
-    await screen.findByText("Analysis lock created successfully.");
-    expect(downloadButton()).toBeEnabled();
-
-    await user.upload(
-      screen.getByLabelText("Blinded CSV"),
-      createFile(
-        "replacement_blinded.csv",
-        `${BLINDED_TEXT}3,Group_A\n`,
-        "text/csv",
-      ),
-    );
-    expect(downloadButton()).toBeDisabled();
-
     await user.click(createButton());
     await screen.findByText("Analysis lock created successfully.");
     expect(downloadButton()).toBeEnabled();

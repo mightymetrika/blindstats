@@ -36,14 +36,9 @@ function serializeReceipt(
 
 export async function createAnalysisLockPackage(
   blindingReceiptBytes: Uint8Array,
-  blindedArtifactBytes: Uint8Array,
   analysisArtifact: AnalysisArtifactInput,
   createdAt: Date = new Date(),
 ): Promise<AnalysisLockPackage> {
-  if (blindedArtifactBytes.length === 0) {
-    throw new Error("Blinded artifact file cannot be empty.");
-  }
-
   if (analysisArtifact.filename.trim().length === 0) {
     throw new Error("Analysis artifact filename cannot be blank.");
   }
@@ -55,24 +50,11 @@ export async function createAnalysisLockPackage(
   const blindingReceipt =
     parseBlindingReceiptBytes(blindingReceiptBytes);
 
-  const [
-    blindingReceiptSha256,
-    blindedArtifactSha256,
-    analysisArtifactSha256,
-  ] = await Promise.all([
-    sha256Hex(blindingReceiptBytes),
-    sha256Hex(blindedArtifactBytes),
-    sha256Hex(analysisArtifact.bytes),
-  ]);
-
-  if (
-    blindedArtifactSha256 !==
-    blindingReceipt.blindedArtifact.sha256
-  ) {
-    throw new Error(
-      "Blinded artifact hash does not match the public blinding receipt.",
-    );
-  }
+  const [blindingReceiptSha256, analysisArtifactSha256] =
+    await Promise.all([
+      sha256Hex(blindingReceiptBytes),
+      sha256Hex(analysisArtifact.bytes),
+    ]);
 
   const identity = createAnalysisLockIdentity(createdAt);
 
@@ -84,7 +66,8 @@ export async function createAnalysisLockPackage(
     blinding: {
       transformationId: blindingReceipt.transformationId,
       blindingReceiptSha256,
-      blindedArtifactSha256,
+      blindedArtifactSha256:
+        blindingReceipt.blindedArtifact.sha256,
     },
     analysisArtifact: {
       filename: analysisArtifact.filename,

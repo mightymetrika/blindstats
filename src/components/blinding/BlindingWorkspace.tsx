@@ -230,14 +230,14 @@ export function BlindingWorkspace() {
     );
   }
 
-  function downloadPrivateKey(): void {
+  function downloadUnblindingSecret(): void {
     if (!generation) {
       return;
     }
 
     downloadBytes(
-      generation.keyArtifact.bytes,
-      "blinding-key.json",
+      generation.secretArtifact.bytes,
+      "unblinding-secret.json",
       "application/json;charset=utf-8",
     );
   }
@@ -261,7 +261,7 @@ export function BlindingWorkspace() {
 
           <p className="mt-4 max-w-3xl text-base leading-7 text-slate-600">
             Select a CSV, choose one categorical variable, and generate a
-            blinded CSV with a public receipt and separate private blinding key.
+            blinded CSV with a public receipt and separate unblinding secret.
           </p>
         </header>
 
@@ -270,7 +270,7 @@ export function BlindingWorkspace() {
             Local-processing prototype
           </h2>
           <p className="mt-2 text-sm leading-6 text-sky-900">
-            Dataset contents and the generated private key are processed in
+            Dataset contents and the generated unblinding secret are processed in
             this browser session. This v0 workspace does not yet provide
             accounts, role-based separation, cloud storage, or controls
             appropriate for sensitive or regulated research data.
@@ -282,7 +282,7 @@ export function BlindingWorkspace() {
             <StageHeading
               number={1}
               title="Select data"
-              description="Choose one UTF-8, comma-delimited CSV file. The file is parsed locally before you continue."
+              description="Choose one UTF-8, comma-delimited CSV file."
             />
 
             <div className="mt-6">
@@ -455,7 +455,7 @@ export function BlindingWorkspace() {
             <StageHeading
               number={3}
               title="Generate blinded package"
-              description="Create a new randomized mapping, blinded dataset, and linked audit artifacts from the original uploaded bytes."
+              description="Create the blinded dataset and linked audit artifacts."
             />
 
             <div className="mt-6">
@@ -531,7 +531,7 @@ export function BlindingWorkspace() {
             <StageHeading
               number={4}
               title="Download artifacts"
-              description="Keep the private blinding key separate from materials supplied to a blinded analyst."
+              description="Keep the unblinding secret separate from materials supplied to a blinded analyst."
             />
 
             <div className="mt-6 grid gap-4 md:grid-cols-3">
@@ -558,8 +558,8 @@ export function BlindingWorkspace() {
                   Public receipt
                 </h3>
                 <p className="mt-2 text-sm leading-6 text-slate-600">
-                  Shareable transformation metadata and hashes without the
-                  private mapping.
+                  Transformation metadata, artifact hashes, and the sealed
+                  mapping.
                 </p>
                 <button
                   type="button"
@@ -573,29 +573,25 @@ export function BlindingWorkspace() {
 
               <div className="rounded-xl border border-amber-300 bg-amber-50 p-4">
                 <h3 className="text-sm font-semibold text-amber-950">
-                  Private blinding key
+                  Unblinding secret
                 </h3>
                 <p className="mt-2 text-sm leading-6 text-amber-900">
-                  Contains the true category mapping. Do not provide this file
-                  to the blinded analyst.
+                  Cryptographic key used to decrypt the sealed mapping. Keep
+                  it separate until unblinding is authorized.
                 </p>
                 <button
                   type="button"
-                  onClick={downloadPrivateKey}
+                  onClick={downloadUnblindingSecret}
                   disabled={!generation}
                   className="mt-4 w-full rounded-lg bg-amber-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-amber-900 disabled:cursor-not-allowed disabled:bg-amber-200"
                 >
-                  Download private key
+                  Download unblinding secret
                 </button>
               </div>
             </div>
           </section>
         </div>
 
-        <footer className="mt-8 text-center text-xs leading-5 text-slate-500">
-          Blinding Workspace v0 is an early single-user prototype. The private
-          mapping is intentionally not displayed in the ordinary workspace.
-        </footer>
       </div>
     </main>
   );

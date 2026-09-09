@@ -1,16 +1,30 @@
 "use client";
 
-import { useState, type ChangeEvent } from "react";
+import {
+  useState,
+  type ChangeEvent,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 
 import {
-  createAnalysisLockPackage,
-  type AnalysisLockPackage,
-} from "@/lib/blinding/analysis-lock";
+  createUnblindingPackage,
+  type UnblindingPackage,
+} from "@/lib/blinding/unblinding";
+
+type InputStage = "receipt" | "secret" | "lock";
 
 type WorkspaceError = {
-  stage: "receipt" | "analysis" | "generation";
+  stage: InputStage | "generation";
   message: string;
 };
+
+type LoadedArtifact = {
+  file: File;
+  bytes: Uint8Array;
+};
+
+type ArtifactSetter = Dispatch<SetStateAction<LoadedArtifact | null>>;
 
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message.trim().length > 0) {
@@ -65,10 +79,10 @@ function StageHeading({
 }
 
 function FileSummary({
-  file,
+  artifact,
   label,
 }: {
-  file: File;
+  artifact: LoadedArtifact;
   label: string;
 }) {
   return (
@@ -77,10 +91,11 @@ function FileSummary({
         {label}
       </p>
       <p className="mt-1 break-all text-sm font-semibold text-slate-900">
-        {file.name}
+        {artifact.file.name}
       </p>
       <p className="mt-1 text-xs text-slate-500">
-        {file.size.toLocaleString()} {file.size === 1 ? "byte" : "bytes"}
+        {artifact.bytes.length.toLocaleString()}{" "}
+        {artifact.bytes.length === 1 ? "byte" : "bytes"}
       </p>
     </div>
   );
@@ -98,37 +113,32 @@ async function readFileBytes(file: File): Promise<Uint8Array> {
   return new Uint8Array(await file.arrayBuffer());
 }
 
-export function AnalysisLockWorkspace() {
-  const [receiptFile, setReceiptFile] = useState<File | null>(null);
-  const [receiptBytes, setReceiptBytes] = useState<Uint8Array | null>(null);
-  const [analysisFile, setAnalysisFile] = useState<File | null>(null);
-  const [analysisBytes, setAnalysisBytes] = useState<Uint8Array | null>(null);
-  const [generation, setGeneration] = useState<AnalysisLockPackage | null>(null);
+export function UnblindingWorkspace() {
+  const [receipt, setReceipt] = useState<LoadedArtifact | null>(null);
+  const [secret, setSecret] = useState<LoadedArtifact | null>(null);
+  const [lockReceipt, setLockReceipt] = useState<LoadedArtifact | null>(null);
+  const [generation, setGeneration] = useState<UnblindingPackage | null>(null);
   const [workspaceError, setWorkspaceError] = useState<WorkspaceError | null>(
     null,
   );
   const [isGenerating, setIsGenerating] = useState(false);
 
   const canGenerate =
-    Boolean(
-      receiptFile &&
-        receiptBytes &&
-        analysisFile &&
-        analysisBytes,
-    ) && !isGenerating;
+    Boolean(receipt && secret && lockReceipt) && !isGenerating;
 
   function invalidateGeneration(): void {
     setGeneration(null);
     setWorkspaceError(null);
   }
 
-  async function handleReceiptChange(
+  async function handleArtifactChange(
     event: ChangeEvent<HTMLInputElement>,
+    stage: InputStage,
+    setter: ArtifactSetter,
   ): Promise<void> {
     const file = event.target.files?.[0] ?? null;
 
-    setReceiptFile(null);
-    setReceiptBytes(null);
+    setter(null);
     invalidateGeneration();
 
     if (!file) {
@@ -137,47 +147,20 @@ export function AnalysisLockWorkspace() {
 
     try {
       const bytes = await readFileBytes(file);
-      setReceiptFile(file);
-      setReceiptBytes(bytes);
-    } catch (error) {
-      setWorkspaceError({
-        stage: "receipt",
-        message: getErrorMessage(error),
+      setter({
+        file,
+        bytes,
       });
-    }
-  }
-
-  async function handleAnalysisChange(
-    event: ChangeEvent<HTMLInputElement>,
-  ): Promise<void> {
-    const file = event.target.files?.[0] ?? null;
-
-    setAnalysisFile(null);
-    setAnalysisBytes(null);
-    invalidateGeneration();
-
-    if (!file) {
-      return;
-    }
-
-    try {
-      const bytes = await readFileBytes(file);
-      setAnalysisFile(file);
-      setAnalysisBytes(bytes);
     } catch (error) {
       setWorkspaceError({
-        stage: "analysis",
+        stage,
         message: getErrorMessage(error),
       });
     }
   }
 
   async function handleGenerate(): Promise<void> {
-    if (
-      !receiptBytes ||
-      !analysisFile ||
-      !analysisBytes
-    ) {
+    if (!receipt || !secret || !lockReceipt) {
       return;
     }
 
@@ -186,12 +169,10 @@ export function AnalysisLockWorkspace() {
     setWorkspaceError(null);
 
     try {
-      const result = await createAnalysisLockPackage(
-        receiptBytes,
-        {
-          filename: analysisFile.name,
-          bytes: analysisBytes,
-        },
+      const result = await createUnblindingPackage(
+        receipt.bytes,
+        secret.bytes,
+        lockReceipt.bytes,
       );
 
       setGeneration(result);
@@ -212,7 +193,7 @@ export function AnalysisLockWorkspace() {
 
     downloadBytes(
       generation.receiptArtifact.bytes,
-      "analysis-lock-receipt.json",
+      "unblinding-receipt.json",
       "application/json;charset=utf-8",
     );
   }
@@ -226,27 +207,28 @@ export function AnalysisLockWorkspace() {
               blindstats
             </p>
             <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600">
-              Analysis Lock v0
+              Documented Unblinding v0
             </span>
           </div>
 
           <h1 className="mt-4 max-w-3xl text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
-            Lock an exact analysis artifact before unblinding.
+            Verify the locked workflow before releasing the mapping.
           </h1>
 
           <p className="mt-4 max-w-3xl text-base leading-7 text-slate-600">
-            Select the public blinding receipt and the analysis artifact to lock
-            before unblinding.
+            Supply the public receipt, unblinding secret, and analysis-lock
+            receipt. blindstats verifies the artifact chain and decrypts the
+            sealed mapping.
           </p>
         </header>
 
-        <section className="mb-8 rounded-2xl border border-sky-200 bg-sky-50 p-5">
-          <h2 className="text-sm font-semibold text-sky-950">
-            Browser-local analysis lock
+        <section className="mb-8 rounded-2xl border border-amber-300 bg-amber-50 p-5">
+          <h2 className="text-sm font-semibold text-amber-950">
+            Unblinding releases protected information
           </h2>
-          <p className="mt-2 text-sm leading-6 text-sky-900">
-            blindstats hashes the exact analysis artifact and links it to the
-            public blinding receipt.
+          <p className="mt-2 text-sm leading-6 text-amber-900">
+            A successful unblinding receipt contains the original-to-blinded
+            mapping and should be treated as unblinded material.
           </p>
         </section>
 
@@ -255,21 +237,23 @@ export function AnalysisLockWorkspace() {
             <StageHeading
               number={1}
               title="Select public blinding receipt"
-              description="Choose the exact public receipt associated with the blinded analysis."
+              description="Choose the exact public receipt used when the blinded analysis was locked."
             />
 
             <div className="mt-6">
               <label
-                htmlFor="lock-blinding-receipt"
+                htmlFor="unblind-blinding-receipt"
                 className="block text-sm font-medium text-slate-800"
               >
                 Public blinding receipt
               </label>
               <input
-                id="lock-blinding-receipt"
+                id="unblind-blinding-receipt"
                 type="file"
                 accept=".json,application/json"
-                onChange={handleReceiptChange}
+                onChange={(event) =>
+                  handleArtifactChange(event, "receipt", setReceipt)
+                }
                 className="mt-2 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 file:mr-4 file:rounded-lg file:border-0 file:bg-slate-950 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-slate-800"
               />
 
@@ -282,45 +266,41 @@ export function AnalysisLockWorkspace() {
                 </p>
               ) : null}
 
-              {receiptFile ? (
-                <FileSummary file={receiptFile} label="Receipt file" />
+              {receipt ? (
+                <FileSummary artifact={receipt} label="Public receipt" />
               ) : null}
             </div>
           </section>
 
           <section
             className={`rounded-2xl border bg-white p-6 shadow-sm sm:p-7 ${
-              receiptBytes
-                ? "border-slate-200"
-                : "border-slate-200 opacity-60"
+              receipt ? "border-slate-200" : "border-slate-200 opacity-60"
             }`}
           >
             <StageHeading
               number={2}
-              title="Select analysis artifact"
-              description="Choose the exact analysis artifact to lock before unblinding."
+              title="Select unblinding secret"
+              description="Choose the cryptographic secret released after analysis locking."
             />
 
             <div className="mt-6">
               <label
-                htmlFor="lock-analysis-artifact"
+                htmlFor="unblind-secret"
                 className="block text-sm font-medium text-slate-800"
               >
-                Analysis artifact
+                Unblinding secret
               </label>
               <input
-                id="lock-analysis-artifact"
+                id="unblind-secret"
                 type="file"
-                onChange={handleAnalysisChange}
-                className="mt-2 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 file:mr-4 file:rounded-lg file:border-0 file:bg-slate-950 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-slate-800"
+                accept=".json,application/json"
+                onChange={(event) =>
+                  handleArtifactChange(event, "secret", setSecret)
+                }
+                className="mt-2 block w-full rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm text-amber-900 file:mr-4 file:rounded-lg file:border-0 file:bg-amber-950 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-amber-900"
               />
 
-              <p className="mt-2 text-xs leading-5 text-slate-500">
-                This may be a manuscript, report, script, notebook, archive, or
-                another research artifact.
-              </p>
-
-              {workspaceError?.stage === "analysis" ? (
+              {workspaceError?.stage === "secret" ? (
                 <p
                   className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"
                   role="alert"
@@ -329,23 +309,71 @@ export function AnalysisLockWorkspace() {
                 </p>
               ) : null}
 
-              {analysisFile ? (
-                <FileSummary file={analysisFile} label="Analysis artifact" />
+              {secret ? (
+                <FileSummary artifact={secret} label="Unblinding secret" />
               ) : null}
             </div>
           </section>
 
           <section
             className={`rounded-2xl border bg-white p-6 shadow-sm sm:p-7 ${
-              receiptBytes && analysisBytes
+              receipt && secret
                 ? "border-slate-200"
                 : "border-slate-200 opacity-60"
             }`}
           >
             <StageHeading
               number={3}
-              title="Create analysis lock"
-              description="Hash the exact analysis artifact and link it to the public blinding receipt."
+              title="Select analysis-lock receipt"
+              description="Choose the receipt for the analysis artifact locked before unblinding."
+            />
+
+            <div className="mt-6">
+              <label
+                htmlFor="unblind-lock-receipt"
+                className="block text-sm font-medium text-slate-800"
+              >
+                Analysis-lock receipt
+              </label>
+              <input
+                id="unblind-lock-receipt"
+                type="file"
+                accept=".json,application/json"
+                onChange={(event) =>
+                  handleArtifactChange(event, "lock", setLockReceipt)
+                }
+                className="mt-2 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 file:mr-4 file:rounded-lg file:border-0 file:bg-slate-950 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-slate-800"
+              />
+
+              {workspaceError?.stage === "lock" ? (
+                <p
+                  className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"
+                  role="alert"
+                >
+                  {workspaceError.message}
+                </p>
+              ) : null}
+
+              {lockReceipt ? (
+                <FileSummary
+                  artifact={lockReceipt}
+                  label="Analysis-lock receipt"
+                />
+              ) : null}
+            </div>
+          </section>
+
+          <section
+            className={`rounded-2xl border bg-white p-6 shadow-sm sm:p-7 ${
+              receipt && secret && lockReceipt
+                ? "border-slate-200"
+                : "border-slate-200 opacity-60"
+            }`}
+          >
+            <StageHeading
+              number={4}
+              title="Verify and unblind"
+              description="Verify the linked artifacts and release the mapping."
             />
 
             <div className="mt-6">
@@ -353,11 +381,11 @@ export function AnalysisLockWorkspace() {
                 type="button"
                 onClick={handleGenerate}
                 disabled={!canGenerate}
-                className="inline-flex min-h-11 items-center justify-center rounded-xl bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                className="inline-flex min-h-11 items-center justify-center rounded-xl bg-amber-950 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-amber-900 disabled:cursor-not-allowed disabled:bg-slate-300"
               >
                 {isGenerating
-                  ? "Creating analysis lock..."
-                  : "Create analysis lock"}
+                  ? "Verifying artifact chain..."
+                  : "Verify and unblind"}
               </button>
 
               {workspaceError?.stage === "generation" ? (
@@ -375,10 +403,28 @@ export function AnalysisLockWorkspace() {
                   aria-live="polite"
                 >
                   <p className="text-sm font-semibold text-emerald-900">
-                    Analysis lock created successfully.
+                    Artifact chain verified. Mapping released.
                   </p>
 
                   <dl className="mt-4 space-y-4">
+                    <div>
+                      <dt className="text-xs font-medium uppercase tracking-wide text-emerald-800">
+                        Unblinding ID
+                      </dt>
+                      <dd className="mt-1 break-all font-mono text-sm text-emerald-950">
+                        {generation.receipt.unblindingId}
+                      </dd>
+                    </div>
+
+                    <div>
+                      <dt className="text-xs font-medium uppercase tracking-wide text-emerald-800">
+                        Transformation ID
+                      </dt>
+                      <dd className="mt-1 break-all font-mono text-sm text-emerald-950">
+                        {generation.receipt.transformationId}
+                      </dd>
+                    </div>
+
                     <div>
                       <dt className="text-xs font-medium uppercase tracking-wide text-emerald-800">
                         Lock ID
@@ -390,10 +436,10 @@ export function AnalysisLockWorkspace() {
 
                     <div>
                       <dt className="text-xs font-medium uppercase tracking-wide text-emerald-800">
-                        Transformation ID
+                        Selected column
                       </dt>
-                      <dd className="mt-1 break-all font-mono text-sm text-emerald-950">
-                        {generation.receipt.blinding.transformationId}
+                      <dd className="mt-1 break-all text-sm font-semibold text-emerald-950">
+                        {generation.receipt.selectedColumn}
                       </dd>
                     </div>
 
@@ -404,7 +450,7 @@ export function AnalysisLockWorkspace() {
                       <dd>
                         <HashValue
                           value={
-                            generation.receipt.blinding
+                            generation.receipt.artifacts
                               .blindedArtifactSha256
                           }
                         />
@@ -413,32 +459,35 @@ export function AnalysisLockWorkspace() {
 
                     <div>
                       <dt className="text-xs font-medium uppercase tracking-wide text-emerald-800">
-                        Analysis artifact
-                      </dt>
-                      <dd className="mt-1 break-all text-sm font-semibold text-emerald-950">
-                        {generation.receipt.analysisArtifact.filename}
-                      </dd>
-                    </div>
-
-                    <div>
-                      <dt className="text-xs font-medium uppercase tracking-wide text-emerald-800">
-                        Analysis SHA-256
+                        Locked analysis SHA-256
                       </dt>
                       <dd>
                         <HashValue
-                          value={generation.receipt.analysisArtifact.sha256}
+                          value={
+                            generation.receipt.artifacts.analysisArtifact
+                              .sha256
+                          }
                         />
                       </dd>
                     </div>
                   </dl>
 
-                  <button
-                    type="button"
-                    onClick={downloadReceipt}
-                    className="mt-5 rounded-lg bg-emerald-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-900"
-                  >
-                    Download analysis-lock receipt
-                  </button>
+                  <div className="mt-6 rounded-xl border border-amber-300 bg-amber-50 p-4">
+                    <h3 className="text-sm font-semibold text-amber-950">
+                      Unblinding receipt
+                    </h3>
+                    <p className="mt-2 text-sm leading-6 text-amber-900">
+                      Records the released mapping and the linked workflow
+                      artifacts. Treat this receipt as unblinded material.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={downloadReceipt}
+                      className="mt-4 rounded-lg bg-amber-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-amber-900"
+                    >
+                      Download unblinding receipt
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <button
@@ -446,7 +495,7 @@ export function AnalysisLockWorkspace() {
                   disabled
                   className="mt-5 block rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-400"
                 >
-                  Download analysis-lock receipt
+                  Download unblinding receipt
                 </button>
               )}
             </div>

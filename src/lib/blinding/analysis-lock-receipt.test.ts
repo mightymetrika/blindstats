@@ -7,7 +7,7 @@ const encoder = new TextEncoder();
 
 function validReceipt(): AnalysisLockReceipt {
   return {
-    schemaVersion: "0.1",
+    schemaVersion: "0.3",
     receiptType: "analysis_lock",
     lockId: "7d5a4f1f-59d7-4c62-9821-3e2ae6a1bf33",
     createdAt: "2026-09-08T01:30:00.000Z",

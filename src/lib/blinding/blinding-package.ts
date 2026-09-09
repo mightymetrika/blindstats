@@ -1,13 +1,17 @@
 import { createBlindingAuditArtifacts } from "./audit-artifacts";
-import { parseCsvBytes, serializeCsvDataset } from "./csv";
+import {
+  parseCsvBytes,
+  serializeCsvDataset,
+} from "./csv";
 import { sha256Hex } from "./hashing";
 import { createTransformationIdentity } from "./identity";
 import { createBlindingMapping } from "./mapping";
+import { sealBlindingMapping } from "./mapping-crypto";
 import { applyBlindingMapping } from "./transform";
 import type {
-  BlindingKey,
   BlindingReceipt,
   DatasetRow,
+  UnblindingSecret,
 } from "./types";
 
 const UTF8_ENCODER = new TextEncoder();
@@ -32,12 +36,14 @@ export type BlindedPackage = {
     sha256: string;
   };
   receipt: BlindingReceipt;
-  key: BlindingKey;
+  secret: UnblindingSecret;
   receiptArtifact: SerializedJsonArtifact;
-  keyArtifact: SerializedJsonArtifact;
+  secretArtifact: SerializedJsonArtifact;
 };
 
-function serializeJsonArtifact(value: unknown): SerializedJsonArtifact {
+function serializeJsonArtifact(
+  value: unknown,
+): SerializedJsonArtifact {
   const text = `${JSON.stringify(value, null, 2)}\n`;
 
   return {
@@ -59,7 +65,9 @@ export async function createBlindedPackage(
     );
   }
 
-  const selectedValues = parsed.rows.map((row) => row[selectedColumn]);
+  const selectedValues = parsed.rows.map(
+    (row) => row[selectedColumn],
+  );
   const mapping = createBlindingMapping(selectedValues);
   const blindedRows = applyBlindingMapping(
     parsed.rows,
@@ -71,21 +79,38 @@ export async function createBlindedPackage(
     blindedRows,
   );
 
-  const [sourceSha256, blindedSha256] = await Promise.all([
-    sha256Hex(sourceBytes),
-    sha256Hex(serializedBlinded.bytes),
-  ]);
+  const [sourceSha256, blindedSha256] =
+    await Promise.all([
+      sha256Hex(sourceBytes),
+      sha256Hex(serializedBlinded.bytes),
+    ]);
 
   const identity = createTransformationIdentity(createdAt);
-  const { receipt, key } = createBlindingAuditArtifacts({
-    identity,
+
+  const sealed = await sealBlindingMapping({
+    transformationId: identity.transformationId,
+    createdAt: identity.createdAt,
     selectedColumn,
-    mapping,
+    categoryCount: mapping.length,
     rowCount: parsed.rows.length,
     columnCount: parsed.columns.length,
     sourceArtifactSha256: sourceSha256,
     blindedArtifactSha256: blindedSha256,
+    mapping,
   });
+
+  const { receipt, secret } =
+    createBlindingAuditArtifacts({
+      identity,
+      selectedColumn,
+      categoryCount: mapping.length,
+      rowCount: parsed.rows.length,
+      columnCount: parsed.columns.length,
+      sourceArtifactSha256: sourceSha256,
+      blindedArtifactSha256: blindedSha256,
+      sealedMapping: sealed.sealedMapping,
+      secret: sealed.secret,
+    });
 
   return {
     source: {
@@ -102,8 +127,8 @@ export async function createBlindedPackage(
       sha256: blindedSha256,
     },
     receipt,
-    key,
+    secret,
     receiptArtifact: serializeJsonArtifact(receipt),
-    keyArtifact: serializeJsonArtifact(key),
+    secretArtifact: serializeJsonArtifact(secret),
   };
 }

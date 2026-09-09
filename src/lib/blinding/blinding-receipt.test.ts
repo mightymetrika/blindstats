@@ -7,10 +7,12 @@ const encoder = new TextEncoder();
 
 function validReceipt(): BlindingReceipt {
   return {
-    schemaVersion: "0.1",
-    transformationId: "123e4567-e89b-42d3-a456-426614174000",
-    createdAt: "2026-09-07T21:00:00.000Z",
-    transformationType: "categorical_label_permutation",
+    schemaVersion: "0.3",
+    transformationId:
+      "123e4567-e89b-42d3-a456-426614174000",
+    createdAt: "2026-09-08T23:00:00.000Z",
+    transformationType:
+      "categorical_label_permutation",
     selectedColumn: "treatment",
     categoryCount: 2,
     rowCount: 4,
@@ -21,63 +23,91 @@ function validReceipt(): BlindingReceipt {
     blindedArtifact: {
       sha256: "b".repeat(64),
     },
+    sealedMapping: {
+      algorithm: "AES-GCM",
+      keyLength: 256,
+      tagLength: 128,
+      encoding: "hex",
+      aadScheme:
+        "blindstats_blinding_mapping_aad_v1",
+      ivHex: "01".repeat(12),
+      ciphertextHex: "02".repeat(48),
+    },
     algorithm: {
       neutralLabelScheme: "Group_<letters>",
-      mappingAssignment: "web_crypto_random_permutation",
+      mappingAssignment:
+        "web_crypto_random_permutation",
     },
   };
 }
 
-function encodeReceipt(value: unknown): Uint8Array {
-  return encoder.encode(`${JSON.stringify(value, null, 2)}\n`);
+function encode(value: unknown): Uint8Array {
+  return encoder.encode(
+    `${JSON.stringify(value, null, 2)}\n`,
+  );
 }
 
 describe("parseBlindingReceiptBytes", () => {
-  it("parses and validates a canonical public blinding receipt", () => {
+  it("parses and validates a canonical schema-0.3 receipt", () => {
     const receipt = validReceipt();
 
-    expect(parseBlindingReceiptBytes(encodeReceipt(receipt))).toEqual(
-      receipt,
-    );
+    expect(
+      parseBlindingReceiptBytes(encode(receipt)),
+    ).toEqual(receipt);
   });
 
-  it("rejects malformed JSON and unsupported schema versions", () => {
+  it("rejects older schemas and unexpected plaintext mapping fields", () => {
     expect(() =>
       parseBlindingReceiptBytes(
-        encoder.encode('{"schemaVersion":'),
-      ),
-    ).toThrow("valid JSON");
-
-    expect(() =>
-      parseBlindingReceiptBytes(
-        encodeReceipt({
+        encode({
           ...validReceipt(),
-          schemaVersion: "9.9",
+          schemaVersion: "0.2",
         }),
       ),
-    ).toThrow("Unsupported blinding receipt schema version");
-  });
+    ).toThrow(
+      "Unsupported blinding receipt schema version",
+    );
 
-  it("rejects unexpected top-level fields such as an exposed mapping", () => {
     expect(() =>
       parseBlindingReceiptBytes(
-        encodeReceipt({
+        encode({
           ...validReceipt(),
-          mapping: [
-            {
-              original: "Treatment",
-              blinded: "Group_A",
-            },
-          ],
+          mapping: [],
         }),
       ),
     ).toThrow("unexpected structure");
   });
 
-  it("rejects invalid artifact hashes and invalid category counts", () => {
+  it("rejects malformed sealed-mapping encryption parameters", () => {
     expect(() =>
       parseBlindingReceiptBytes(
-        encodeReceipt({
+        encode({
+          ...validReceipt(),
+          sealedMapping: {
+            ...validReceipt().sealedMapping,
+            algorithm: "something-else",
+          },
+        }),
+      ),
+    ).toThrow("sealed-mapping parameters");
+
+    expect(() =>
+      parseBlindingReceiptBytes(
+        encode({
+          ...validReceipt(),
+          sealedMapping: {
+            ...validReceipt().sealedMapping,
+            ivHex: "bad",
+          },
+        }),
+      ),
+    ).toThrow("IV must be 12 bytes");
+  });
+
+  it("rejects invalid artifact hashes and category counts", () => {
+    expect(() =>
+      parseBlindingReceiptBytes(
+        encode({
           ...validReceipt(),
           blindedArtifact: {
             sha256: "not-a-sha256",
@@ -88,7 +118,7 @@ describe("parseBlindingReceiptBytes", () => {
 
     expect(() =>
       parseBlindingReceiptBytes(
-        encodeReceipt({
+        encode({
           ...validReceipt(),
           categoryCount: 1,
         }),
@@ -96,12 +126,12 @@ describe("parseBlindingReceiptBytes", () => {
     ).toThrow("Category count");
   });
 
-  it("rejects noncanonical creation timestamps", () => {
+  it("rejects noncanonical timestamps", () => {
     expect(() =>
       parseBlindingReceiptBytes(
-        encodeReceipt({
+        encode({
           ...validReceipt(),
-          createdAt: "2026-09-07",
+          createdAt: "2026-09-08",
         }),
       ),
     ).toThrow("canonical ISO-8601");

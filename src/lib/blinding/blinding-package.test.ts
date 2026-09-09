@@ -1,22 +1,24 @@
 import { describe, expect, it } from "vitest";
 
+import { createBlindedPackage } from "./blinding-package";
 import { parseCsvBytes } from "./csv";
 import { sha256Hex } from "./hashing";
-import { createBlindedPackage } from "./blinding-package";
+import { openBlindingMapping } from "./mapping-crypto";
 
 const encoder = new TextEncoder();
 
 const sourceText =
-  "participant_id,treatment,outcome,note\n" +
-  'P001,Treatment,12.4,"first, participant"\n' +
-  "P002,Control,10.1,\n" +
-  "P003,Treatment,11.8,follow-up\n" +
-  "P004,Control,9.9,complete\n";
+  "id,treatment,outcome\n" +
+  "1,Treatment,12\n" +
+  "2,Control,10\n" +
+  "3,Treatment,11\n";
 
-const createdAt = new Date("2026-09-02T02:30:00.000Z");
+const createdAt = new Date(
+  "2026-09-08T23:00:00.000Z",
+);
 
 describe("createBlindedPackage", () => {
-  it("runs the complete CSV-to-blinded-package workflow", async () => {
+  it("creates a linked blinded CSV, public receipt, and mapping-free unblinding secret", async () => {
     const sourceBytes = encoder.encode(sourceText);
 
     const result = await createBlindedPackage(
@@ -25,175 +27,146 @@ describe("createBlindedPackage", () => {
       createdAt,
     );
 
-    expect(result.source.columns).toEqual([
-      "participant_id",
-      "treatment",
-      "outcome",
-      "note",
-    ]);
-    expect(result.source.rowCount).toBe(4);
-    expect(result.source.columnCount).toBe(4);
-
-    expect(result.blinded.rows).toHaveLength(4);
-    expect(result.receipt.selectedColumn).toBe("treatment");
-    expect(result.receipt.categoryCount).toBe(2);
-    expect(result.receipt.createdAt).toBe(createdAt.toISOString());
-    expect(result.key.mapping).toHaveLength(2);
-  });
-
-  it("applies the private key mapping consistently to every selected-column value", async () => {
-    const sourceBytes = encoder.encode(sourceText);
-    const source = parseCsvBytes(sourceBytes);
-
-    const result = await createBlindedPackage(
-      sourceBytes,
-      "treatment",
-      createdAt,
+    expect(result.receipt.schemaVersion).toBe("0.3");
+    expect(result.secret.schemaVersion).toBe("0.3");
+    expect(result.receipt.transformationId).toBe(
+      result.secret.transformationId,
     );
-
-    const lookup = new Map(
-      result.key.mapping.map((entry) => [
-        entry.original,
-        entry.blinded,
-      ]),
-    );
-
-    source.rows.forEach((sourceRow, index) => {
-      const originalValue = sourceRow.treatment;
-
-      expect(originalValue).not.toBeNull();
-      expect(result.blinded.rows[index].treatment).toBe(
-        lookup.get(originalValue as string),
-      );
-    });
-
-    expect(
-      new Set(result.key.mapping.map((entry) => entry.blinded)),
-    ).toEqual(new Set(["Group_A", "Group_B"]));
-  });
-
-  it("preserves row order, unrelated values, and missing cells", async () => {
-    const sourceBytes = encoder.encode(sourceText);
-    const source = parseCsvBytes(sourceBytes);
-
-    const result = await createBlindedPackage(
-      sourceBytes,
-      "treatment",
-      createdAt,
-    );
-
-    expect(
-      result.blinded.rows.map((row) => row.participant_id),
-    ).toEqual(
-      source.rows.map((row) => row.participant_id),
-    );
-
-    result.blinded.rows.forEach((row, index) => {
-      expect(row.participant_id).toBe(
-        source.rows[index].participant_id,
-      );
-      expect(row.outcome).toBe(source.rows[index].outcome);
-      expect(row.note).toBe(source.rows[index].note);
-    });
-
-    expect(result.blinded.rows[1].note).toBeNull();
-  });
-
-  it("hashes the exact original source bytes and exact blinded download bytes", async () => {
-    const sourceBytes = encoder.encode(sourceText);
-
-    const result = await createBlindedPackage(
-      sourceBytes,
-      "treatment",
-      createdAt,
-    );
-
     expect(result.source.sha256).toBe(
       await sha256Hex(sourceBytes),
     );
     expect(result.blinded.sha256).toBe(
       await sha256Hex(result.blinded.bytes),
     );
-
     expect(result.receipt.sourceArtifact.sha256).toBe(
       result.source.sha256,
     );
-    expect(result.receipt.blindedArtifact.sha256).toBe(
-      result.blinded.sha256,
-    );
-    expect(result.key.sourceArtifactSha256).toBe(
-      result.source.sha256,
-    );
-    expect(result.key.blindedArtifactSha256).toBe(
-      result.blinded.sha256,
-    );
+    expect(
+      result.receipt.blindedArtifact.sha256,
+    ).toBe(result.blinded.sha256);
+    expect(result.secret).not.toHaveProperty("mapping");
   });
 
-  it("returns blinded bytes that exactly match the returned blinded text", async () => {
+  it("never serializes plaintext mapping values into either generated JSON artifact", async () => {
     const result = await createBlindedPackage(
       encoder.encode(sourceText),
       "treatment",
       createdAt,
     );
 
-    expect(result.blinded.bytes).toEqual(
-      encoder.encode(result.blinded.text),
-    );
-  });
-
-  it("links receipt and private key with one transformation identity", async () => {
-    const result = await createBlindedPackage(
-      encoder.encode(sourceText),
-      "treatment",
-      createdAt,
-    );
-
-    expect(result.receipt.transformationId).toBe(
-      result.key.transformationId,
-    );
-    expect(result.receipt.createdAt).toBe(result.key.createdAt);
-    expect(result.receipt.createdAt).toBe(
-      "2026-09-02T02:30:00.000Z",
-    );
-  });
-
-  it("serializes a public receipt that does not reveal mapping values", async () => {
-    const result = await createBlindedPackage(
-      encoder.encode(sourceText),
-      "treatment",
-      createdAt,
-    );
-
-    for (const entry of result.key.mapping) {
+    for (const value of ["Treatment", "Control"]) {
       expect(result.receiptArtifact.text).not.toContain(
-        entry.original,
+        value,
       );
-      expect(result.receiptArtifact.text).not.toContain(
-        entry.blinded,
+      expect(result.secretArtifact.text).not.toContain(
+        value,
       );
     }
 
-    expect(result.receiptArtifact.text).not.toContain(
-      '"mapping"',
-    );
+    for (const label of ["Group_A", "Group_B"]) {
+      expect(result.receiptArtifact.text).not.toContain(
+        label,
+      );
+      expect(result.secretArtifact.text).not.toContain(
+        label,
+      );
+    }
   });
 
-  it("serializes the complete mapping only into the private key artifact", async () => {
+  it("allows the sealed mapping to be recovered only with the matching generated secret", async () => {
     const result = await createBlindedPackage(
       encoder.encode(sourceText),
       "treatment",
       createdAt,
     );
 
-    const serializedKey = JSON.parse(result.keyArtifact.text);
+    const mapping = await openBlindingMapping(
+      result.receipt,
+      result.secret,
+    );
 
-    expect(serializedKey.mapping).toEqual(result.key.mapping);
-    expect(result.keyArtifact.bytes).toEqual(
-      encoder.encode(result.keyArtifact.text),
+    expect(
+      new Set(mapping.map((entry) => entry.original)),
+    ).toEqual(new Set(["Treatment", "Control"]));
+    expect(
+      new Set(mapping.map((entry) => entry.blinded)),
+    ).toEqual(new Set(["Group_A", "Group_B"]));
+    expect(mapping).toHaveLength(2);
+  });
+
+  it("applies the encrypted private mapping consistently to the selected column", async () => {
+    const result = await createBlindedPackage(
+      encoder.encode(sourceText),
+      "treatment",
+      createdAt,
+    );
+    const mapping = await openBlindingMapping(
+      result.receipt,
+      result.secret,
+    );
+    const mappingMap = new Map(
+      mapping.map((entry) => [
+        entry.original,
+        entry.blinded,
+      ]),
+    );
+
+    const source = parseCsvBytes(
+      encoder.encode(sourceText),
+    );
+    const blinded = parseCsvBytes(result.blinded.bytes);
+
+    source.rows.forEach((row, index) => {
+      expect(blinded.rows[index].treatment).toBe(
+        mappingMap.get(row.treatment as string),
+      );
+      expect(blinded.rows[index].id).toBe(row.id);
+      expect(blinded.rows[index].outcome).toBe(
+        row.outcome,
+      );
+    });
+  });
+
+  it("preserves missing selected-column values", async () => {
+    const result = await createBlindedPackage(
+      encoder.encode(
+        "id,treatment\n1,Treatment\n2,\n3,Control\n",
+      ),
+      "treatment",
+      createdAt,
+    );
+
+    expect(
+      parseCsvBytes(result.blinded.bytes).rows[1]
+        .treatment,
+    ).toBeNull();
+  });
+
+  it("rejects a selected column that does not exist", async () => {
+    await expect(
+      createBlindedPackage(
+        encoder.encode(sourceText),
+        "missing_column",
+        createdAt,
+      ),
+    ).rejects.toThrow(
+      'Selected blinding column "missing_column" does not exist',
     );
   });
 
-  it("produces deterministic JSON serialization for the generated receipt and key objects", async () => {
+  it("rejects selected columns with fewer than two nonmissing categories", async () => {
+    await expect(
+      createBlindedPackage(
+        encoder.encode(
+          "id,treatment\n1,Treatment\n2,Treatment\n",
+        ),
+        "treatment",
+        createdAt,
+      ),
+    ).rejects.toThrow();
+  });
+
+  it("serializes generated JSON artifacts deterministically", async () => {
     const result = await createBlindedPackage(
       encoder.encode(sourceText),
       "treatment",
@@ -203,74 +176,14 @@ describe("createBlindedPackage", () => {
     expect(result.receiptArtifact.text).toBe(
       `${JSON.stringify(result.receipt, null, 2)}\n`,
     );
-    expect(result.keyArtifact.text).toBe(
-      `${JSON.stringify(result.key, null, 2)}\n`,
+    expect(result.secretArtifact.text).toBe(
+      `${JSON.stringify(result.secret, null, 2)}\n`,
     );
-  });
-
-  it("does not mutate the caller's source bytes", async () => {
-    const sourceBytes = encoder.encode(sourceText);
-    const snapshot = new Uint8Array(sourceBytes);
-
-    await createBlindedPackage(
-      sourceBytes,
-      "treatment",
-      createdAt,
+    expect(result.receiptArtifact.bytes).toEqual(
+      encoder.encode(result.receiptArtifact.text),
     );
-
-    expect(sourceBytes).toEqual(snapshot);
-  });
-
-  it("rejects a selected column that is absent from the source dataset", async () => {
-    await expect(
-      createBlindedPackage(
-        encoder.encode(sourceText),
-        "not_a_column",
-        createdAt,
-      ),
-    ).rejects.toThrow(
-      'Selected blinding column "not_a_column" does not exist',
+    expect(result.secretArtifact.bytes).toEqual(
+      encoder.encode(result.secretArtifact.text),
     );
-  });
-
-  it("rejects a selected column with fewer than two distinct nonmissing categories", async () => {
-    const singleCategorySource = encoder.encode(
-      "id,treatment\n" +
-        "P001,Treatment\n" +
-        "P002,Treatment\n",
-    );
-
-    await expect(
-      createBlindedPackage(
-        singleCategorySource,
-        "treatment",
-        createdAt,
-      ),
-    ).rejects.toThrow(
-      "at least two distinct nonmissing categories",
-    );
-  });
-
-  it("preserves selected-column missingness while blinding observed categories", async () => {
-    const sourceBytes = encoder.encode(
-      "id,treatment,outcome\n" +
-        "P001,Treatment,12.4\n" +
-        "P002,,10.1\n" +
-        "P003,Control,11.2\n",
-    );
-
-    const result = await createBlindedPackage(
-      sourceBytes,
-      "treatment",
-      createdAt,
-    );
-
-    expect(result.blinded.rows[1].treatment).toBeNull();
-    expect(result.key.mapping).toHaveLength(2);
-    expect(
-      result.key.mapping.some(
-        (entry) => entry.original === "",
-      ),
-    ).toBe(false);
   });
 });

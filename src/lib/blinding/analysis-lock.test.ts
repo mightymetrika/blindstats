@@ -5,30 +5,23 @@ import { sha256Hex } from "./hashing";
 import type { BlindingReceipt } from "./types";
 
 const encoder = new TextEncoder();
-const createdAt = new Date("2026-09-07T22:30:00.000Z");
-
-const blindedText =
-  "participant_id,treatment,outcome\n" +
-  "P001,Group_A,12.4\n" +
-  "P002,Group_B,10.1\n";
+const createdAt = new Date("2026-09-08T22:30:00.000Z");
 
 const analysisText =
   "Methods drafted under blinded labels.\n" +
   "Primary contrast: Group_A vs Group_B.\n";
 
-async function fixture(): Promise<{
+function fixture(): {
   blindingReceiptBytes: Uint8Array;
-  blindedArtifactBytes: Uint8Array;
   analysisArtifactBytes: Uint8Array;
-}> {
-  const blindedArtifactBytes = encoder.encode(blindedText);
-  const blindedArtifactSha256 =
-    await sha256Hex(blindedArtifactBytes);
+  blindedArtifactSha256: string;
+} {
+  const blindedArtifactSha256 = "b".repeat(64);
 
   const receipt: BlindingReceipt = {
-    schemaVersion: "0.1",
+    schemaVersion: "0.3",
     transformationId: "123e4567-e89b-42d3-a456-426614174000",
-    createdAt: "2026-09-07T21:00:00.000Z",
+    createdAt: "2026-09-08T21:00:00.000Z",
     transformationType: "categorical_label_permutation",
     selectedColumn: "treatment",
     categoryCount: 2,
@@ -40,6 +33,15 @@ async function fixture(): Promise<{
     blindedArtifact: {
       sha256: blindedArtifactSha256,
     },
+    sealedMapping: {
+      algorithm: "AES-GCM",
+      keyLength: 256,
+      tagLength: 128,
+      encoding: "hex",
+      aadScheme: "blindstats_blinding_mapping_aad_v1",
+      ivHex: "01".repeat(12),
+      ciphertextHex: "02".repeat(48),
+    },
     algorithm: {
       neutralLabelScheme: "Group_<letters>",
       mappingAssignment: "web_crypto_random_permutation",
@@ -50,22 +52,21 @@ async function fixture(): Promise<{
     blindingReceiptBytes: encoder.encode(
       `${JSON.stringify(receipt, null, 2)}\n`,
     ),
-    blindedArtifactBytes,
     analysisArtifactBytes: encoder.encode(analysisText),
+    blindedArtifactSha256,
   };
 }
 
 describe("createAnalysisLockPackage", () => {
-  it("links exact analysis bytes to the exact blinded artifact and public receipt", async () => {
+  it("links exact analysis bytes to the exact public receipt without requiring the blinded dataset again", async () => {
     const {
       blindingReceiptBytes,
-      blindedArtifactBytes,
       analysisArtifactBytes,
-    } = await fixture();
+      blindedArtifactSha256,
+    } = fixture();
 
     const result = await createAnalysisLockPackage(
       blindingReceiptBytes,
-      blindedArtifactBytes,
       {
         filename: "blinded-analysis-draft.docx",
         bytes: analysisArtifactBytes,
@@ -88,7 +89,7 @@ describe("createAnalysisLockPackage", () => {
     ).toBe(await sha256Hex(blindingReceiptBytes));
     expect(
       result.receipt.blinding.blindedArtifactSha256,
-    ).toBe(await sha256Hex(blindedArtifactBytes));
+    ).toBe(blindedArtifactSha256);
     expect(result.receipt.analysisArtifact).toEqual({
       filename: "blinded-analysis-draft.docx",
       sha256: await sha256Hex(analysisArtifactBytes),
@@ -96,16 +97,14 @@ describe("createAnalysisLockPackage", () => {
     });
   });
 
-  it("serializes the receipt once into the exact bytes offered as the receipt artifact", async () => {
+  it("serializes the receipt once into the exact downloadable receipt bytes", async () => {
     const {
       blindingReceiptBytes,
-      blindedArtifactBytes,
       analysisArtifactBytes,
-    } = await fixture();
+    } = fixture();
 
     const result = await createAnalysisLockPackage(
       blindingReceiptBytes,
-      blindedArtifactBytes,
       {
         filename: "analysis.zip",
         bytes: analysisArtifactBytes,
@@ -122,40 +121,15 @@ describe("createAnalysisLockPackage", () => {
     ).toBe(expectedText);
   });
 
-  it("rejects a blinded artifact that does not match the public blinding receipt", async () => {
-    const {
-      blindingReceiptBytes,
-      analysisArtifactBytes,
-    } = await fixture();
-
-    await expect(
-      createAnalysisLockPackage(
-        blindingReceiptBytes,
-        encoder.encode(
-          "participant_id,treatment\nP001,Group_Z\n",
-        ),
-        {
-          filename: "analysis.docx",
-          bytes: analysisArtifactBytes,
-        },
-        createdAt,
-      ),
-    ).rejects.toThrow(
-      "Blinded artifact hash does not match the public blinding receipt.",
-    );
-  });
-
   it("rejects blank filenames and empty analysis artifacts", async () => {
     const {
       blindingReceiptBytes,
-      blindedArtifactBytes,
       analysisArtifactBytes,
-    } = await fixture();
+    } = fixture();
 
     await expect(
       createAnalysisLockPackage(
         blindingReceiptBytes,
-        blindedArtifactBytes,
         {
           filename: "   ",
           bytes: analysisArtifactBytes,
@@ -167,7 +141,6 @@ describe("createAnalysisLockPackage", () => {
     await expect(
       createAnalysisLockPackage(
         blindingReceiptBytes,
-        blindedArtifactBytes,
         {
           filename: "analysis.docx",
           bytes: new Uint8Array(),
@@ -180,13 +153,11 @@ describe("createAnalysisLockPackage", () => {
   it("changes the locked analysis hash when the analysis bytes change", async () => {
     const {
       blindingReceiptBytes,
-      blindedArtifactBytes,
       analysisArtifactBytes,
-    } = await fixture();
+    } = fixture();
 
     const first = await createAnalysisLockPackage(
       blindingReceiptBytes,
-      blindedArtifactBytes,
       {
         filename: "analysis.docx",
         bytes: analysisArtifactBytes,
@@ -196,7 +167,6 @@ describe("createAnalysisLockPackage", () => {
 
     const second = await createAnalysisLockPackage(
       blindingReceiptBytes,
-      blindedArtifactBytes,
       {
         filename: "analysis.docx",
         bytes: encoder.encode(`${analysisText}Revision.\n`),

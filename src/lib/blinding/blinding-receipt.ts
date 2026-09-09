@@ -1,10 +1,17 @@
 import {
   BLINDING_SCHEMA_VERSION,
+  SEALED_MAPPING_AAD_SCHEME,
+  SEALED_MAPPING_ALGORITHM,
+  SEALED_MAPPING_ENCODING,
   type BlindingReceipt,
 } from "./types";
 
-const UTF8_DECODER = new TextDecoder("utf-8", { fatal: true });
+const UTF8_DECODER = new TextDecoder("utf-8", {
+  fatal: true,
+});
 const SHA256_HEX_PATTERN = /^[0-9a-f]{64}$/;
+const IV_HEX_PATTERN = /^[0-9a-f]{24}$/;
+const CIPHERTEXT_HEX_PATTERN = /^[0-9a-f]+$/;
 
 function requireRecord(
   value: unknown,
@@ -15,7 +22,9 @@ function requireRecord(
     value === null ||
     Array.isArray(value)
   ) {
-    throw new Error(`${fieldName} must be a JSON object.`);
+    throw new Error(
+      `${fieldName} must be a JSON object.`,
+    );
   }
 
   return value as Record<string, unknown>;
@@ -29,10 +38,17 @@ function requireExactKeys(
   const expected = new Set(expectedKeys);
   const actual = Object.keys(value);
 
-  const missing = expectedKeys.filter((key) => !(key in value));
-  const unexpected = actual.filter((key) => !expected.has(key));
+  const missing = expectedKeys.filter(
+    (key) => !(key in value),
+  );
+  const unexpected = actual.filter(
+    (key) => !expected.has(key),
+  );
 
-  if (missing.length > 0 || unexpected.length > 0) {
+  if (
+    missing.length > 0 ||
+    unexpected.length > 0
+  ) {
     throw new Error(
       `${fieldName} has an unexpected structure.`,
     );
@@ -71,7 +87,10 @@ function requirePositiveInteger(
   return value;
 }
 
-function requireSha256(value: unknown, fieldName: string): string {
+function requireSha256(
+  value: unknown,
+  fieldName: string,
+): string {
   if (
     typeof value !== "string" ||
     !SHA256_HEX_PATTERN.test(value)
@@ -110,15 +129,21 @@ export function parseBlindingReceiptBytes(
   bytes: Uint8Array,
 ): BlindingReceipt {
   if (bytes.length === 0) {
-    throw new Error("Blinding receipt file cannot be empty.");
+    throw new Error(
+      "Blinding receipt file cannot be empty.",
+    );
   }
 
   let text: string;
 
   try {
-    text = UTF8_DECODER.decode(new Uint8Array(bytes));
+    text = UTF8_DECODER.decode(
+      new Uint8Array(bytes),
+    );
   } catch {
-    throw new Error("Blinding receipt must be valid UTF-8.");
+    throw new Error(
+      "Blinding receipt must be valid UTF-8.",
+    );
   }
 
   let parsed: unknown;
@@ -126,10 +151,15 @@ export function parseBlindingReceiptBytes(
   try {
     parsed = JSON.parse(text);
   } catch {
-    throw new Error("Blinding receipt must contain valid JSON.");
+    throw new Error(
+      "Blinding receipt must contain valid JSON.",
+    );
   }
 
-  const receipt = requireRecord(parsed, "Blinding receipt");
+  const receipt = requireRecord(
+    parsed,
+    "Blinding receipt",
+  );
 
   requireExactKeys(
     receipt,
@@ -144,12 +174,16 @@ export function parseBlindingReceiptBytes(
       "columnCount",
       "sourceArtifact",
       "blindedArtifact",
+      "sealedMapping",
       "algorithm",
     ],
     "Blinding receipt",
   );
 
-  if (receipt.schemaVersion !== BLINDING_SCHEMA_VERSION) {
+  if (
+    receipt.schemaVersion !==
+    BLINDING_SCHEMA_VERSION
+  ) {
     throw new Error(
       `Unsupported blinding receipt schema version "${String(receipt.schemaVersion)}".`,
     );
@@ -171,7 +205,9 @@ export function parseBlindingReceiptBytes(
   );
 
   if (transformationId.trim().length === 0) {
-    throw new Error("Transformation identifier cannot be blank.");
+    throw new Error(
+      "Transformation identifier cannot be blank.",
+    );
   }
 
   const selectedColumn = requireString(
@@ -181,7 +217,9 @@ export function parseBlindingReceiptBytes(
   );
 
   if (selectedColumn.trim().length === 0) {
-    throw new Error("Selected blinding column cannot be blank.");
+    throw new Error(
+      "Selected blinding column cannot be blank.",
+    );
   }
 
   const sourceArtifact = requireRecord(
@@ -204,17 +242,82 @@ export function parseBlindingReceiptBytes(
     "Blinded artifact",
   );
 
+  const sealedMapping = requireRecord(
+    receipt.sealedMapping,
+    "Sealed mapping",
+  );
+  requireExactKeys(
+    sealedMapping,
+    [
+      "algorithm",
+      "keyLength",
+      "tagLength",
+      "encoding",
+      "aadScheme",
+      "ivHex",
+      "ciphertextHex",
+    ],
+    "Sealed mapping",
+  );
+
+  if (
+    sealedMapping.algorithm !==
+      SEALED_MAPPING_ALGORITHM ||
+    sealedMapping.keyLength !== 256 ||
+    sealedMapping.tagLength !== 128 ||
+    sealedMapping.encoding !==
+      SEALED_MAPPING_ENCODING ||
+    sealedMapping.aadScheme !==
+      SEALED_MAPPING_AAD_SCHEME
+  ) {
+    throw new Error(
+      "Blinding receipt has unsupported sealed-mapping parameters.",
+    );
+  }
+
+  if (
+    typeof sealedMapping.ivHex !== "string" ||
+    !IV_HEX_PATTERN.test(
+      sealedMapping.ivHex,
+    )
+  ) {
+    throw new Error(
+      "Sealed-mapping IV must be 12 bytes encoded as lowercase hexadecimal.",
+    );
+  }
+
+  if (
+    typeof sealedMapping.ciphertextHex !==
+      "string" ||
+    sealedMapping.ciphertextHex.length < 32 ||
+    sealedMapping.ciphertextHex.length % 2 !==
+      0 ||
+    !CIPHERTEXT_HEX_PATTERN.test(
+      sealedMapping.ciphertextHex,
+    )
+  ) {
+    throw new Error(
+      "Sealed-mapping ciphertext must be nonempty lowercase hexadecimal containing an authentication tag.",
+    );
+  }
+
   const algorithm = requireRecord(
     receipt.algorithm,
     "Blinding algorithm",
   );
   requireExactKeys(
     algorithm,
-    ["neutralLabelScheme", "mappingAssignment"],
+    [
+      "neutralLabelScheme",
+      "mappingAssignment",
+    ],
     "Blinding algorithm",
   );
 
-  if (algorithm.neutralLabelScheme !== "Group_<letters>") {
+  if (
+    algorithm.neutralLabelScheme !==
+    "Group_<letters>"
+  ) {
     throw new Error(
       "Blinding receipt has an unsupported neutral-label scheme.",
     );
@@ -236,7 +339,8 @@ export function parseBlindingReceiptBytes(
       receipt.createdAt,
       "Blinding receipt creation time",
     ),
-    transformationType: "categorical_label_permutation",
+    transformationType:
+      "categorical_label_permutation",
     selectedColumn,
     categoryCount: requirePositiveInteger(
       receipt.categoryCount,
@@ -263,9 +367,20 @@ export function parseBlindingReceiptBytes(
         "Blinded artifact hash",
       ),
     },
+    sealedMapping: {
+      algorithm: SEALED_MAPPING_ALGORITHM,
+      keyLength: 256,
+      tagLength: 128,
+      encoding: SEALED_MAPPING_ENCODING,
+      aadScheme: SEALED_MAPPING_AAD_SCHEME,
+      ivHex: sealedMapping.ivHex as string,
+      ciphertextHex:
+        sealedMapping.ciphertextHex as string,
+    },
     algorithm: {
       neutralLabelScheme: "Group_<letters>",
-      mappingAssignment: "web_crypto_random_permutation",
+      mappingAssignment:
+        "web_crypto_random_permutation",
     },
   };
 }

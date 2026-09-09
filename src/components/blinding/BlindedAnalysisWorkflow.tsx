@@ -4,8 +4,9 @@ import { useState } from "react";
 
 import { AnalysisLockWorkspace } from "./AnalysisLockWorkspace";
 import { BlindingWorkspace } from "./BlindingWorkspace";
+import { UnblindingWorkspace } from "./UnblindingWorkspace";
 
-type WorkflowStage = "blind" | "lock";
+type WorkflowStage = "blind" | "lock" | "unblind";
 
 export function BlindedAnalysisWorkflow() {
   const [stage, setStage] = useState<WorkflowStage>("blind");
@@ -20,20 +21,20 @@ export function BlindedAnalysisWorkflow() {
                 Blinded analysis workflow
               </p>
               <p className="mt-1 text-sm leading-6 text-slate-600">
-                Choose the stage you are working on. Saved artifacts can move
-                between researchers, computers, and browser sessions.
+                Create, lock, and unblind an analysis using linked audit
+                artifacts.
               </p>
             </div>
 
             <div
-              className="inline-flex w-full rounded-xl border border-slate-200 bg-slate-50 p-1 sm:w-auto"
+              className="grid w-full grid-cols-1 gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1 sm:w-auto sm:grid-cols-3"
               aria-label="Blinded analysis workflow stage"
             >
               <button
                 type="button"
                 aria-pressed={stage === "blind"}
                 onClick={() => setStage("blind")}
-                className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-semibold transition sm:flex-none ${
+                className={`rounded-lg px-4 py-2.5 text-sm font-semibold transition ${
                   stage === "blind"
                     ? "bg-slate-950 text-white shadow-sm"
                     : "text-slate-700 hover:bg-white"
@@ -45,7 +46,7 @@ export function BlindedAnalysisWorkflow() {
                 type="button"
                 aria-pressed={stage === "lock"}
                 onClick={() => setStage("lock")}
-                className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-semibold transition sm:flex-none ${
+                className={`rounded-lg px-4 py-2.5 text-sm font-semibold transition ${
                   stage === "lock"
                     ? "bg-slate-950 text-white shadow-sm"
                     : "text-slate-700 hover:bg-white"
@@ -53,12 +54,30 @@ export function BlindedAnalysisWorkflow() {
               >
                 Lock blinded analysis
               </button>
+              <button
+                type="button"
+                aria-pressed={stage === "unblind"}
+                onClick={() => setStage("unblind")}
+                className={`rounded-lg px-4 py-2.5 text-sm font-semibold transition ${
+                  stage === "unblind"
+                    ? "bg-slate-950 text-white shadow-sm"
+                    : "text-slate-700 hover:bg-white"
+                }`}
+              >
+                Unblind
+              </button>
             </div>
           </div>
         </div>
       </div>
 
-      {stage === "blind" ? <BlindingWorkspace /> : <AnalysisLockWorkspace />}
+      {stage === "blind" ? (
+        <BlindingWorkspace />
+      ) : stage === "lock" ? (
+        <AnalysisLockWorkspace />
+      ) : (
+        <UnblindingWorkspace />
+      )}
     </>
   );
 }
