@@ -33,6 +33,34 @@ reporting, replication, or researcher judgment.
 blindstats is intended to make analyst blinding easier to conduct, link, document,
 and reproduce.
 
+## Research literature
+
+The rationale for blindstats is consistent with the broader literature on
+blinding in research. Monaghan et al. (2021) describe blinding as withholding
+information that could influence study results and note that randomization alone
+does not prevent differential interpretation and analysis of outcomes. Although
+their review focuses on clinical trials, it also notes that the relevance of
+blinding extends across study designs.
+
+For statisticians specifically, Monaghan et al. identify statisticians as one of
+the groups for whom blinding merits separate consideration. Their reporting
+example lists participant and group identities as information that may be withheld
+from statisticians, with numerical identifiers used to preserve blinding. The
+review also treats blinding as a continuum rather than an all-or-nothing feature
+and emphasizes reporting who was blinded, what information was withheld, and how
+blinding was performed.
+
+blindstats operationalizes a narrow part of that broader methodological idea:
+helping analysts work with neutral labels, lock an exact analysis artifact before
+unblinding, and retain linked receipts that document the workflow. The software
+does not assume that statistician blinding is appropriate or sufficient for every
+study, nor does it claim to eliminate bias.
+
+**Reference:** Monaghan, T. F., Agudelo, C. W., Rahman, S. N., Wein, A. J.,
+Lazar, J. M., Everaert, K., & Dmochowski, R. R. (2021). Blinding in clinical
+trials: Seeing the big picture. *Medicina, 57*(7), 647.
+https://doi.org/10.3390/medicina57070647
+
 ## First-release workflow
 
 The current prototype implements a browser-local, file-mediated workflow:
