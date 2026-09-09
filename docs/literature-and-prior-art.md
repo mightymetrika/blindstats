@@ -1,8 +1,8 @@
 # Literature and Prior Art
 
-**Project:** blindstats  
-**Status:** focused working review  
-**Updated:** 2026-09-09
+- **Project:** blindstats
+- **Status:** focused working review
+- **Updated:** 2026-09-09
 
 ## 1. Purpose
 
@@ -355,9 +355,9 @@ model should avoid making it impossible.
 
 ### 4.1 inBlindSight
 
-**Project:** AlexHenriques/inBlindSight  
-**Type:** local Python GUI  
-**Repository:** https://github.com/AlexHenriques/inBlindSight
+- **Project:** AlexHenriques/inBlindSight
+- **Type:** local Python GUI
+- **Repository:** https://github.com/AlexHenriques/inBlindSight
 
 inBlindSight generates random mappings between identifiers and labels and can use
 a key file to blind or unblind Excel data or filenames. Its documentation
@@ -380,9 +380,9 @@ artifact, and a linked blind-lock-unblind audit chain.
 
 ### 4.2 BlindSpot
 
-**Project:** maddox-lab/BlindSpot  
-**Type:** cross-platform file-name blinding application  
-**Repository:** https://github.com/maddox-lab/BlindSpot
+- **Project:** maddox-lab/BlindSpot
+- **Type:** cross-platform file-name blinding application
+- **Repository:** https://github.com/maddox-lab/BlindSpot
 
 BlindSpot provides reproducible filename blinding for laboratory workflows,
 including microscopy/image scoring. It creates a blinding key and supports later
@@ -396,9 +396,9 @@ unblinding while leaving file contents unchanged.
 
 ### 4.3 blindanalysis
 
-**Project:** jimsalterjrs/blindanalysis  
-**Type:** Perl utility  
-**Repository:** https://github.com/jimsalterjrs/blindanalysis
+- **Project:** jimsalterjrs/blindanalysis
+- **Type:** Perl utility
+- **Repository:** https://github.com/jimsalterjrs/blindanalysis
 
 This project renames files and writes the original-to-random-name mapping into a
 CSV key. Its suggested workflow explicitly recommends moving the key to a trusted
@@ -414,9 +414,9 @@ key movement with permissions and controlled release.
 
 ### 4.4 blindr
 
-**Project:** U8NWXD/blindr  
-**Type:** MATLAB filename-blinding scripts  
-**Repository:** https://github.com/U8NWXD/blindr
+- **Project:** U8NWXD/blindr
+- **Type:** MATLAB filename-blinding scripts
+- **Repository:** https://github.com/U8NWXD/blindr
 
 blindr reversibly randomizes filenames, recommends moving the blinding key to a
 trusted location, and later restores the relationship between blinded and
@@ -430,9 +430,9 @@ an auditable study workflow rather than only an operational instruction.
 
 ### 4.5 Smokescreen / LSST DESC blinding
 
-**Project:** LSSTDESC/Smokescreen  
-**Type:** scientific blinding library  
-**Repository:** https://github.com/LSSTDESC/Smokescreen
+- **Project:** LSSTDESC/Smokescreen
+- **Type:** scientific blinding library
+- **Repository:** https://github.com/LSSTDESC/Smokescreen
 
 Smokescreen implements data-concealment methods for cosmological analysis,
 including data-vector blinding and related methods developed in the cosmology
@@ -451,9 +451,9 @@ general enough that other blinding mechanisms could eventually plug into it.
 
 ### 4.6 vazul
 
-**Project:** nthun/vazul  
-**Type:** R package for analysis blinding  
-**Repository:** https://github.com/nthun/vazul
+- **Project:** nthun/vazul
+- **Type:** R package for analysis blinding
+- **Repository:** https://github.com/nthun/vazul
 
 The project describes masking and scrambling approaches intended to anonymize or
 blind data while preserving analysis usefulness.
@@ -468,9 +468,9 @@ validated.
 
 ### 4.7 Open Science Framework registrations
 
-**Project:** Open Science Framework / Center for Open Science  
-**Type:** open-source research platform  
-**Documentation:** https://help.osf.io/article/330-welcome-to-registrations
+- **Project:** Open Science Framework / Center for Open Science
+- **Type:** open-source research platform
+- **Documentation:** https://help.osf.io/article/330-welcome-to-registrations
 
 OSF registrations provide a strong adjacent model for freezing research state.
 Submitted registrations are time-stamped and read-only; the frozen record is
@@ -486,9 +486,9 @@ contributor permissions.
 
 ### 4.8 OpenClinica
 
-**Project:** OpenClinica/OpenClinica  
-**Type:** open-source clinical data-management platform  
-**Repository:** https://github.com/OpenClinica/OpenClinica
+- **Project:** OpenClinica/OpenClinica
+- **Type:** open-source clinical data-management platform
+- **Repository:** https://github.com/OpenClinica/OpenClinica
 
 OpenClinica supports studies, role-based access controls, audit trails, and
 electronic signatures. Its scope is much broader than blindstats and includes
