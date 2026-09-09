@@ -35,32 +35,85 @@ and reproduce.
 
 ## Research literature
 
-The rationale for blindstats is consistent with the broader literature on
-blinding in research. Monaghan et al. (2021) describe blinding as withholding
-information that could influence study results and note that randomization alone
-does not prevent differential interpretation and analysis of outcomes. Although
-their review focuses on clinical trials, it also notes that the relevance of
-blinding extends across study designs.
+The rationale for blindstats is supported by research on blinding, analysis
+blinding, statistical-analysis planning, and reproducible research workflows.
 
-For statisticians specifically, Monaghan et al. identify statisticians as one of
-the groups for whom blinding merits separate consideration. Their reporting
-example lists participant and group identities as information that may be withheld
-from statisticians, with numerical identifiers used to preserve blinding. The
-review also treats blinding as a continuum rather than an all-or-nothing feature
-and emphasizes reporting who was blinded, what information was withheld, and how
-blinding was performed.
+Blinding is generally used to withhold information that could influence research
+decisions or interpretation. Reporting guidance therefore recommends describing
+who was blinded, what information was withheld, and how blinding was performed
+rather than relying on ambiguous labels such as "single blind" or "double blind"
+(Moher et al., 2010; Monaghan et al., 2021). Recent SPIRIT guidance explicitly
+includes data analysts among the groups whose blinding status may be relevant
+(Chan et al., 2025).
 
-blindstats operationalizes a narrow part of that broader methodological idea:
-helping analysts work with neutral labels, lock an exact analysis artifact before
-unblinding, and retain linked receipts that document the workflow. The software
-does not assume that statistician blinding is appropriate or sufficient for every
-study, nor does it claim to eliminate bias.
+Analysis blinding applies that principle to statistical work. MacCoun and
+Perlmutter (2015) argued for wider use of blind analysis to reduce experimenter
+bias. Dutilh et al. (2021) described blinded analysis as a way to break the
+feedback loop between analysis choices and analysis outcomes while retaining
+flexibility to respond to unexpected features of the data. Their review includes
+masking or shuffling condition labels as one possible method. This preserves the
+data values but does not hide every result-relevant feature: analysts may still
+observe that groups differ even when they do not know which substantive group a
+neutral label represents.
 
-**Reference:** Monaghan, T. F., Agudelo, C. W., Rahman, S. N., Wein, A. J.,
-Lazar, J. M., Everaert, K., & Dmochowski, R. R. (2021). Blinding in clinical
-trials: Seeing the big picture. *Medicina, 57*(7), 647.
-https://doi.org/10.3390/medicina57070647
+Clinical-trial methodology provides complementary guidance about workflow and
+timing. Gamble et al. (2017) recommend versioning statistical analysis plans,
+documenting revisions and their timing, and treating post-unblinding deviations
+transparently. The Blinding of Trial Statisticians (BOTS) project found substantial
+variation in practice and recommends a risk-proportionate approach rather than a
+single universal rule for statistician blinding (Iflaifel et al., 2022, 2023).
+Timing matters: completing and approving important analysis decisions before
+unblinding can reduce the opportunity for knowledge of treatment allocation to
+influence those decisions.
 
+Related work also supports explicit pre-unblinding commitment. Järvinen et al.
+(2014) described a blinded-interpretation procedure in which investigators agree
+that no further changes will be made before the treatment code is broken.
+Blinding is also established practice in areas of physics and cosmology, where
+critical results may remain concealed until analysis choices and validation checks
+are finalized (MacCoun & Perlmutter, 2015; Muir et al., 2020).
+
+blindstats operationalizes a deliberately narrow part of this broader
+methodological landscape: neutralizing meaningful labels, identifying an exact
+analysis artifact before unblinding, and retaining linked audit artifacts that
+document the workflow. The software does not assume that analyst blinding is
+appropriate or sufficient for every study, does not claim to eliminate bias, and
+does not claim that neutral-label masking conceals every potentially informative
+feature of the data.
+
+A focused review of the literature and related software is maintained in
+[`docs/literature-and-prior-art.md`](docs/literature-and-prior-art.md).
+
+### Selected references
+
+- Chan, A.-W., Tetzlaff, J. M., Altman, D. G., et al. (2025). SPIRIT 2025
+  statement: Updated guideline for protocols of randomized trials. *JAMA*.
+- Dutilh, G., Sarafoglou, A., & Wagenmakers, E.-J. (2021). Flexible yet fair:
+  Blinding analyses in experimental psychology. *Synthese, 198*, 5745-5772.
+  https://doi.org/10.1007/s11229-019-02456-7
+- Gamble, C., Krishan, A., Stocken, D., et al. (2017). Guidelines for the content
+  of statistical analysis plans in clinical trials. *JAMA, 318*(23), 2337-2343.
+  https://doi.org/10.1001/jama.2017.18556
+- Iflaifel, M., Partlett, C., Bell, J., et al. (2022). Blinding of study
+  statisticians in clinical trials: A qualitative study in UK clinical trials
+  units. *Trials, 23*, 535. https://doi.org/10.1186/s13063-022-06481-9
+- Iflaifel, M., Sprange, K., Bell, J., et al. (2023). Developing guidance for a
+  risk-proportionate approach to blinding statisticians within clinical trials:
+  A mixed methods study. *Trials, 24*, 71.
+  https://doi.org/10.1186/s13063-022-06992-5
+- Järvinen, T. L. N., Sihvonen, R., Bhandari, M., et al. (2014). Blinded
+  interpretation of study results can feasibly and effectively diminish
+  interpretation bias. *Journal of Clinical Epidemiology, 67*(7), 769-772.
+  https://doi.org/10.1016/j.jclinepi.2013.11.011
+- MacCoun, R., & Perlmutter, S. (2015). Blind analysis: Hide results to seek the
+  truth. *Nature, 526*, 187-189. https://doi.org/10.1038/526187a
+- Monaghan, T. F., Agudelo, C. W., Rahman, S. N., Wein, A. J., Lazar, J. M.,
+  Everaert, K., & Dmochowski, R. R. (2021). Blinding in clinical trials: Seeing
+  the big picture. *Medicina, 57*(7), 647.
+  https://doi.org/10.3390/medicina57070647
+- Muir, J., Bernstein, G. M., Huterer, D., et al. (2020). Blinding multiprobe
+  cosmological experiments. *Monthly Notices of the Royal Astronomical Society,
+  494*(3), 4454-4470. https://doi.org/10.1093/mnras/staa965
 ## First-release workflow
 
 The current prototype implements a browser-local, file-mediated workflow:
