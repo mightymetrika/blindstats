@@ -3,6 +3,8 @@ import { notFound, redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
 
+import { createBlindingWorkflow } from "./blinding/actions";
+
 type StudyPageProps = {
   params: Promise<{
     studyId: string;
@@ -20,14 +22,32 @@ export default async function StudyPage({ params }: StudyPageProps) {
     redirect("/login");
   }
 
-  const { data: study, error } = await supabase
-    .from("studies")
-    .select("id, name, description, lifecycle, created_at, updated_at")
-    .eq("id", studyId)
-    .maybeSingle();
+  const [
+    { data: study, error: studyError },
+    { data: workflow, error: workflowError },
+  ] = await Promise.all([
+    supabase
+      .from("studies")
+      .select("id, name, description, lifecycle, created_at, updated_at")
+      .eq("id", studyId)
+      .maybeSingle(),
+    supabase
+      .from("blinding_workflows")
+      .select("id, state, created_at")
+      .eq("study_id", studyId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
 
-  if (error) {
-    throw new Error(`Unable to load Study: ${error.message}`);
+  if (studyError) {
+    throw new Error(`Unable to load Study: ${studyError.message}`);
+  }
+
+  if (workflowError) {
+    throw new Error(
+      `Unable to load blinding workflow: ${workflowError.message}`,
+    );
   }
 
   if (!study) {
@@ -59,11 +79,39 @@ export default async function StudyPage({ params }: StudyPageProps) {
       </header>
 
       <section className="mt-10 rounded-2xl border border-black/10 p-6 dark:border-white/15">
-        <h2 className="text-lg font-semibold">Study workspace</h2>
-        <p className="mt-2 text-sm text-black/60 dark:text-white/60">
-          This Study is persistent and access-controlled. Research workflows
-          added to this Study will appear here.
-        </p>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-semibold">Blinding workflow</h2>
+            <p className="mt-2 max-w-2xl text-sm text-black/60 dark:text-white/60">
+              Configure the analyst-blinding workflow for this Study.
+            </p>
+          </div>
+
+          {workflow ? (
+            <span className="rounded-full border border-black/10 px-2.5 py-1 text-xs font-medium capitalize text-black/60 dark:border-white/15 dark:text-white/60">
+              {workflow.state.replaceAll("_", " ")}
+            </span>
+          ) : null}
+        </div>
+
+        {workflow ? (
+          <Link
+            className="mt-5 inline-block rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background"
+            href={`/studies/${study.id}/blinding/${workflow.id}`}
+          >
+            Open blinding workflow
+          </Link>
+        ) : (
+          <form action={createBlindingWorkflow} className="mt-5">
+            <input type="hidden" name="studyId" value={study.id} />
+            <button
+              className="rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background"
+              type="submit"
+            >
+              Create blinding workflow
+            </button>
+          </form>
+        )}
       </section>
 
       <section className="mt-6 grid gap-4 sm:grid-cols-2">
