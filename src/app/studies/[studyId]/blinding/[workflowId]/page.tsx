@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
+import { BlindingWorkspace } from "@/components/blinding/BlindingWorkspace";
 import { createClient } from "@/lib/supabase/server";
 
 import {
   activateBlindingPlan,
+  registerBlindingTransformation,
   saveBlindingPlanDraft,
 } from "../actions";
 
@@ -16,6 +18,7 @@ type BlindingWorkflowPageProps = {
   searchParams: Promise<{
     saved?: string;
     activated?: string;
+    blinded?: string;
     stale?: string;
   }>;
 };
@@ -31,7 +34,7 @@ export default async function BlindingWorkflowPage({
   searchParams,
 }: BlindingWorkflowPageProps) {
   const { studyId, workflowId } = await params;
-  const { saved, activated, stale } = await searchParams;
+  const { saved, activated, blinded, stale } = await searchParams;
   const supabase = await createClient();
 
   const { data: claimsData, error: claimsError } =
@@ -119,6 +122,38 @@ export default async function BlindingWorkflowPage({
     }
 
     activePlan = data;
+  }
+
+  let transformation:
+    | {
+        transformation_id: string;
+        selected_column: string;
+        source_artifact_sha256: string;
+        blinded_artifact_sha256: string;
+        public_receipt_sha256: string;
+        receipt_created_at: string;
+        registered_at: string;
+        plan_version_id: string;
+      }
+    | null = null;
+
+  if (workflow.state !== "setup") {
+    const { data, error } = await supabase
+      .from("blinding_transformations")
+      .select(
+        "transformation_id, selected_column, source_artifact_sha256, blinded_artifact_sha256, public_receipt_sha256, receipt_created_at, registered_at, plan_version_id",
+      )
+      .eq("workflow_id", workflow.id)
+      .eq("study_id", study.id)
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(
+        `Unable to load registered blinding transformation: ${error.message}`,
+      );
+    }
+
+    transformation = data;
   }
 
   const protectionTarget = draft.protection_targets[0] ?? "";
@@ -257,14 +292,115 @@ export default async function BlindingWorkflowPage({
             ) : null}
           </section>
 
-          <section className="mt-6 rounded-2xl border border-black/10 p-6 dark:border-white/15">
-            <h2 className="text-lg font-semibold">Ready for blinding</h2>
-            <p className="mt-2 max-w-3xl text-sm text-black/60 dark:text-white/60">
-              Plan v{activePlan.version_number} is active. The workflow remains
-              in setup until a blinded package is successfully created and
-              registered.
-            </p>
-          </section>
+          {workflow.state === "setup" ? (
+            <>
+              <section className="mt-6 rounded-2xl border border-black/10 p-6 dark:border-white/15">
+                <h2 className="text-lg font-semibold">Ready for blinding</h2>
+                <p className="mt-2 max-w-3xl text-sm text-black/60 dark:text-white/60">
+                  Plan v{activePlan.version_number} is active. Create the blinded
+                  package locally, save all three artifacts, then register the
+                  public receipt to move this workflow into the blinded state.
+                </p>
+              </section>
+
+              <BlindingWorkspace
+                registration={{
+                  studyId: study.id,
+                  workflowId: workflow.id,
+                  planVersionNumber: activePlan.version_number,
+                }}
+                registerAction={registerBlindingTransformation}
+              />
+            </>
+          ) : transformation ? (
+            <section className="mt-6 rounded-2xl border border-black/10 p-6 dark:border-white/15">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-lg font-semibold">Blinding registered</h2>
+                  <p className="mt-2 max-w-3xl text-sm text-black/60 dark:text-white/60">
+                    The public receipt and safe transformation metadata are
+                    registered. Dataset contents and the unblinding secret were
+                    not uploaded as part of this registration.
+                  </p>
+                </div>
+                <span className="rounded-full border border-black/10 px-2.5 py-1 text-xs font-medium dark:border-white/15">
+                  {workflow.state.replaceAll("_", " ")}
+                </span>
+              </div>
+
+              {blinded === "1" ? (
+                <p className="mt-4 text-sm font-medium">
+                  Blinded package registered successfully.
+                </p>
+              ) : null}
+
+              <dl className="mt-6 grid gap-5 sm:grid-cols-2">
+                <div>
+                  <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+                    Transformation ID
+                  </dt>
+                  <dd className="mt-1 break-all font-mono text-sm">
+                    {transformation.transformation_id}
+                  </dd>
+                </div>
+
+                <div>
+                  <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+                    Blinded variable
+                  </dt>
+                  <dd className="mt-1 text-sm">
+                    {transformation.selected_column}
+                  </dd>
+                </div>
+
+                <div>
+                  <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+                    Source SHA-256
+                  </dt>
+                  <dd className="mt-1 break-all font-mono text-xs">
+                    {transformation.source_artifact_sha256}
+                  </dd>
+                </div>
+
+                <div>
+                  <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+                    Blinded SHA-256
+                  </dt>
+                  <dd className="mt-1 break-all font-mono text-xs">
+                    {transformation.blinded_artifact_sha256}
+                  </dd>
+                </div>
+
+                <div>
+                  <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+                    Public receipt SHA-256
+                  </dt>
+                  <dd className="mt-1 break-all font-mono text-xs">
+                    {transformation.public_receipt_sha256}
+                  </dd>
+                </div>
+
+                <div>
+                  <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+                    Registered
+                  </dt>
+                  <dd className="mt-1 text-sm">
+                    {new Date(transformation.registered_at).toLocaleString(
+                      "en-US",
+                    )}
+                  </dd>
+                </div>
+              </dl>
+            </section>
+          ) : (
+            <section className="mt-6 rounded-2xl border border-black/10 p-6 dark:border-white/15">
+              <h2 className="text-lg font-semibold">Blinding workflow</h2>
+              <p className="mt-2 text-sm text-black/60 dark:text-white/60">
+                This workflow is no longer in setup, but no registered blinding
+                transformation is available to display.
+              </p>
+            </section>
+          )}
         </>
       ) : (
         <>

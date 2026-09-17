@@ -1,8 +1,11 @@
 "use server";
 
+import { Buffer } from "node:buffer";
+
 import { revalidatePath } from "next/cache";
 import { redirect, RedirectType } from "next/navigation";
 
+import { parseBlindingReceiptBytes } from "@/lib/blinding/blinding-receipt";
 import { createClient } from "@/lib/supabase/server";
 
 function getRequiredString(formData: FormData, name: string) {
@@ -188,4 +191,148 @@ export async function activateBlindingPlan(formData: FormData) {
   }
 
   redirectToCurrentWorkflow(studyId, workflowId, "activated=1");
+}
+
+export type RegisterBlindingTransformationResult =
+  | {
+      ok: true;
+      transformationRecordId: string;
+    }
+  | {
+      ok: false;
+      error: string;
+    };
+
+export async function registerBlindingTransformation(
+  formData: FormData,
+): Promise<RegisterBlindingTransformationResult> {
+  const studyId = getRequiredString(formData, "studyId");
+  const workflowId = getRequiredString(formData, "workflowId");
+  const publicReceiptBase64Value = formData.get("publicReceiptBase64");
+  const acknowledgedCustody = formData.get("acknowledgeCustody") === "on";
+
+  if (
+    typeof publicReceiptBase64Value !== "string" ||
+    publicReceiptBase64Value.length === 0
+  ) {
+    return {
+      ok: false,
+      error: "A public blinding receipt is required for registration.",
+    };
+  }
+
+  if (!acknowledgedCustody) {
+    return {
+      ok: false,
+      error:
+        "Confirm that the blinded CSV, public receipt, and unblinding secret have been saved before registration.",
+    };
+  }
+
+  const supabase = await createClient();
+  const { data: claimsData, error: claimsError } =
+    await supabase.auth.getClaims();
+
+  if (claimsError || !claimsData?.claims?.sub) {
+    redirect("/login");
+  }
+
+  const { data: workflow, error: workflowError } = await supabase
+    .from("blinding_workflows")
+    .select("state, active_plan_version_id")
+    .eq("id", workflowId)
+    .eq("study_id", studyId)
+    .maybeSingle();
+
+  if (workflowError) {
+    return {
+      ok: false,
+      error: `Unable to verify blinding workflow: ${workflowError.message}`,
+    };
+  }
+
+  if (!workflow) {
+    return {
+      ok: false,
+      error: "Blinding workflow not found.",
+    };
+  }
+
+  if (workflow.state !== "setup") {
+    return {
+      ok: false,
+      error:
+        "This workflow is no longer in setup. Reload the workflow before continuing.",
+    };
+  }
+
+  if (!workflow.active_plan_version_id) {
+    return {
+      ok: false,
+      error: "An active BlindingPlan is required before registration.",
+    };
+  }
+
+  let publicReceiptBytes: Uint8Array;
+  let publicReceiptText: string;
+
+  try {
+    if (
+      publicReceiptBase64Value.length % 4 !== 0 ||
+      !/^[A-Za-z0-9+/]*={0,2}$/.test(publicReceiptBase64Value)
+    ) {
+      throw new Error("Public blinding receipt transport encoding is invalid.");
+    }
+
+    const decoded = Buffer.from(publicReceiptBase64Value, "base64");
+
+    if (decoded.toString("base64") !== publicReceiptBase64Value) {
+      throw new Error("Public blinding receipt transport encoding is invalid.");
+    }
+
+    publicReceiptBytes = new Uint8Array(decoded);
+    parseBlindingReceiptBytes(publicReceiptBytes);
+    publicReceiptText = new TextDecoder("utf-8", { fatal: true }).decode(
+      publicReceiptBytes,
+    );
+  } catch (error) {
+    return {
+      ok: false,
+      error:
+        error instanceof Error
+          ? `Unable to validate public blinding receipt: ${error.message}`
+          : "Unable to validate public blinding receipt.",
+    };
+  }
+
+  const { data, error } = await supabase.rpc(
+    "register_blinding_transformation",
+    {
+      p_workflow_id: workflowId,
+      p_public_receipt_text: publicReceiptText,
+    },
+  );
+
+  if (error) {
+    return {
+      ok: false,
+      error: `Unable to register blinded package: ${error.message}`,
+    };
+  }
+
+  if (typeof data !== "string" || data.length === 0) {
+    return {
+      ok: false,
+      error:
+        "The blinded package was registered, but its server record could not be confirmed.",
+    };
+  }
+
+  revalidatePath(`/studies/${studyId}`);
+  revalidatePath(`/studies/${studyId}/blinding/${workflowId}`);
+
+  return {
+    ok: true,
+    transformationRecordId: data,
+  };
 }

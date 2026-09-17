@@ -2,7 +2,7 @@
 
 import "@testing-library/jest-dom/vitest";
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   afterEach,
@@ -19,6 +19,14 @@ import {
 } from "@/lib/blinding/blinding-package";
 
 import { BlindingWorkspace } from "./BlindingWorkspace";
+
+const routerMocks = vi.hoisted(() => ({
+  replace: vi.fn(),
+}));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => routerMocks,
+}));
 
 vi.mock("@/lib/blinding/blinding-package", () => ({
   createBlindedPackage: vi.fn(),
@@ -289,4 +297,116 @@ describe("BlindingWorkspace workflow", () => {
       expect(button).toBeDisabled();
     });
   });
+
+  it("requires an explicit custody acknowledgement before persistent registration", async () => {
+    const user = userEvent.setup();
+    const registerAction = vi.fn().mockResolvedValue({
+      ok: true,
+      transformationRecordId: "transformation-record-id",
+    });
+
+    render(
+      <BlindingWorkspace
+        registration={{
+          studyId: "study-id",
+          workflowId: "workflow-id",
+          planVersionNumber: 1,
+        }}
+        registerAction={registerAction}
+      />,
+    );
+
+    const registerButton = screen.getByRole("button", {
+      name: "Register blinded package",
+    });
+    const custodyCheckbox = screen.getByRole("checkbox", {
+      name: /I have saved the blinded CSV/i,
+    });
+
+    expect(registerButton).toBeDisabled();
+    expect(custodyCheckbox).toBeDisabled();
+
+    await uploadCsv(user);
+    await chooseColumn(user, "group");
+    await user.click(generateButton());
+    await screen.findByText("Blinded package created successfully.");
+
+    expect(custodyCheckbox).toBeEnabled();
+    expect(registerButton).toBeDisabled();
+
+    await user.click(custodyCheckbox);
+    expect(registerButton).toBeEnabled();
+
+    await user.click(registerButton);
+
+    await waitFor(() => {
+      expect(registerAction).toHaveBeenCalledTimes(1);
+    });
+
+    const [formData] = registerAction.mock.calls[0] as [FormData];
+
+    expect(formData.get("studyId")).toBe("study-id");
+    expect(formData.get("workflowId")).toBe("workflow-id");
+    const publicReceiptBase64 = formData.get("publicReceiptBase64");
+
+    expect(typeof publicReceiptBase64).toBe("string");
+
+    const decodedReceiptBytes = Uint8Array.from(
+      atob(publicReceiptBase64 as string),
+      (character) => character.charCodeAt(0),
+    );
+
+    expect(new TextDecoder().decode(decodedReceiptBytes)).toBe(
+      createMockPackage().receiptArtifact.text,
+    );
+    expect(formData.get("acknowledgeCustody")).toBe("on");
+    expect(routerMocks.replace).toHaveBeenCalledWith(
+      "/studies/study-id/blinding/workflow-id?blinded=1",
+    );
+  });
+
+  it("keeps generated artifacts available when registration fails", async () => {
+    const user = userEvent.setup();
+    const registerAction = vi.fn().mockResolvedValue({
+      ok: false,
+      error: "The workflow changed in another tab.",
+    });
+
+    render(
+      <BlindingWorkspace
+        registration={{
+          studyId: "study-id",
+          workflowId: "workflow-id",
+          planVersionNumber: 1,
+        }}
+        registerAction={registerAction}
+      />,
+    );
+
+    await uploadCsv(user);
+    await chooseColumn(user, "group");
+    await user.click(generateButton());
+    await screen.findByText("Blinded package created successfully.");
+
+    await user.click(
+      screen.getByRole("checkbox", {
+        name: /I have saved the blinded CSV/i,
+      }),
+    );
+    await user.click(
+      screen.getByRole("button", {
+        name: "Register blinded package",
+      }),
+    );
+
+    expect(
+      await screen.findByText("The workflow changed in another tab."),
+    ).toBeInTheDocument();
+
+    downloadButtons().forEach((button) => {
+      expect(button).toBeEnabled();
+    });
+    expect(routerMocks.replace).not.toHaveBeenCalled();
+  });
+
 });

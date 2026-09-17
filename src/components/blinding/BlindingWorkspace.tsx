@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import {
   useMemo,
   useState,
@@ -19,8 +20,31 @@ import { getDistinctNonmissingCategories } from "@/lib/blinding/mapping";
 const CATEGORY_PREVIEW_LIMIT = 8;
 
 type WorkspaceError = {
-  stage: "file" | "generation";
+  stage: "file" | "generation" | "registration";
   message: string;
+};
+
+export type BlindingRegistrationResult =
+  | {
+      ok: true;
+      transformationRecordId: string;
+    }
+  | {
+      ok: false;
+      error: string;
+    };
+
+type BlindingRegistrationContext = {
+  studyId: string;
+  workflowId: string;
+  planVersionNumber: number;
+};
+
+type BlindingWorkspaceProps = {
+  registration?: BlindingRegistrationContext;
+  registerAction?: (
+    formData: FormData,
+  ) => Promise<BlindingRegistrationResult>;
 };
 
 function getErrorMessage(error: unknown): string {
@@ -33,6 +57,18 @@ function getErrorMessage(error: unknown): string {
 
 function sourceBaseName(filename: string): string {
   return filename.replace(/\.csv$/i, "");
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  const chunkSize = 0x8000;
+  let binary = "";
+
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    const chunk = bytes.subarray(offset, offset + chunkSize);
+    binary += String.fromCharCode(...chunk);
+  }
+
+  return btoa(binary);
 }
 
 function downloadBytes(
@@ -87,7 +123,11 @@ function HashValue({ value }: { value: string }) {
   );
 }
 
-export function BlindingWorkspace() {
+export function BlindingWorkspace({
+  registration,
+  registerAction,
+}: BlindingWorkspaceProps = {}) {
+  const router = useRouter();
   const [sourceFile, setSourceFile] = useState<File | null>(null);
   const [sourceBytes, setSourceBytes] = useState<Uint8Array | null>(null);
   const [parsed, setParsed] = useState<ParsedCsvDataset | null>(null);
@@ -97,6 +137,10 @@ export function BlindingWorkspace() {
     null,
   );
   const [isGenerating, setIsGenerating] = useState(false);
+  const [custodyAcknowledged, setCustodyAcknowledged] = useState(false);
+  const [isRegistering, setIsRegistering] = useState(false);
+
+  const registrationEnabled = Boolean(registration && registerAction);
 
   const selectedColumnInspection = useMemo(() => {
     if (!parsed || !selectedColumn) {
@@ -131,6 +175,7 @@ export function BlindingWorkspace() {
 
   function resetGeneratedPackage(): void {
     setGeneration(null);
+    setCustodyAcknowledged(false);
   }
 
   async function handleFileChange(
@@ -242,10 +287,72 @@ export function BlindingWorkspace() {
     );
   }
 
+
+  async function handleRegister(): Promise<void> {
+    if (
+      !registration ||
+      !registerAction ||
+      !generation ||
+      !custodyAcknowledged ||
+      isRegistering
+    ) {
+      return;
+    }
+
+    const formData = new FormData();
+
+    formData.set("studyId", registration.studyId);
+    formData.set("workflowId", registration.workflowId);
+    formData.set(
+      "publicReceiptBase64",
+      bytesToBase64(generation.receiptArtifact.bytes),
+    );
+    formData.set("acknowledgeCustody", "on");
+
+    setIsRegistering(true);
+    setWorkspaceError(null);
+
+    try {
+      const result = await registerAction(formData);
+
+      if (result.ok === false) {
+        setWorkspaceError({
+          stage: "registration",
+          message: result.error,
+        });
+        return;
+      }
+
+      router.replace(
+        `/studies/${registration.studyId}/blinding/${registration.workflowId}?blinded=1`,
+      );
+    } catch (error) {
+      setWorkspaceError({
+        stage: "registration",
+        message: getErrorMessage(error),
+      });
+    } finally {
+      setIsRegistering(false);
+    }
+  }
+
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-950">
-      <div className="mx-auto w-full max-w-5xl px-6 py-10 sm:px-8 sm:py-14">
-        <header className="mb-8">
+    <div
+      className={
+        registrationEnabled
+          ? "mt-6 text-slate-950"
+          : "min-h-screen bg-slate-50 text-slate-950"
+      }
+    >
+      <div
+        className={
+          registrationEnabled
+            ? "w-full"
+            : "mx-auto w-full max-w-5xl px-6 py-10 sm:px-8 sm:py-14"
+        }
+      >
+        {!registrationEnabled ? (
+          <header className="mb-8">
           <div className="flex flex-wrap items-center gap-3">
             <p className="text-sm font-semibold tracking-wide text-slate-500">
               blindstats
@@ -263,17 +370,17 @@ export function BlindingWorkspace() {
             Select a CSV, choose one categorical variable, and generate a
             blinded CSV with a public receipt and separate unblinding secret.
           </p>
-        </header>
+          </header>
+        ) : null}
 
         <section className="mb-8 rounded-2xl border border-sky-200 bg-sky-50 p-5">
           <h2 className="text-sm font-semibold text-sky-950">
-            Local-processing prototype
+            Browser-local research files
           </h2>
           <p className="mt-2 text-sm leading-6 text-sky-900">
-            Dataset contents and the generated unblinding secret are processed in
-            this browser session. This v0 workspace does not yet provide
-            accounts, role-based separation, cloud storage, or controls
-            appropriate for sensitive or regulated research data.
+            {registrationEnabled
+              ? "Source and blinded dataset contents and the unblinding secret stay in this browser session. Registration sends only the public receipt and safe transformation metadata to blindstats."
+              : "Dataset contents and the generated unblinding secret are processed in this browser session. This standalone v0 workspace does not register workflow state or store research files on a server."}
           </p>
         </section>
 
@@ -590,9 +697,74 @@ export function BlindingWorkspace() {
               </div>
             </div>
           </section>
+
+          {registrationEnabled && registration ? (
+            <section
+              className={`rounded-2xl border bg-white p-6 shadow-sm sm:p-7 ${
+                generation
+                  ? "border-slate-200"
+                  : "border-slate-200 opacity-60"
+              }`}
+            >
+              <StageHeading
+                number={5}
+                title="Register blinding"
+                description={`Bind this package to active BlindingPlan v${registration.planVersionNumber} and move the workflow from setup to blinded.`}
+              />
+
+              <div className="mt-6">
+                <label className="flex max-w-3xl items-start gap-3 text-sm leading-6 text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={custodyAcknowledged}
+                    onChange={(event) =>
+                      setCustodyAcknowledged(event.target.checked)
+                    }
+                    disabled={!generation || isRegistering}
+                    className="mt-1"
+                  />
+                  <span>
+                    I have saved the blinded CSV, public receipt, and unblinding
+                    secret, and I understand that blindstats does not store the
+                    unblinding secret.
+                  </span>
+                </label>
+
+                <button
+                  type="button"
+                  onClick={handleRegister}
+                  disabled={
+                    !generation ||
+                    !custodyAcknowledged ||
+                    isRegistering
+                  }
+                  className="mt-5 inline-flex min-h-11 items-center justify-center rounded-xl bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                >
+                  {isRegistering
+                    ? "Registering..."
+                    : "Register blinded package"}
+                </button>
+
+                {workspaceError?.stage === "registration" ? (
+                  <p
+                    className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"
+                    role="alert"
+                  >
+                    {workspaceError.message}
+                  </p>
+                ) : null}
+
+                <p className="mt-4 max-w-3xl text-xs leading-5 text-slate-500">
+                  Registration stores the exact public receipt and safe artifact
+                  metadata. It does not upload the source CSV, blinded CSV, or
+                  unblinding secret.
+                </p>
+              </div>
+            </section>
+          ) : null}
         </div>
 
       </div>
-    </main>
+    </div>
   );
 }
