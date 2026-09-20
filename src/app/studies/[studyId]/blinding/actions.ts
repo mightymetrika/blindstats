@@ -5,6 +5,7 @@ import { Buffer } from "node:buffer";
 import { revalidatePath } from "next/cache";
 import { redirect, RedirectType } from "next/navigation";
 
+import { parseAnalysisLockReceiptBytes } from "@/lib/blinding/analysis-lock-receipt";
 import { parseBlindingReceiptBytes } from "@/lib/blinding/blinding-receipt";
 import { createClient } from "@/lib/supabase/server";
 
@@ -334,5 +335,129 @@ export async function registerBlindingTransformation(
   return {
     ok: true,
     transformationRecordId: data,
+  };
+}
+
+export type RegisterAnalysisLockResult =
+  | {
+      ok: true;
+      lockRecordId: string;
+    }
+  | {
+      ok: false;
+      error: string;
+    };
+
+export async function registerAnalysisLock(
+  formData: FormData,
+): Promise<RegisterAnalysisLockResult> {
+  const studyId = getRequiredString(formData, "studyId");
+  const workflowId = getRequiredString(formData, "workflowId");
+  const receiptBase64Value = formData.get("analysisLockReceiptBase64");
+
+  if (
+    typeof receiptBase64Value !== "string" ||
+    receiptBase64Value.length === 0
+  ) {
+    return {
+      ok: false,
+      error: "An analysis-lock receipt is required for registration.",
+    };
+  }
+
+  const supabase = await createClient();
+  const { data: claimsData, error: claimsError } =
+    await supabase.auth.getClaims();
+
+  if (claimsError || !claimsData?.claims?.sub) {
+    redirect("/login");
+  }
+
+  const { data: workflow, error: workflowError } = await supabase
+    .from("blinding_workflows")
+    .select("state")
+    .eq("id", workflowId)
+    .eq("study_id", studyId)
+    .maybeSingle();
+
+  if (workflowError) {
+    return {
+      ok: false,
+      error: `Unable to verify blinding workflow: ${workflowError.message}`,
+    };
+  }
+
+  if (!workflow) {
+    return {
+      ok: false,
+      error: "Blinding workflow not found.",
+    };
+  }
+
+  if (workflow.state !== "blinded") {
+    return {
+      ok: false,
+      error:
+        "Analysis-lock registration requires the workflow to be blinded. Reload the workflow before continuing.",
+    };
+  }
+
+  let receiptText: string;
+
+  try {
+    if (
+      receiptBase64Value.length % 4 !== 0 ||
+      !/^[A-Za-z0-9+/]*={0,2}$/.test(receiptBase64Value)
+    ) {
+      throw new Error("Analysis-lock receipt transport encoding is invalid.");
+    }
+
+    const decoded = Buffer.from(receiptBase64Value, "base64");
+
+    if (decoded.toString("base64") !== receiptBase64Value) {
+      throw new Error("Analysis-lock receipt transport encoding is invalid.");
+    }
+
+    const receiptBytes = new Uint8Array(decoded);
+    parseAnalysisLockReceiptBytes(receiptBytes);
+    receiptText = new TextDecoder("utf-8", { fatal: true }).decode(
+      receiptBytes,
+    );
+  } catch (error) {
+    return {
+      ok: false,
+      error:
+        error instanceof Error
+          ? `Unable to validate analysis-lock receipt: ${error.message}`
+          : "Unable to validate analysis-lock receipt.",
+    };
+  }
+
+  const { data, error } = await supabase.rpc("register_analysis_lock", {
+    p_workflow_id: workflowId,
+    p_analysis_lock_receipt_text: receiptText,
+  });
+
+  if (error) {
+    return {
+      ok: false,
+      error: `Unable to register analysis lock: ${error.message}`,
+    };
+  }
+
+  if (typeof data !== "string" || data.length === 0) {
+    return {
+      ok: false,
+      error:
+        "The analysis lock was registered, but its server record could not be confirmed.",
+    };
+  }
+
+  revalidatePath(`/studies/${studyId}`);
+  revalidatePath(`/studies/${studyId}/blinding/${workflowId}`);
+
+  return {
+    ok: true,
+    lockRecordId: data,
   };
 }

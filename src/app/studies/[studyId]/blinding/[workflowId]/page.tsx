@@ -1,11 +1,15 @@
+import { Buffer } from "node:buffer";
+
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
+import { AnalysisLockWorkspace } from "@/components/blinding/AnalysisLockWorkspace";
 import { BlindingWorkspace } from "@/components/blinding/BlindingWorkspace";
 import { createClient } from "@/lib/supabase/server";
 
 import {
   activateBlindingPlan,
+  registerAnalysisLock,
   registerBlindingTransformation,
   saveBlindingPlanDraft,
 } from "../actions";
@@ -19,6 +23,7 @@ type BlindingWorkflowPageProps = {
     saved?: string;
     activated?: string;
     blinded?: string;
+    locked?: string;
     stale?: string;
   }>;
 };
@@ -34,7 +39,7 @@ export default async function BlindingWorkflowPage({
   searchParams,
 }: BlindingWorkflowPageProps) {
   const { studyId, workflowId } = await params;
-  const { saved, activated, blinded, stale } = await searchParams;
+  const { saved, activated, blinded, locked, stale } = await searchParams;
   const supabase = await createClient();
 
   const { data: claimsData, error: claimsError } =
@@ -134,6 +139,7 @@ export default async function BlindingWorkflowPage({
         receipt_created_at: string;
         registered_at: string;
         plan_version_id: string;
+        public_receipt_text: string;
       }
     | null = null;
 
@@ -141,7 +147,7 @@ export default async function BlindingWorkflowPage({
     const { data, error } = await supabase
       .from("blinding_transformations")
       .select(
-        "transformation_id, selected_column, source_artifact_sha256, blinded_artifact_sha256, public_receipt_sha256, receipt_created_at, registered_at, plan_version_id",
+        "transformation_id, selected_column, source_artifact_sha256, blinded_artifact_sha256, public_receipt_sha256, public_receipt_text, receipt_created_at, registered_at, plan_version_id",
       )
       .eq("workflow_id", workflow.id)
       .eq("study_id", study.id)
@@ -154,6 +160,34 @@ export default async function BlindingWorkflowPage({
     }
 
     transformation = data;
+  }
+
+  let analysisLocks: {
+    id: string;
+    lock_id: string;
+    receipt_created_at: string;
+    analysis_artifact_filename: string;
+    analysis_artifact_sha256: string;
+    analysis_artifact_byte_length: number;
+    analysis_lock_receipt_sha256: string;
+    registered_at: string;
+  }[] = [];
+
+  if (transformation) {
+    const { data, error } = await supabase
+      .from("analysis_locks")
+      .select(
+        "id, lock_id, receipt_created_at, analysis_artifact_filename, analysis_artifact_sha256, analysis_artifact_byte_length, analysis_lock_receipt_sha256, registered_at",
+      )
+      .eq("workflow_id", workflow.id)
+      .eq("study_id", study.id)
+      .order("registered_at", { ascending: false });
+
+    if (error) {
+      throw new Error(`Unable to load analysis locks: ${error.message}`);
+    }
+
+    analysisLocks = data ?? [];
   }
 
   const protectionTarget = draft.protection_targets[0] ?? "";
@@ -313,85 +347,220 @@ export default async function BlindingWorkflowPage({
               />
             </>
           ) : transformation ? (
-            <section className="mt-6 rounded-2xl border border-black/10 p-6 dark:border-white/15">
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div>
-                  <h2 className="text-lg font-semibold">Blinding registered</h2>
-                  <p className="mt-2 max-w-3xl text-sm text-black/60 dark:text-white/60">
-                    The public receipt and safe transformation metadata are
-                    registered. Dataset contents and the unblinding secret were
-                    not uploaded as part of this registration.
+            <>
+              <section className="mt-6 rounded-2xl border border-black/10 p-6 dark:border-white/15">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div>
+                    <h2 className="text-lg font-semibold">Blinding registered</h2>
+                    <p className="mt-2 max-w-3xl text-sm text-black/60 dark:text-white/60">
+                      The public receipt and safe transformation metadata are
+                      registered. Dataset contents and the unblinding secret were
+                      not uploaded as part of this registration.
+                    </p>
+                  </div>
+                  <span className="rounded-full border border-black/10 px-2.5 py-1 text-xs font-medium dark:border-white/15">
+                    {workflow.state.replaceAll("_", " ")}
+                  </span>
+                </div>
+
+                {blinded === "1" ? (
+                  <p className="mt-4 text-sm font-medium">
+                    Blinded package registered successfully.
                   </p>
-                </div>
-                <span className="rounded-full border border-black/10 px-2.5 py-1 text-xs font-medium dark:border-white/15">
-                  {workflow.state.replaceAll("_", " ")}
-                </span>
-              </div>
+                ) : null}
 
-              {blinded === "1" ? (
-                <p className="mt-4 text-sm font-medium">
-                  Blinded package registered successfully.
+                <dl className="mt-6 grid gap-5 sm:grid-cols-2">
+                  <div>
+                    <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+                      Transformation ID
+                    </dt>
+                    <dd className="mt-1 break-all font-mono text-sm">
+                      {transformation.transformation_id}
+                    </dd>
+                  </div>
+
+                  <div>
+                    <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+                      Blinded variable
+                    </dt>
+                    <dd className="mt-1 text-sm">
+                      {transformation.selected_column}
+                    </dd>
+                  </div>
+
+                  <div>
+                    <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+                      Source SHA-256
+                    </dt>
+                    <dd className="mt-1 break-all font-mono text-xs">
+                      {transformation.source_artifact_sha256}
+                    </dd>
+                  </div>
+
+                  <div>
+                    <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+                      Blinded SHA-256
+                    </dt>
+                    <dd className="mt-1 break-all font-mono text-xs">
+                      {transformation.blinded_artifact_sha256}
+                    </dd>
+                  </div>
+
+                  <div>
+                    <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+                      Public receipt SHA-256
+                    </dt>
+                    <dd className="mt-1 break-all font-mono text-xs">
+                      {transformation.public_receipt_sha256}
+                    </dd>
+                  </div>
+
+                  <div>
+                    <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+                      Registered
+                    </dt>
+                    <dd className="mt-1 text-sm">
+                      {new Date(transformation.registered_at).toLocaleString(
+                        "en-US",
+                      )}
+                    </dd>
+                  </div>
+                </dl>
+              </section>
+
+              <section className="mt-6 rounded-2xl border border-black/10 p-6 dark:border-white/15">
+                <h2 className="text-lg font-semibold">Analysis locks</h2>
+                <p className="mt-2 max-w-3xl text-sm text-black/60 dark:text-white/60">
+                  Each registered lock identifies one exact analysis artifact
+                  under the registered blinding receipt. Analysis artifact
+                  contents are not stored by blindstats.
                 </p>
+
+                {locked === "1" ? (
+                  <p className="mt-4 text-sm font-medium">
+                    Analysis lock registered successfully.
+                  </p>
+                ) : null}
+
+                {analysisLocks.length === 0 ? (
+                  <p className="mt-5 text-sm text-black/60 dark:text-white/60">
+                    No analysis lock has been registered yet.
+                  </p>
+                ) : (
+                  <div className="mt-5 space-y-4">
+                    {analysisLocks.map((lock, index) => (
+                      <div
+                        className="rounded-xl border border-black/10 p-4 dark:border-white/15"
+                        key={lock.id}
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <p className="text-sm font-medium">
+                            Analysis lock {analysisLocks.length - index}
+                          </p>
+                          <span className="text-xs text-black/50 dark:text-white/50">
+                            Registered {new Date(lock.registered_at).toLocaleString("en-US")}
+                          </span>
+                        </div>
+
+                        <dl className="mt-4 grid gap-4 sm:grid-cols-2">
+                          <div>
+                            <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+                              Analysis artifact
+                            </dt>
+                            <dd className="mt-1 break-all text-sm">
+                              {lock.analysis_artifact_filename}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+                              Byte length
+                            </dt>
+                            <dd className="mt-1 text-sm">
+                              {lock.analysis_artifact_byte_length.toLocaleString()}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+                              Analysis SHA-256
+                            </dt>
+                            <dd className="mt-1 break-all font-mono text-xs">
+                              {lock.analysis_artifact_sha256}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+                              Lock receipt SHA-256
+                            </dt>
+                            <dd className="mt-1 break-all font-mono text-xs">
+                              {lock.analysis_lock_receipt_sha256}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+                              Lock ID
+                            </dt>
+                            <dd className="mt-1 break-all font-mono text-xs">
+                              {lock.lock_id}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+                              Receipt created
+                            </dt>
+                            <dd className="mt-1 text-sm">
+                              {new Date(lock.receipt_created_at).toLocaleString("en-US")}
+                            </dd>
+                          </div>
+                        </dl>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              {workflow.state === "blinded" ? (
+                analysisLocks.length === 0 ? (
+                  <AnalysisLockWorkspace
+                    registration={{
+                      studyId: study.id,
+                      workflowId: workflow.id,
+                      transformationId: transformation.transformation_id,
+                      publicReceiptSha256: transformation.public_receipt_sha256,
+                      publicReceiptBase64: Buffer.from(
+                        transformation.public_receipt_text,
+                        "utf8",
+                      ).toString("base64"),
+                    }}
+                    registerAction={registerAnalysisLock}
+                  />
+                ) : (
+                  <details className="mt-6 rounded-2xl border border-black/10 p-6 dark:border-white/15">
+                    <summary className="cursor-pointer text-sm font-semibold">
+                      Create another analysis lock
+                    </summary>
+                    <p className="mt-2 max-w-3xl text-sm text-black/60 dark:text-white/60">
+                      Create an additional immutable lock for another exact
+                      analysis artifact. Existing registered locks remain
+                      unchanged.
+                    </p>
+
+                    <AnalysisLockWorkspace
+                      registration={{
+                        studyId: study.id,
+                        workflowId: workflow.id,
+                        transformationId: transformation.transformation_id,
+                        publicReceiptSha256: transformation.public_receipt_sha256,
+                        publicReceiptBase64: Buffer.from(
+                          transformation.public_receipt_text,
+                          "utf8",
+                        ).toString("base64"),
+                      }}
+                      registerAction={registerAnalysisLock}
+                    />
+                  </details>
+                )
               ) : null}
-
-              <dl className="mt-6 grid gap-5 sm:grid-cols-2">
-                <div>
-                  <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
-                    Transformation ID
-                  </dt>
-                  <dd className="mt-1 break-all font-mono text-sm">
-                    {transformation.transformation_id}
-                  </dd>
-                </div>
-
-                <div>
-                  <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
-                    Blinded variable
-                  </dt>
-                  <dd className="mt-1 text-sm">
-                    {transformation.selected_column}
-                  </dd>
-                </div>
-
-                <div>
-                  <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
-                    Source SHA-256
-                  </dt>
-                  <dd className="mt-1 break-all font-mono text-xs">
-                    {transformation.source_artifact_sha256}
-                  </dd>
-                </div>
-
-                <div>
-                  <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
-                    Blinded SHA-256
-                  </dt>
-                  <dd className="mt-1 break-all font-mono text-xs">
-                    {transformation.blinded_artifact_sha256}
-                  </dd>
-                </div>
-
-                <div>
-                  <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
-                    Public receipt SHA-256
-                  </dt>
-                  <dd className="mt-1 break-all font-mono text-xs">
-                    {transformation.public_receipt_sha256}
-                  </dd>
-                </div>
-
-                <div>
-                  <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
-                    Registered
-                  </dt>
-                  <dd className="mt-1 text-sm">
-                    {new Date(transformation.registered_at).toLocaleString(
-                      "en-US",
-                    )}
-                  </dd>
-                </div>
-              </dl>
-            </section>
+            </>
           ) : (
             <section className="mt-6 rounded-2xl border border-black/10 p-6 dark:border-white/15">
               <h2 className="text-lg font-semibold">Blinding workflow</h2>

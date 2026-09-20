@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, type ChangeEvent } from "react";
+import { useRouter } from "next/navigation";
+import { useMemo, useState, type ChangeEvent } from "react";
 
 import {
   createAnalysisLockPackage,
@@ -8,8 +9,33 @@ import {
 } from "@/lib/blinding/analysis-lock";
 
 type WorkspaceError = {
-  stage: "receipt" | "analysis" | "generation";
+  stage: "receipt" | "analysis" | "generation" | "registration";
   message: string;
+};
+
+export type AnalysisLockRegistrationResult =
+  | {
+      ok: true;
+      lockRecordId: string;
+    }
+  | {
+      ok: false;
+      error: string;
+    };
+
+type AnalysisLockRegistrationContext = {
+  studyId: string;
+  workflowId: string;
+  transformationId: string;
+  publicReceiptSha256: string;
+  publicReceiptBase64: string;
+};
+
+type AnalysisLockWorkspaceProps = {
+  registration?: AnalysisLockRegistrationContext;
+  registerAction?: (
+    formData: FormData,
+  ) => Promise<AnalysisLockRegistrationResult>;
 };
 
 function getErrorMessage(error: unknown): string {
@@ -18,6 +44,22 @@ function getErrorMessage(error: unknown): string {
   }
 
   return "An unexpected error occurred.";
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  const chunkSize = 0x8000;
+  let binary = "";
+
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize));
+  }
+
+  return btoa(binary);
+}
+
+function base64ToBytes(value: string): Uint8Array {
+  const binary = atob(value);
+  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
 }
 
 function downloadBytes(
@@ -98,7 +140,11 @@ async function readFileBytes(file: File): Promise<Uint8Array> {
   return new Uint8Array(await file.arrayBuffer());
 }
 
-export function AnalysisLockWorkspace() {
+export function AnalysisLockWorkspace({
+  registration,
+  registerAction,
+}: AnalysisLockWorkspaceProps = {}) {
+  const router = useRouter();
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [receiptBytes, setReceiptBytes] = useState<Uint8Array | null>(null);
   const [analysisFile, setAnalysisFile] = useState<File | null>(null);
@@ -108,14 +154,25 @@ export function AnalysisLockWorkspace() {
     null,
   );
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isRegistering, setIsRegistering] = useState(false);
+
+  const registrationEnabled = Boolean(registration && registerAction);
+
+  const registeredReceiptBytes = useMemo(() => {
+    if (!registration) {
+      return null;
+    }
+
+    return base64ToBytes(registration.publicReceiptBase64);
+  }, [registration]);
+
+  const effectiveReceiptBytes = registeredReceiptBytes ?? receiptBytes;
+  const receiptReady = registrationEnabled
+    ? Boolean(registeredReceiptBytes)
+    : Boolean(receiptFile && receiptBytes);
 
   const canGenerate =
-    Boolean(
-      receiptFile &&
-        receiptBytes &&
-        analysisFile &&
-        analysisBytes,
-    ) && !isGenerating;
+    Boolean(receiptReady && analysisFile && analysisBytes) && !isGenerating;
 
   function invalidateGeneration(): void {
     setGeneration(null);
@@ -173,11 +230,7 @@ export function AnalysisLockWorkspace() {
   }
 
   async function handleGenerate(): Promise<void> {
-    if (
-      !receiptBytes ||
-      !analysisFile ||
-      !analysisBytes
-    ) {
+    if (!effectiveReceiptBytes || !analysisFile || !analysisBytes) {
       return;
     }
 
@@ -187,7 +240,7 @@ export function AnalysisLockWorkspace() {
 
     try {
       const result = await createAnalysisLockPackage(
-        receiptBytes,
+        effectiveReceiptBytes,
         {
           filename: analysisFile.name,
           bytes: analysisBytes,
@@ -217,9 +270,66 @@ export function AnalysisLockWorkspace() {
     );
   }
 
+  async function handleRegister(): Promise<void> {
+    if (
+      !registration ||
+      !registerAction ||
+      !generation ||
+      isRegistering
+    ) {
+      return;
+    }
+
+    const formData = new FormData();
+    formData.set("studyId", registration.studyId);
+    formData.set("workflowId", registration.workflowId);
+    formData.set(
+      "analysisLockReceiptBase64",
+      bytesToBase64(generation.receiptArtifact.bytes),
+    );
+
+    setIsRegistering(true);
+    setWorkspaceError(null);
+
+    try {
+      const result = await registerAction(formData);
+
+      if (result.ok === false) {
+        setWorkspaceError({
+          stage: "registration",
+          message: result.error,
+        });
+        return;
+      }
+
+      router.replace(
+        `/studies/${registration.studyId}/blinding/${registration.workflowId}?locked=1`,
+      );
+    } catch (error) {
+      setWorkspaceError({
+        stage: "registration",
+        message: getErrorMessage(error),
+      });
+    } finally {
+      setIsRegistering(false);
+    }
+  }
+
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-950">
-      <div className="mx-auto w-full max-w-5xl px-6 py-10 sm:px-8 sm:py-14">
+    <div
+      className={
+        registrationEnabled
+          ? "mt-6 text-slate-950"
+          : "min-h-screen bg-slate-50 text-slate-950"
+      }
+    >
+      <div
+        className={
+          registrationEnabled
+            ? "w-full"
+            : "mx-auto w-full max-w-5xl px-6 py-10 sm:px-8 sm:py-14"
+        }
+      >
         <header className="mb-8">
           <div className="flex flex-wrap items-center gap-3">
             <p className="text-sm font-semibold tracking-wide text-slate-500">
@@ -235,8 +345,9 @@ export function AnalysisLockWorkspace() {
           </h1>
 
           <p className="mt-4 max-w-3xl text-base leading-7 text-slate-600">
-            Select the public blinding receipt and the analysis artifact to lock
-            before unblinding.
+            {registrationEnabled
+              ? "Select the exact analysis artifact to lock. The public blinding receipt already registered for this workflow is supplied automatically."
+              : "Select the public blinding receipt and the analysis artifact to lock before unblinding."}
           </p>
         </header>
 
@@ -245,52 +356,83 @@ export function AnalysisLockWorkspace() {
             Browser-local analysis lock
           </h2>
           <p className="mt-2 text-sm leading-6 text-sky-900">
-            blindstats hashes the exact analysis artifact and links it to the
-            public blinding receipt.
+            blindstats hashes the exact analysis artifact locally and links it to
+            the exact public blinding receipt. The analysis artifact itself is
+            not uploaded during registration.
           </p>
         </section>
 
         <div className="space-y-6">
           <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-7">
-            <StageHeading
-              number={1}
-              title="Select public blinding receipt"
-              description="Choose the exact public receipt associated with the blinded analysis."
-            />
+            {registrationEnabled && registration ? (
+              <>
+                <StageHeading
+                  number={1}
+                  title="Registered blinding receipt"
+                  description="Use the exact public receipt already registered for this blinded workflow."
+                />
+                <dl className="mt-6 space-y-4">
+                  <div>
+                    <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                      Transformation ID
+                    </dt>
+                    <dd className="mt-1 break-all font-mono text-sm text-slate-900">
+                      {registration.transformationId}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                      Public receipt SHA-256
+                    </dt>
+                    <dd>
+                      <HashValue value={registration.publicReceiptSha256} />
+                    </dd>
+                  </div>
+                </dl>
+              </>
+            ) : (
+              <>
+                <StageHeading
+                  number={1}
+                  title="Select public blinding receipt"
+                  description="Choose the exact public receipt associated with the blinded analysis."
+                />
 
-            <div className="mt-6">
-              <label
-                htmlFor="lock-blinding-receipt"
-                className="block text-sm font-medium text-slate-800"
-              >
-                Public blinding receipt
-              </label>
-              <input
-                id="lock-blinding-receipt"
-                type="file"
-                accept=".json,application/json"
-                onChange={handleReceiptChange}
-                className="mt-2 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 file:mr-4 file:rounded-lg file:border-0 file:bg-slate-950 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-slate-800"
-              />
+                <div className="mt-6">
+                  <label
+                    htmlFor="lock-blinding-receipt"
+                    className="block text-sm font-medium text-slate-800"
+                  >
+                    Public blinding receipt
+                  </label>
+                  <input
+                    id="lock-blinding-receipt"
+                    type="file"
+                    accept=".json,application/json"
+                    onChange={handleReceiptChange}
+                    className="mt-2 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 file:mr-4 file:rounded-lg file:border-0 file:bg-slate-950 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-slate-800"
+                  />
 
-              {workspaceError?.stage === "receipt" ? (
-                <p
-                  className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"
-                  role="alert"
-                >
-                  {workspaceError.message}
-                </p>
-              ) : null}
+                  {workspaceError?.stage === "receipt" ? (
+                    <p
+                      className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"
+                      role="alert"
+                    >
+                      {workspaceError.message}
+                    </p>
+                  ) : null}
 
-              {receiptFile ? (
-                <FileSummary file={receiptFile} label="Receipt file" />
-              ) : null}
-            </div>
+                  {receiptFile ? (
+                    <FileSummary file={receiptFile} label="Receipt file" />
+                  ) : null}
+                </div>
+              </>
+            )}
           </section>
 
           <section
             className={`rounded-2xl border bg-white p-6 shadow-sm sm:p-7 ${
-              receiptBytes
+              receiptReady
                 ? "border-slate-200"
                 : "border-slate-200 opacity-60"
             }`}
@@ -337,7 +479,7 @@ export function AnalysisLockWorkspace() {
 
           <section
             className={`rounded-2xl border bg-white p-6 shadow-sm sm:p-7 ${
-              receiptBytes && analysisBytes
+              receiptReady && analysisBytes
                 ? "border-slate-200"
                 : "border-slate-200 opacity-60"
             }`}
@@ -404,8 +546,7 @@ export function AnalysisLockWorkspace() {
                       <dd>
                         <HashValue
                           value={
-                            generation.receipt.blinding
-                              .blindedArtifactSha256
+                            generation.receipt.blinding.blindedArtifactSha256
                           }
                         />
                       </dd>
@@ -425,9 +566,7 @@ export function AnalysisLockWorkspace() {
                         Analysis SHA-256
                       </dt>
                       <dd>
-                        <HashValue
-                          value={generation.receipt.analysisArtifact.sha256}
-                        />
+                        <HashValue value={generation.receipt.analysisArtifact.sha256} />
                       </dd>
                     </div>
                   </dl>
@@ -451,9 +590,46 @@ export function AnalysisLockWorkspace() {
               )}
             </div>
           </section>
-        </div>
 
+          {registrationEnabled ? (
+            <section
+              className={`rounded-2xl border bg-white p-6 shadow-sm sm:p-7 ${
+                generation
+                  ? "border-slate-200"
+                  : "border-slate-200 opacity-60"
+              }`}
+            >
+              <StageHeading
+                number={4}
+                title="Register analysis lock"
+                description="Register the exact lock receipt and safe artifact metadata with this workflow. The analysis artifact contents stay local."
+              />
+
+              <div className="mt-6">
+                <button
+                  type="button"
+                  onClick={handleRegister}
+                  disabled={!generation || isRegistering}
+                  className="inline-flex min-h-11 items-center justify-center rounded-xl bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                >
+                  {isRegistering
+                    ? "Registering analysis lock..."
+                    : "Register analysis lock"}
+                </button>
+
+                {workspaceError?.stage === "registration" ? (
+                  <p
+                    className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"
+                    role="alert"
+                  >
+                    {workspaceError.message}
+                  </p>
+                ) : null}
+              </div>
+            </section>
+          ) : null}
+        </div>
       </div>
-    </main>
+    </div>
   );
 }
