@@ -9,8 +9,10 @@ import { createClient } from "@/lib/supabase/server";
 
 import {
   activateBlindingPlan,
+  authorizeUnblinding,
   registerAnalysisLock,
   registerBlindingTransformation,
+  requestUnblinding,
   saveBlindingPlanDraft,
 } from "../actions";
 
@@ -24,6 +26,8 @@ type BlindingWorkflowPageProps = {
     activated?: string;
     blinded?: string;
     locked?: string;
+    requested?: string;
+    authorized?: string;
     stale?: string;
   }>;
 };
@@ -39,7 +43,8 @@ export default async function BlindingWorkflowPage({
   searchParams,
 }: BlindingWorkflowPageProps) {
   const { studyId, workflowId } = await params;
-  const { saved, activated, blinded, locked, stale } = await searchParams;
+  const { saved, activated, blinded, locked, requested, authorized, stale } =
+    await searchParams;
   const supabase = await createClient();
 
   const { data: claimsData, error: claimsError } =
@@ -49,10 +54,13 @@ export default async function BlindingWorkflowPage({
     redirect("/login");
   }
 
+  const currentUserId = claimsData.claims.sub as string;
+
   const [
     { data: study, error: studyError },
     { data: workflow, error: workflowError },
     { data: draft, error: draftError },
+    { data: currentCapabilities, error: capabilitiesError },
   ] = await Promise.all([
     supabase
       .from("studies")
@@ -75,6 +83,11 @@ export default async function BlindingWorkflowPage({
       .eq("workflow_id", workflowId)
       .eq("study_id", studyId)
       .maybeSingle(),
+    supabase
+      .from("study_capabilities")
+      .select("capability")
+      .eq("study_id", studyId)
+      .eq("user_id", currentUserId),
   ]);
 
   if (studyError) {
@@ -89,6 +102,12 @@ export default async function BlindingWorkflowPage({
 
   if (draftError) {
     throw new Error(`Unable to load BlindingPlan draft: ${draftError.message}`);
+  }
+
+  if (capabilitiesError) {
+    throw new Error(
+      `Unable to load Study capabilities: ${capabilitiesError.message}`,
+    );
   }
 
   if (!study || !workflow || !draft) {
@@ -189,6 +208,63 @@ export default async function BlindingWorkflowPage({
 
     analysisLocks = data ?? [];
   }
+
+  let unblindingRequest:
+    | {
+        id: string;
+        analysis_lock_id: string | null;
+        requested_by: string;
+        requested_at: string;
+      }
+    | null = null;
+
+  let unblindingAuthorization:
+    | {
+        id: string;
+        authorization_policy: string;
+        authorized_by: string;
+        authorized_at: string;
+      }
+    | null = null;
+
+  if (transformation) {
+    const { data, error } = await supabase
+      .from("unblinding_requests")
+      .select("id, analysis_lock_id, requested_by, requested_at")
+      .eq("workflow_id", workflow.id)
+      .eq("study_id", study.id)
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(`Unable to load unblinding request: ${error.message}`);
+    }
+
+    unblindingRequest = data;
+  }
+
+  if (unblindingRequest) {
+    const { data, error } = await supabase
+      .from("unblinding_authorizations")
+      .select("id, authorization_policy, authorized_by, authorized_at")
+      .eq("request_id", unblindingRequest.id)
+      .eq("workflow_id", workflow.id)
+      .eq("study_id", study.id)
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(
+        `Unable to load unblinding authorization: ${error.message}`,
+      );
+    }
+
+    unblindingAuthorization = data;
+  }
+
+  const capabilitySet = new Set(
+    (currentCapabilities ?? []).map((entry) => entry.capability),
+  );
+  const canRequestUnblinding = capabilitySet.has("unblinding.request");
+  const canAuthorizeUnblinding = capabilitySet.has("unblinding.authorize");
 
   const protectionTarget = draft.protection_targets[0] ?? "";
   const hasProtectionTarget = protectionTarget.trim().length > 0;
@@ -518,7 +594,267 @@ export default async function BlindingWorkflowPage({
                 )}
               </section>
 
-              {workflow.state === "blinded" ? (
+              <section className="mt-6 rounded-2xl border border-black/10 p-6 dark:border-white/15">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div>
+                    <h2 className="text-lg font-semibold">Unblinding</h2>
+                    <p className="mt-2 max-w-3xl text-sm text-black/60 dark:text-white/60">
+                      Request and authorization are durable governance events.
+                      Authorization does not itself expose the protected mapping.
+                    </p>
+                  </div>
+                  <span className="rounded-full border border-black/10 px-2.5 py-1 text-xs font-medium dark:border-white/15">
+                    {unblindingAuthorization
+                      ? "Authorized"
+                      : unblindingRequest
+                        ? "Requested"
+                        : "Not requested"}
+                  </span>
+                </div>
+
+                {requested === "1" ? (
+                  <p className="mt-4 text-sm font-medium">
+                    Unblinding request registered successfully.
+                  </p>
+                ) : null}
+
+                {authorized === "1" ? (
+                  <p className="mt-4 text-sm font-medium">
+                    Unblinding authorized successfully. The protected mapping
+                    has not been released by this authorization event.
+                  </p>
+                ) : null}
+
+                {unblindingRequest ? (
+                  <div className="mt-6 rounded-xl border border-black/10 p-4 dark:border-white/15">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <p className="text-sm font-medium">Unblinding request</p>
+                      <span className="text-xs text-black/50 dark:text-white/50">
+                        Requested {new Date(
+                          unblindingRequest.requested_at,
+                        ).toLocaleString("en-US")}
+                      </span>
+                    </div>
+
+                    <dl className="mt-4 grid gap-4 sm:grid-cols-2">
+                      <div>
+                        <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+                          Request ID
+                        </dt>
+                        <dd className="mt-1 break-all font-mono text-xs">
+                          {unblindingRequest.id}
+                        </dd>
+                      </div>
+
+                      <div>
+                        <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+                          Requested by
+                        </dt>
+                        <dd className="mt-1 text-sm">
+                          {unblindingRequest.requested_by === currentUserId
+                            ? "You"
+                            : "Another Study member"}
+                        </dd>
+                      </div>
+
+                      <div className="sm:col-span-2">
+                        <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+                          Analysis lock for this request
+                        </dt>
+                        <dd className="mt-1 text-sm">
+                          {unblindingRequest.analysis_lock_id
+                            ? (() => {
+                                const selectedLockIndex = analysisLocks.findIndex(
+                                  (lock) =>
+                                    lock.id ===
+                                    unblindingRequest.analysis_lock_id,
+                                );
+                                const selectedLock =
+                                  selectedLockIndex >= 0
+                                    ? analysisLocks[selectedLockIndex]
+                                    : null;
+
+                                return selectedLock
+                                  ? `Analysis lock ${analysisLocks.length - selectedLockIndex}: ${selectedLock.analysis_artifact_filename}`
+                                  : "Registered analysis lock";
+                              })()
+                            : "No analysis lock selected (not required by the active Plan)."}
+                        </dd>
+                      </div>
+                    </dl>
+                  </div>
+                ) : workflow.state === "blinded" ? (
+                  <div className="mt-6">
+                    {activePlan.require_analysis_lock &&
+                    analysisLocks.length === 0 ? (
+                      <div className="rounded-xl border border-black/10 p-4 dark:border-white/15">
+                        <p className="text-sm font-medium">
+                          Analysis lock required before requesting unblinding
+                        </p>
+                        <p className="mt-1 text-sm text-black/60 dark:text-white/60">
+                          Plan v{activePlan.version_number} requires an Analysis
+                          Lock. Register at least one lock before creating the
+                          unblinding request.
+                        </p>
+                      </div>
+                    ) : canRequestUnblinding ? (
+                      <form action={requestUnblinding} className="space-y-4">
+                        <input type="hidden" name="studyId" value={study.id} />
+                        <input
+                          type="hidden"
+                          name="workflowId"
+                          value={workflow.id}
+                        />
+
+                        <div>
+                          <label
+                            className="text-sm font-medium"
+                            htmlFor="analysisLockId"
+                          >
+                            Analysis lock for unblinding
+                          </label>
+                          <select
+                            className="mt-1 w-full rounded-lg border border-black/15 bg-transparent px-3 py-2 outline-none focus:border-black/40 dark:border-white/20 dark:focus:border-white/50"
+                            defaultValue=""
+                            id="analysisLockId"
+                            name="analysisLockId"
+                            required={activePlan.require_analysis_lock}
+                          >
+                            <option value="">
+                              {activePlan.require_analysis_lock
+                                ? "Select the registered Analysis Lock to use"
+                                : "No Analysis Lock (Plan does not require one)"}
+                            </option>
+                            {analysisLocks.map((lock, index) => (
+                              <option key={lock.id} value={lock.id}>
+                                Analysis lock {analysisLocks.length - index}: {lock.analysis_artifact_filename}
+                              </option>
+                            ))}
+                          </select>
+                          <p className="mt-1 text-xs text-black/50 dark:text-white/50">
+                            {activePlan.require_analysis_lock
+                              ? "The request will be permanently bound to the selected registered lock."
+                              : "A lock is optional under this Plan. If selected, the request will be permanently bound to it."}
+                          </p>
+                        </div>
+
+                        <button
+                          className="rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background"
+                          type="submit"
+                        >
+                          Request unblinding
+                        </button>
+                      </form>
+                    ) : (
+                      <p className="text-sm text-black/60 dark:text-white/60">
+                        You do not have the unblinding.request capability for
+                        this Study.
+                      </p>
+                    )}
+                  </div>
+                ) : null}
+
+                {unblindingRequest && !unblindingAuthorization ? (
+                  <div className="mt-6 rounded-xl border border-black/10 p-4 dark:border-white/15">
+                    <p className="text-sm font-medium">Authorization</p>
+
+                    {activePlan.authorization_policy === "independent" &&
+                    unblindingRequest.requested_by === currentUserId ? (
+                      <>
+                        <p className="mt-2 text-sm font-medium">
+                          Awaiting independent authorization
+                        </p>
+                        <p className="mt-1 max-w-3xl text-sm text-black/60 dark:text-white/60">
+                          Plan v{activePlan.version_number} requires a different
+                          authenticated Study member with the
+                          unblinding.authorize capability. The requester cannot
+                          authorize their own request.
+                        </p>
+                      </>
+                    ) : canAuthorizeUnblinding ? (
+                      <>
+                        <p className="mt-2 max-w-3xl text-sm text-black/60 dark:text-white/60">
+                          {activePlan.authorization_policy === "independent"
+                            ? "You are a different Study member from the requester and may authorize this request if you hold the required capability."
+                            : "This Plan permits self-authorization. A user with the unblinding.authorize capability may authorize this request."}
+                        </p>
+                        <form action={authorizeUnblinding} className="mt-4">
+                          <input
+                            type="hidden"
+                            name="studyId"
+                            value={study.id}
+                          />
+                          <input
+                            type="hidden"
+                            name="workflowId"
+                            value={workflow.id}
+                          />
+                          <input
+                            type="hidden"
+                            name="requestId"
+                            value={unblindingRequest.id}
+                          />
+                          <button
+                            className="rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background"
+                            type="submit"
+                          >
+                            Authorize unblinding
+                          </button>
+                        </form>
+                      </>
+                    ) : (
+                      <p className="mt-2 text-sm text-black/60 dark:text-white/60">
+                        Authorization is pending. A Study member with the
+                        unblinding.authorize capability is required.
+                      </p>
+                    )}
+                  </div>
+                ) : null}
+
+                {unblindingAuthorization ? (
+                  <div className="mt-6 rounded-xl border border-black/10 p-4 dark:border-white/15">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <p className="text-sm font-medium">
+                        Unblinding authorized
+                      </p>
+                      <span className="text-xs text-black/50 dark:text-white/50">
+                        Authorized {new Date(
+                          unblindingAuthorization.authorized_at,
+                        ).toLocaleString("en-US")}
+                      </span>
+                    </div>
+                    <dl className="mt-4 grid gap-4 sm:grid-cols-2">
+                      <div>
+                        <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+                          Authorization policy
+                        </dt>
+                        <dd className="mt-1 text-sm">
+                          {formatAuthorizationPolicy(
+                            unblindingAuthorization.authorization_policy,
+                          )}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+                          Authorized by
+                        </dt>
+                        <dd className="mt-1 text-sm">
+                          {unblindingAuthorization.authorized_by === currentUserId
+                            ? "You"
+                            : "Another Study member"}
+                        </dd>
+                      </div>
+                    </dl>
+                    <p className="mt-4 text-sm text-black/60 dark:text-white/60">
+                      Authorization is complete. Persistent mapping release is
+                      intentionally not part of this slice, so the protected
+                      mapping has not been exposed here.
+                    </p>
+                  </div>
+                ) : null}
+              </section>
+
+              {workflow.state === "blinded" && !unblindingRequest ? (
                 analysisLocks.length === 0 ? (
                   <AnalysisLockWorkspace
                     registration={{

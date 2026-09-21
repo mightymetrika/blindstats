@@ -22,7 +22,12 @@ function getRequiredString(formData: FormData, name: string) {
 function redirectToCurrentWorkflow(
   studyId: string,
   workflowId: string,
-  query: "saved=1" | "activated=1" | "stale=1",
+  query:
+    | "saved=1"
+    | "activated=1"
+    | "stale=1"
+    | "requested=1"
+    | "authorized=1",
 ) {
   revalidatePath(`/studies/${studyId}`);
   revalidatePath(`/studies/${studyId}/blinding/${workflowId}`);
@@ -460,4 +465,111 @@ export async function registerAnalysisLock(
     ok: true,
     lockRecordId: data,
   };
+}
+
+export async function requestUnblinding(formData: FormData) {
+  const studyId = getRequiredString(formData, "studyId");
+  const workflowId = getRequiredString(formData, "workflowId");
+  const analysisLockIdValue = formData.get("analysisLockId");
+  const analysisLockId =
+    typeof analysisLockIdValue === "string" &&
+    analysisLockIdValue.trim().length > 0
+      ? analysisLockIdValue.trim()
+      : null;
+
+  const supabase = await createClient();
+  const { data: claimsData, error: claimsError } =
+    await supabase.auth.getClaims();
+
+  if (claimsError || !claimsData?.claims?.sub) {
+    redirect("/login");
+  }
+
+  const { data: workflow, error: workflowError } = await supabase
+    .from("blinding_workflows")
+    .select("state")
+    .eq("id", workflowId)
+    .eq("study_id", studyId)
+    .maybeSingle();
+
+  if (workflowError) {
+    throw new Error(
+      `Unable to verify blinding workflow: ${workflowError.message}`,
+    );
+  }
+
+  if (!workflow) {
+    throw new Error("Blinding workflow not found.");
+  }
+
+  if (workflow.state !== "blinded") {
+    throw new Error(
+      "Unblinding can only be requested while the workflow is blinded.",
+    );
+  }
+
+  const { data, error } = await supabase.rpc("request_unblinding", {
+    p_workflow_id: workflowId,
+    p_analysis_lock_id: analysisLockId,
+  });
+
+  if (error) {
+    throw new Error(`Unable to request unblinding: ${error.message}`);
+  }
+
+  if (typeof data !== "string" || data.length === 0) {
+    throw new Error(
+      "The unblinding request was registered, but its server record could not be confirmed.",
+    );
+  }
+
+  redirectToCurrentWorkflow(studyId, workflowId, "requested=1");
+}
+
+export async function authorizeUnblinding(formData: FormData) {
+  const studyId = getRequiredString(formData, "studyId");
+  const workflowId = getRequiredString(formData, "workflowId");
+  const requestId = getRequiredString(formData, "requestId");
+
+  const supabase = await createClient();
+  const { data: claimsData, error: claimsError } =
+    await supabase.auth.getClaims();
+
+  if (claimsError || !claimsData?.claims?.sub) {
+    redirect("/login");
+  }
+
+  const { data: request, error: requestError } = await supabase
+    .from("unblinding_requests")
+    .select("id")
+    .eq("id", requestId)
+    .eq("workflow_id", workflowId)
+    .eq("study_id", studyId)
+    .maybeSingle();
+
+  if (requestError) {
+    throw new Error(
+      `Unable to verify unblinding request: ${requestError.message}`,
+    );
+  }
+
+  if (!request) {
+    throw new Error("Unblinding request not found.");
+  }
+
+  const { data, error } = await supabase.rpc("authorize_unblinding", {
+    p_request_id: requestId,
+  });
+
+  if (error) {
+    throw new Error(`Unable to authorize unblinding: ${error.message}`);
+  }
+
+  if (typeof data !== "string" || data.length === 0) {
+    throw new Error(
+      "Unblinding was authorized, but its server record could not be confirmed.",
+    );
+  }
+
+  redirectToCurrentWorkflow(studyId, workflowId, "authorized=1");
 }
