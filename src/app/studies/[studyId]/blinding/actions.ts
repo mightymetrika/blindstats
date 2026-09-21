@@ -19,6 +19,50 @@ function getRequiredString(formData: FormData, name: string) {
   return value.trim();
 }
 
+function getRequiredExactString(formData: FormData, name: string) {
+  const value = formData.get(name);
+
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new Error(`${name} is required.`);
+  }
+
+  return value;
+}
+
+const SHA256_HEX_PATTERN = /^[0-9a-f]{64}$/;
+
+function getRequiredSha256(formData: FormData, name: string) {
+  const value = getRequiredString(formData, name);
+
+  if (!SHA256_HEX_PATTERN.test(value)) {
+    throw new Error(`${name} must be a lowercase 64-character SHA-256 digest.`);
+  }
+
+  return value;
+}
+
+function getRequiredPositiveInteger(formData: FormData, name: string) {
+  const value = getRequiredString(formData, name);
+  const parsed = Number(value);
+
+  if (!Number.isSafeInteger(parsed) || parsed < 1) {
+    throw new Error(`${name} must be a positive integer.`);
+  }
+
+  return parsed;
+}
+
+function getRequiredCanonicalTimestamp(formData: FormData, name: string) {
+  const value = getRequiredString(formData, name);
+  const parsed = new Date(value);
+
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString() !== value) {
+    throw new Error(`${name} must be a canonical ISO-8601 timestamp.`);
+  }
+
+  return value;
+}
+
 function redirectToCurrentWorkflow(
   studyId: string,
   workflowId: string,
@@ -27,7 +71,8 @@ function redirectToCurrentWorkflow(
     | "activated=1"
     | "stale=1"
     | "requested=1"
-    | "authorized=1",
+    | "authorized=1"
+    | "unblinded=1",
 ) {
   revalidatePath(`/studies/${studyId}`);
   revalidatePath(`/studies/${studyId}/blinding/${workflowId}`);
@@ -572,4 +617,208 @@ export async function authorizeUnblinding(formData: FormData) {
   }
 
   redirectToCurrentWorkflow(studyId, workflowId, "authorized=1");
+}
+
+export type RegisterUnblindingCompletionResult =
+  | {
+      ok: true;
+      completionRecordId: string;
+    }
+  | {
+      ok: false;
+      error: string;
+    };
+
+export async function registerUnblindingCompletion(
+  formData: FormData,
+): Promise<RegisterUnblindingCompletionResult> {
+  const studyId = getRequiredString(formData, "studyId");
+  const workflowId = getRequiredString(formData, "workflowId");
+  const requestId = getRequiredString(formData, "requestId");
+  const acknowledgedCustody = formData.get("acknowledgeCustody") === "on";
+
+  if (!acknowledgedCustody) {
+    return {
+      ok: false,
+      error:
+        "Confirm that the final unblinding receipt has been saved before registering completion.",
+    };
+  }
+
+  let receiptCreatedAt: string;
+  let unblindingId: string;
+  let transformationId: string;
+  let lockId: string;
+  let selectedColumn: string;
+  let sourceArtifactSha256: string;
+  let blindingReceiptSha256: string;
+  let blindedArtifactSha256: string;
+  let unblindingSecretSha256: string;
+  let analysisLockReceiptSha256: string;
+  let analysisArtifactFilename: string;
+  let analysisArtifactSha256: string;
+  let analysisArtifactByteLength: number;
+  let unblindingReceiptSha256: string;
+
+  try {
+    receiptCreatedAt = getRequiredCanonicalTimestamp(
+      formData,
+      "receiptCreatedAt",
+    );
+    unblindingId = getRequiredString(formData, "unblindingId");
+    transformationId = getRequiredString(formData, "transformationId");
+    lockId = getRequiredString(formData, "lockId");
+    selectedColumn = getRequiredExactString(formData, "selectedColumn");
+    sourceArtifactSha256 = getRequiredSha256(
+      formData,
+      "sourceArtifactSha256",
+    );
+    blindingReceiptSha256 = getRequiredSha256(
+      formData,
+      "blindingReceiptSha256",
+    );
+    blindedArtifactSha256 = getRequiredSha256(
+      formData,
+      "blindedArtifactSha256",
+    );
+    unblindingSecretSha256 = getRequiredSha256(
+      formData,
+      "unblindingSecretSha256",
+    );
+    analysisLockReceiptSha256 = getRequiredSha256(
+      formData,
+      "analysisLockReceiptSha256",
+    );
+    analysisArtifactFilename = getRequiredExactString(
+      formData,
+      "analysisArtifactFilename",
+    );
+    analysisArtifactSha256 = getRequiredSha256(
+      formData,
+      "analysisArtifactSha256",
+    );
+    analysisArtifactByteLength = getRequiredPositiveInteger(
+      formData,
+      "analysisArtifactByteLength",
+    );
+    unblindingReceiptSha256 = getRequiredSha256(
+      formData,
+      "unblindingReceiptSha256",
+    );
+  } catch (error) {
+    return {
+      ok: false,
+      error:
+        error instanceof Error
+          ? `Unable to validate unblinding completion metadata: ${error.message}`
+          : "Unable to validate unblinding completion metadata.",
+    };
+  }
+
+  const supabase = await createClient();
+  const { data: claimsData, error: claimsError } =
+    await supabase.auth.getClaims();
+
+  if (claimsError || !claimsData?.claims?.sub) {
+    redirect("/login");
+  }
+
+  const { data: workflow, error: workflowError } = await supabase
+    .from("blinding_workflows")
+    .select("state")
+    .eq("id", workflowId)
+    .eq("study_id", studyId)
+    .maybeSingle();
+
+  if (workflowError) {
+    return {
+      ok: false,
+      error: `Unable to verify blinding workflow: ${workflowError.message}`,
+    };
+  }
+
+  if (!workflow) {
+    return {
+      ok: false,
+      error: "Blinding workflow not found.",
+    };
+  }
+
+  if (
+    workflow.state !== "unblinding_authorized" &&
+    workflow.state !== "unblinded"
+  ) {
+    return {
+      ok: false,
+      error:
+        "Completion registration requires an authorized unblinding workflow. Reload the workflow before continuing.",
+    };
+  }
+
+  const { data: request, error: requestError } = await supabase
+    .from("unblinding_requests")
+    .select("id")
+    .eq("id", requestId)
+    .eq("workflow_id", workflowId)
+    .eq("study_id", studyId)
+    .maybeSingle();
+
+  if (requestError) {
+    return {
+      ok: false,
+      error: `Unable to verify unblinding request: ${requestError.message}`,
+    };
+  }
+
+  if (!request) {
+    return {
+      ok: false,
+      error: "Authorized unblinding request not found.",
+    };
+  }
+
+  const { data, error } = await supabase.rpc(
+    "register_unblinding_completion",
+    {
+      p_workflow_id: workflowId,
+      p_request_id: requestId,
+      p_unblinding_id: unblindingId,
+      p_receipt_created_at: receiptCreatedAt,
+      p_transformation_id: transformationId,
+      p_lock_id: lockId,
+      p_selected_column: selectedColumn,
+      p_source_artifact_sha256: sourceArtifactSha256,
+      p_blinding_receipt_sha256: blindingReceiptSha256,
+      p_blinded_artifact_sha256: blindedArtifactSha256,
+      p_unblinding_secret_sha256: unblindingSecretSha256,
+      p_analysis_lock_receipt_sha256: analysisLockReceiptSha256,
+      p_analysis_artifact_filename: analysisArtifactFilename,
+      p_analysis_artifact_sha256: analysisArtifactSha256,
+      p_analysis_artifact_byte_length: analysisArtifactByteLength,
+      p_unblinding_receipt_sha256: unblindingReceiptSha256,
+    },
+  );
+
+  if (error) {
+    return {
+      ok: false,
+      error: `Unable to register unblinding completion: ${error.message}`,
+    };
+  }
+
+  if (typeof data !== "string" || data.length === 0) {
+    return {
+      ok: false,
+      error:
+        "The unblinding completion was registered, but its server record could not be confirmed.",
+    };
+  }
+
+  revalidatePath(`/studies/${studyId}`);
+  revalidatePath(`/studies/${studyId}/blinding/${workflowId}`);
+
+  return {
+    ok: true,
+    completionRecordId: data,
+  };
 }

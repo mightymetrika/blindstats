@@ -5,6 +5,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { AnalysisLockWorkspace } from "@/components/blinding/AnalysisLockWorkspace";
 import { BlindingWorkspace } from "@/components/blinding/BlindingWorkspace";
+import { UnblindingWorkspace } from "@/components/blinding/UnblindingWorkspace";
 import { createClient } from "@/lib/supabase/server";
 
 import {
@@ -12,6 +13,7 @@ import {
   authorizeUnblinding,
   registerAnalysisLock,
   registerBlindingTransformation,
+  registerUnblindingCompletion,
   requestUnblinding,
   saveBlindingPlanDraft,
 } from "../actions";
@@ -28,6 +30,7 @@ type BlindingWorkflowPageProps = {
     locked?: string;
     requested?: string;
     authorized?: string;
+    unblinded?: string;
     stale?: string;
   }>;
 };
@@ -43,8 +46,16 @@ export default async function BlindingWorkflowPage({
   searchParams,
 }: BlindingWorkflowPageProps) {
   const { studyId, workflowId } = await params;
-  const { saved, activated, blinded, locked, requested, authorized, stale } =
-    await searchParams;
+  const {
+    saved,
+    activated,
+    blinded,
+    locked,
+    requested,
+    authorized,
+    unblinded,
+    stale,
+  } = await searchParams;
   const supabase = await createClient();
 
   const { data: claimsData, error: claimsError } =
@@ -260,11 +271,73 @@ export default async function BlindingWorkflowPage({
     unblindingAuthorization = data;
   }
 
+  let authorizedAnalysisLock:
+    | {
+        id: string;
+        lock_id: string;
+        analysis_lock_receipt_sha256: string;
+        analysis_lock_receipt_text: string;
+      }
+    | null = null;
+
+  if (unblindingRequest?.analysis_lock_id) {
+    const { data, error } = await supabase
+      .from("analysis_locks")
+      .select(
+        "id, lock_id, analysis_lock_receipt_sha256, analysis_lock_receipt_text",
+      )
+      .eq("id", unblindingRequest.analysis_lock_id)
+      .eq("workflow_id", workflow.id)
+      .eq("study_id", study.id)
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(
+        `Unable to load request-selected AnalysisLock receipt: ${error.message}`,
+      );
+    }
+
+    authorizedAnalysisLock = data;
+  }
+
+  let unblindingCompletion:
+    | {
+        id: string;
+        unblinding_id: string;
+        receipt_created_at: string;
+        unblinding_secret_sha256: string;
+        unblinding_receipt_sha256: string;
+        completed_by: string;
+        registered_at: string;
+      }
+    | null = null;
+
+  if (unblindingRequest) {
+    const { data, error } = await supabase
+      .from("unblinding_completions")
+      .select(
+        "id, unblinding_id, receipt_created_at, unblinding_secret_sha256, unblinding_receipt_sha256, completed_by, registered_at",
+      )
+      .eq("request_id", unblindingRequest.id)
+      .eq("workflow_id", workflow.id)
+      .eq("study_id", study.id)
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(
+        `Unable to load unblinding completion: ${error.message}`,
+      );
+    }
+
+    unblindingCompletion = data;
+  }
+
   const capabilitySet = new Set(
     (currentCapabilities ?? []).map((entry) => entry.capability),
   );
   const canRequestUnblinding = capabilitySet.has("unblinding.request");
   const canAuthorizeUnblinding = capabilitySet.has("unblinding.authorize");
+  const canReceiveUnblinded = capabilitySet.has("unblinded.receive");
 
   const protectionTarget = draft.protection_targets[0] ?? "";
   const hasProtectionTarget = protectionTarget.trim().length > 0;
@@ -604,11 +677,13 @@ export default async function BlindingWorkflowPage({
                     </p>
                   </div>
                   <span className="rounded-full border border-black/10 px-2.5 py-1 text-xs font-medium dark:border-white/15">
-                    {unblindingAuthorization
-                      ? "Authorized"
-                      : unblindingRequest
-                        ? "Requested"
-                        : "Not requested"}
+                    {unblindingCompletion
+                      ? "Unblinded"
+                      : unblindingAuthorization
+                        ? "Authorized"
+                        : unblindingRequest
+                          ? "Requested"
+                          : "Not requested"}
                   </span>
                 </div>
 
@@ -622,6 +697,12 @@ export default async function BlindingWorkflowPage({
                   <p className="mt-4 text-sm font-medium">
                     Unblinding authorized successfully. The protected mapping
                     has not been released by this authorization event.
+                  </p>
+                ) : null}
+
+                {unblinded === "1" ? (
+                  <p className="mt-4 text-sm font-medium">
+                    Authorized unblinding completed and registered successfully.
                   </p>
                 ) : null}
 
@@ -846,13 +927,145 @@ export default async function BlindingWorkflowPage({
                       </div>
                     </dl>
                     <p className="mt-4 text-sm text-black/60 dark:text-white/60">
-                      Authorization is complete. Persistent mapping release is
-                      intentionally not part of this slice, so the protected
-                      mapping has not been exposed here.
+                      {unblindingCompletion
+                        ? "This authorization preceded the recorded unblinding completion."
+                        : "Authorization is complete. The protected mapping has not been released by the authorization event itself."}
+                    </p>
+                  </div>
+                ) : null}
+
+                {unblindingCompletion ? (
+                  <div className="mt-6 rounded-xl border border-black/10 p-4 dark:border-white/15">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <p className="text-sm font-medium">
+                        Unblinding completed
+                      </p>
+                      <span className="text-xs text-black/50 dark:text-white/50">
+                        Registered {new Date(
+                          unblindingCompletion.registered_at,
+                        ).toLocaleString("en-US")}
+                      </span>
+                    </div>
+
+                    <dl className="mt-4 grid gap-4 sm:grid-cols-2">
+                      <div>
+                        <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+                          Unblinding ID
+                        </dt>
+                        <dd className="mt-1 break-all font-mono text-xs">
+                          {unblindingCompletion.unblinding_id}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+                          Receipt created
+                        </dt>
+                        <dd className="mt-1 text-sm">
+                          {new Date(
+                            unblindingCompletion.receipt_created_at,
+                          ).toLocaleString("en-US")}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+                          Unblinding receipt SHA-256
+                        </dt>
+                        <dd className="mt-1 break-all font-mono text-xs">
+                          {unblindingCompletion.unblinding_receipt_sha256}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+                          Unblinding secret SHA-256
+                        </dt>
+                        <dd className="mt-1 break-all font-mono text-xs">
+                          {unblindingCompletion.unblinding_secret_sha256}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+                          Completed by
+                        </dt>
+                        <dd className="mt-1 text-sm">
+                          {unblindingCompletion.completed_by === currentUserId
+                            ? "You"
+                            : "Another Study member"}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+                          Trusted registration time
+                        </dt>
+                        <dd className="mt-1 text-sm">
+                          {new Date(
+                            unblindingCompletion.registered_at,
+                          ).toLocaleString("en-US")}
+                        </dd>
+                      </div>
+                    </dl>
+
+                    <p className="mt-4 text-sm text-black/60 dark:text-white/60">
+                      blindstats stored safe completion metadata only. The
+                      unblinding secret, plaintext mapping, and final receipt
+                      text were not uploaded.
                     </p>
                   </div>
                 ) : null}
               </section>
+
+              {workflow.state === "unblinding_authorized" &&
+              unblindingRequest &&
+              unblindingAuthorization &&
+              !unblindingCompletion ? (
+                canReceiveUnblinded ? (
+                  authorizedAnalysisLock ? (
+                    <UnblindingWorkspace
+                      registration={{
+                        studyId: study.id,
+                        workflowId: workflow.id,
+                        requestId: unblindingRequest.id,
+                        transformationId: transformation.transformation_id,
+                        publicReceiptSha256:
+                          transformation.public_receipt_sha256,
+                        publicReceiptBase64: Buffer.from(
+                          transformation.public_receipt_text,
+                          "utf8",
+                        ).toString("base64"),
+                        lockId: authorizedAnalysisLock.lock_id,
+                        analysisLockReceiptSha256:
+                          authorizedAnalysisLock.analysis_lock_receipt_sha256,
+                        analysisLockReceiptBase64: Buffer.from(
+                          authorizedAnalysisLock.analysis_lock_receipt_text,
+                          "utf8",
+                        ).toString("base64"),
+                      }}
+                      registerAction={registerUnblindingCompletion}
+                    />
+                  ) : (
+                    <section className="mt-6 rounded-2xl border border-black/10 p-6 dark:border-white/15">
+                      <h2 className="text-lg font-semibold">
+                        Documented unblinding
+                      </h2>
+                      <p className="mt-2 text-sm text-black/60 dark:text-white/60">
+                        This first persistent completion path requires the
+                        authorized request to be bound to a registered
+                        AnalysisLock.
+                      </p>
+                    </section>
+                  )
+                ) : (
+                  <section className="mt-6 rounded-2xl border border-black/10 p-6 dark:border-white/15">
+                    <h2 className="text-lg font-semibold">
+                      Documented unblinding
+                    </h2>
+                    <p className="mt-2 text-sm text-black/60 dark:text-white/60">
+                      You do not have the unblinded.receive capability required
+                      to receive and register unblinded information for this
+                      Study.
+                    </p>
+                  </section>
+                )
+              ) : null}
 
               {workflow.state === "blinded" && !unblindingRequest ? (
                 analysisLocks.length === 0 ? (
