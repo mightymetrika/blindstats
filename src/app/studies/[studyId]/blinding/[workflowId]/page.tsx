@@ -335,9 +335,27 @@ export default async function BlindingWorkflowPage({
   const capabilitySet = new Set(
     (currentCapabilities ?? []).map((entry) => entry.capability),
   );
+  const canConfigureBlinding = capabilitySet.has("blinding.configure");
+  const canCreateBlinding = capabilitySet.has("blinding.create");
+  const canLockAnalysis = capabilitySet.has("analysis.lock");
   const canRequestUnblinding = capabilitySet.has("unblinding.request");
   const canAuthorizeUnblinding = capabilitySet.has("unblinding.authorize");
   const canReceiveUnblinded = capabilitySet.has("unblinded.receive");
+
+  const isBlindedAnalyst =
+    canLockAnalysis &&
+    canRequestUnblinding &&
+    canReceiveUnblinded &&
+    !canCreateBlinding &&
+    !canAuthorizeUnblinding;
+
+  const isBlindingCustodian =
+    canConfigureBlinding &&
+    canCreateBlinding &&
+    canAuthorizeUnblinding &&
+    !canLockAnalysis &&
+    !canRequestUnblinding &&
+    !canReceiveUnblinded;
 
   const protectionTarget = draft.protection_targets[0] ?? "";
   const hasProtectionTarget = protectionTarget.trim().length > 0;
@@ -364,6 +382,11 @@ export default async function BlindingWorkflowPage({
         <p className="mt-2 text-sm text-black/60 dark:text-white/60">
           {study.name}
         </p>
+        {isBlindedAnalyst ? (
+          <p className="mt-2 text-sm font-medium">Role: Blinded analyst</p>
+        ) : isBlindingCustodian ? (
+          <p className="mt-2 text-sm font-medium">Role: Blinding custodian</p>
+        ) : null}
       </header>
 
       {activePlan ? (
@@ -479,21 +502,34 @@ export default async function BlindingWorkflowPage({
             <>
               <section className="mt-6 rounded-2xl border border-black/10 p-6 dark:border-white/15">
                 <h2 className="text-lg font-semibold">Ready for blinding</h2>
-                <p className="mt-2 max-w-3xl text-sm text-black/60 dark:text-white/60">
-                  Plan v{activePlan.version_number} is active. Create the blinded
-                  package locally, save all three artifacts, then register the
-                  public receipt to move this workflow into the blinded state.
-                </p>
+                {canCreateBlinding ? (
+                  <p className="mt-2 max-w-3xl text-sm text-black/60 dark:text-white/60">
+                    Plan v{activePlan.version_number} is active. Create the blinded
+                    package locally and save all three artifacts. Transfer only
+                    the blinded dataset to the blinded analyst through an approved
+                    external secure file-transfer channel. Keep the unblinding
+                    secret under custodian control until unblinding is authorized.
+                  </p>
+                ) : (
+                  <p className="mt-2 max-w-3xl text-sm text-black/60 dark:text-white/60">
+                    Plan v{activePlan.version_number} is active. The blinding
+                    custodian must create and register the blinded package before
+                    analysis begins. Dataset contents are transferred outside
+                    blindstats.
+                  </p>
+                )}
               </section>
 
-              <BlindingWorkspace
-                registration={{
-                  studyId: study.id,
-                  workflowId: workflow.id,
-                  planVersionNumber: activePlan.version_number,
-                }}
-                registerAction={registerBlindingTransformation}
-              />
+              {canCreateBlinding ? (
+                <BlindingWorkspace
+                  registration={{
+                    studyId: study.id,
+                    workflowId: workflow.id,
+                    planVersionNumber: activePlan.version_number,
+                  }}
+                  registerAction={registerBlindingTransformation}
+                />
+              ) : null}
             </>
           ) : transformation ? (
             <>
@@ -575,6 +611,34 @@ export default async function BlindingWorkflowPage({
                     </dd>
                   </div>
                 </dl>
+              </section>
+
+              <section className="mt-6 rounded-2xl border border-black/10 p-6 dark:border-white/15">
+                <h2 className="text-lg font-semibold">Dataset handoff</h2>
+                {isBlindingCustodian || canCreateBlinding ? (
+                  <p className="mt-2 max-w-3xl text-sm text-black/60 dark:text-white/60">
+                    Send the downloaded blinded dataset to the blinded analyst
+                    through the project&apos;s approved secure file-transfer channel.
+                    Do not send the unblinding secret yet. The exact public
+                    receipt is already registered in blindstats and will be
+                    supplied automatically when the analyst creates an
+                    AnalysisLock.
+                  </p>
+                ) : isBlindedAnalyst ? (
+                  <p className="mt-2 max-w-3xl text-sm text-black/60 dark:text-white/60">
+                    Analyze only the blinded dataset supplied by the custodian
+                    through the project&apos;s approved secure file-transfer channel.
+                    You do not need a separate copy of the public receipt to
+                    create the AnalysisLock because blindstats supplies the exact
+                    registered receipt automatically.
+                  </p>
+                ) : (
+                  <p className="mt-2 max-w-3xl text-sm text-black/60 dark:text-white/60">
+                    Dataset contents remain outside blindstats and should be
+                    transferred through the project&apos;s approved secure file-transfer
+                    channel.
+                  </p>
+                )}
               </section>
 
               <section className="mt-6 rounded-2xl border border-black/10 p-6 dark:border-white/15">
@@ -1019,28 +1083,40 @@ export default async function BlindingWorkflowPage({
               !unblindingCompletion ? (
                 canReceiveUnblinded ? (
                   authorizedAnalysisLock ? (
-                    <UnblindingWorkspace
-                      registration={{
-                        studyId: study.id,
-                        workflowId: workflow.id,
-                        requestId: unblindingRequest.id,
-                        transformationId: transformation.transformation_id,
-                        publicReceiptSha256:
-                          transformation.public_receipt_sha256,
-                        publicReceiptBase64: Buffer.from(
-                          transformation.public_receipt_text,
-                          "utf8",
-                        ).toString("base64"),
-                        lockId: authorizedAnalysisLock.lock_id,
-                        analysisLockReceiptSha256:
-                          authorizedAnalysisLock.analysis_lock_receipt_sha256,
-                        analysisLockReceiptBase64: Buffer.from(
-                          authorizedAnalysisLock.analysis_lock_receipt_text,
-                          "utf8",
-                        ).toString("base64"),
-                      }}
-                      registerAction={registerUnblindingCompletion}
-                    />
+                    <>
+                      <section className="mt-6 rounded-2xl border border-black/10 p-6 dark:border-white/15">
+                        <h2 className="text-lg font-semibold">Secret handoff</h2>
+                        <p className="mt-2 max-w-3xl text-sm text-black/60 dark:text-white/60">
+                          Unblinding has been authorized. Obtain the saved
+                          unblinding secret from the blinding custodian through
+                          the project&apos;s approved secure file-transfer channel,
+                          then select it locally below. The secret is not stored
+                          by blindstats.
+                        </p>
+                      </section>
+                      <UnblindingWorkspace
+                        registration={{
+                          studyId: study.id,
+                          workflowId: workflow.id,
+                          requestId: unblindingRequest.id,
+                          transformationId: transformation.transformation_id,
+                          publicReceiptSha256:
+                            transformation.public_receipt_sha256,
+                          publicReceiptBase64: Buffer.from(
+                            transformation.public_receipt_text,
+                            "utf8",
+                          ).toString("base64"),
+                          lockId: authorizedAnalysisLock.lock_id,
+                          analysisLockReceiptSha256:
+                            authorizedAnalysisLock.analysis_lock_receipt_sha256,
+                          analysisLockReceiptBase64: Buffer.from(
+                            authorizedAnalysisLock.analysis_lock_receipt_text,
+                            "utf8",
+                          ).toString("base64"),
+                        }}
+                        registerAction={registerUnblindingCompletion}
+                      />
+                    </>
                   ) : (
                     <section className="mt-6 rounded-2xl border border-black/10 p-6 dark:border-white/15">
                       <h2 className="text-lg font-semibold">
@@ -1056,43 +1132,20 @@ export default async function BlindingWorkflowPage({
                 ) : (
                   <section className="mt-6 rounded-2xl border border-black/10 p-6 dark:border-white/15">
                     <h2 className="text-lg font-semibold">
-                      Documented unblinding
+                      Authorized secret release
                     </h2>
-                    <p className="mt-2 text-sm text-black/60 dark:text-white/60">
-                      You do not have the unblinded.receive capability required
-                      to receive and register unblinded information for this
-                      Study.
+                    <p className="mt-2 max-w-3xl text-sm text-black/60 dark:text-white/60">
+                      {isBlindingCustodian || canAuthorizeUnblinding
+                        ? "Authorization is complete. Send the saved unblinding secret to the blinded analyst through the project&apos;s approved secure file-transfer channel. Do not upload the secret to blindstats; the analyst will select it locally to complete documented unblinding."
+                        : "You do not have the unblinded.receive capability required to receive and register unblinded information for this Study."}
                     </p>
                   </section>
                 )
               ) : null}
 
               {workflow.state === "blinded" && !unblindingRequest ? (
-                analysisLocks.length === 0 ? (
-                  <AnalysisLockWorkspace
-                    registration={{
-                      studyId: study.id,
-                      workflowId: workflow.id,
-                      transformationId: transformation.transformation_id,
-                      publicReceiptSha256: transformation.public_receipt_sha256,
-                      publicReceiptBase64: Buffer.from(
-                        transformation.public_receipt_text,
-                        "utf8",
-                      ).toString("base64"),
-                    }}
-                    registerAction={registerAnalysisLock}
-                  />
-                ) : (
-                  <details className="mt-6 rounded-2xl border border-black/10 p-6 dark:border-white/15">
-                    <summary className="cursor-pointer text-sm font-semibold">
-                      Create another analysis lock
-                    </summary>
-                    <p className="mt-2 max-w-3xl text-sm text-black/60 dark:text-white/60">
-                      Create an additional immutable lock for another exact
-                      analysis artifact. Existing registered locks remain
-                      unchanged.
-                    </p>
-
+                canLockAnalysis ? (
+                  analysisLocks.length === 0 ? (
                     <AnalysisLockWorkspace
                       registration={{
                         studyId: study.id,
@@ -1106,7 +1159,41 @@ export default async function BlindingWorkflowPage({
                       }}
                       registerAction={registerAnalysisLock}
                     />
-                  </details>
+                  ) : (
+                    <details className="mt-6 rounded-2xl border border-black/10 p-6 dark:border-white/15">
+                      <summary className="cursor-pointer text-sm font-semibold">
+                        Create another analysis lock
+                      </summary>
+                      <p className="mt-2 max-w-3xl text-sm text-black/60 dark:text-white/60">
+                        Create an additional immutable lock for another exact
+                        analysis artifact. Existing registered locks remain
+                        unchanged.
+                      </p>
+
+                      <AnalysisLockWorkspace
+                        registration={{
+                          studyId: study.id,
+                          workflowId: workflow.id,
+                          transformationId: transformation.transformation_id,
+                          publicReceiptSha256: transformation.public_receipt_sha256,
+                          publicReceiptBase64: Buffer.from(
+                            transformation.public_receipt_text,
+                            "utf8",
+                          ).toString("base64"),
+                        }}
+                        registerAction={registerAnalysisLock}
+                      />
+                    </details>
+                  )
+                ) : (
+                  <section className="mt-6 rounded-2xl border border-black/10 p-6 dark:border-white/15">
+                    <h2 className="text-lg font-semibold">Analysis handoff</h2>
+                    <p className="mt-2 max-w-3xl text-sm text-black/60 dark:text-white/60">
+                      The blinded analyst is responsible for completing the
+                      analysis and registering its AnalysisLock. Your current
+                      Study role does not include analysis.lock.
+                    </p>
+                  </section>
                 )
               ) : null}
             </>
@@ -1120,7 +1207,7 @@ export default async function BlindingWorkflowPage({
             </section>
           )}
         </>
-      ) : (
+      ) : canConfigureBlinding ? (
         <>
           <section className="mt-10 rounded-2xl border border-black/10 p-6 dark:border-white/15">
             <h2 className="text-lg font-semibold">BlindingPlan draft</h2>
@@ -1268,6 +1355,16 @@ export default async function BlindingWorkflowPage({
             )}
           </section>
         </>
+      ) : (
+        <section className="mt-10 rounded-2xl border border-black/10 p-6 dark:border-white/15">
+          <h2 className="text-lg font-semibold">BlindingPlan setup</h2>
+          <p className="mt-2 max-w-3xl text-sm text-black/60 dark:text-white/60">
+            The blinding custodian is responsible for configuring and activating
+            the Study&apos;s BlindingPlan. Your current Study role is read-only during
+            setup.
+          </p>
+        </section>
+
       )}
     </main>
   );
