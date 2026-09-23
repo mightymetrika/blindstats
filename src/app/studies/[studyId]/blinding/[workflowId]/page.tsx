@@ -8,6 +8,7 @@ import { BlindingWorkspace } from "@/components/blinding/BlindingWorkspace";
 import { UnblindingWorkspace } from "@/components/blinding/UnblindingWorkspace";
 import { createClient } from "@/lib/supabase/server";
 
+import { assignBlindedAnalyst } from "../../actions";
 import {
   activateBlindingPlan,
   authorizeUnblinding,
@@ -32,6 +33,8 @@ type BlindingWorkflowPageProps = {
     authorized?: string;
     unblinded?: string;
     stale?: string;
+    analystAssigned?: string;
+    analystError?: string;
   }>;
 };
 
@@ -39,6 +42,29 @@ function formatAuthorizationPolicy(policy: string) {
   return policy === "independent"
     ? "Independent authorization"
     : "Self-authorization permitted";
+}
+
+function getAnalystErrorMessage(code: string | undefined): string | null {
+  switch (code) {
+    case "account_not_found":
+      return "No existing blindstats account was found for that email.";
+    case "same_account":
+      return "The blinded analyst must use a different authenticated account.";
+    case "not_authorized":
+      return "You do not have permission to assign a blinded analyst.";
+    case "custodian_capabilities":
+      return "Your account does not have the capabilities required to become the blinding custodian.";
+    case "acknowledgement_required":
+      return "Confirm the role separation before assigning the blinded analyst.";
+    case "workflow_not_found":
+      return "The blinding workflow could not be verified. Reload the page and try again.";
+    case "workflow_not_setup":
+      return "A blinded analyst can only be assigned while the workflow is in setup.";
+    case "unable":
+      return "The blinded analyst could not be assigned. Reload the workflow and try again.";
+    default:
+      return null;
+  }
 }
 
 export default async function BlindingWorkflowPage({
@@ -55,6 +81,8 @@ export default async function BlindingWorkflowPage({
     authorized,
     unblinded,
     stale,
+    analystAssigned,
+    analystError,
   } = await searchParams;
   const supabase = await createClient();
 
@@ -341,6 +369,10 @@ export default async function BlindingWorkflowPage({
   const canRequestUnblinding = capabilitySet.has("unblinding.request");
   const canAuthorizeUnblinding = capabilitySet.has("unblinding.authorize");
   const canReceiveUnblinded = capabilitySet.has("unblinded.receive");
+  const canManageMembership = capabilitySet.has("membership.manage");
+  const canManageCapabilities = capabilitySet.has("capability.manage");
+  const canAssignBlindedAnalyst =
+    canManageMembership && canManageCapabilities;
 
   const isBlindedAnalyst =
     canLockAnalysis &&
@@ -357,6 +389,7 @@ export default async function BlindingWorkflowPage({
     !canRequestUnblinding &&
     !canReceiveUnblinded;
 
+  const analystErrorMessage = getAnalystErrorMessage(analystError);
   const protectionTarget = draft.protection_targets[0] ?? "";
   const hasProtectionTarget = protectionTarget.trim().length > 0;
   const hasWeakerPolicy =
@@ -388,6 +421,97 @@ export default async function BlindingWorkflowPage({
           <p className="mt-2 text-sm font-medium">Role: Blinding custodian</p>
         ) : null}
       </header>
+
+      {workflow.state === "setup" && canAssignBlindedAnalyst ? (
+        <section className="mt-8 rounded-2xl border border-black/10 p-6 dark:border-white/15">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold">Analysis roles</h2>
+            <span className="rounded-full border border-black/10 px-2.5 py-1 text-xs font-medium dark:border-white/15">
+              {isBlindingCustodian ? "Separated" : "Single-user"}
+            </span>
+          </div>
+
+          {isBlindingCustodian ? (
+            <p className="mt-3 text-sm text-black/60 dark:text-white/60">
+              A separate blinded analyst is assigned. You are the blinding
+              custodian.
+            </p>
+          ) : (
+            <>
+              <p className="mt-3 text-sm text-black/60 dark:text-white/60">
+                One account currently holds both blinding and analysis
+                responsibilities.
+              </p>
+
+              {analystAssigned === "1" ? (
+                <p className="mt-3 text-sm font-medium">
+                  Blinded analyst assigned.
+                </p>
+              ) : null}
+
+              {analystErrorMessage ? (
+                <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-4 text-red-900">
+                  <p className="text-sm font-medium">
+                    Unable to assign blinded analyst
+                  </p>
+                  <p className="mt-1 text-sm">{analystErrorMessage}</p>
+                </div>
+              ) : null}
+
+              <details className="mt-4">
+                <summary className="cursor-pointer text-sm font-medium">
+                  Use a separate blinded analyst
+                </summary>
+                <form action={assignBlindedAnalyst} className="mt-4 space-y-4">
+                  <input type="hidden" name="studyId" value={study.id} />
+                  <input type="hidden" name="workflowId" value={workflow.id} />
+
+                  <div>
+                    <label
+                      className="text-sm font-medium"
+                      htmlFor="analystEmail"
+                    >
+                      Analyst email
+                    </label>
+                    <input
+                      autoComplete="off"
+                      className="mt-1 w-full rounded-lg border border-black/15 bg-transparent px-3 py-2 outline-none placeholder:text-black/35 focus:border-black/40 dark:border-white/20 dark:placeholder:text-white/35 dark:focus:border-white/50"
+                      id="analystEmail"
+                      name="analystEmail"
+                      placeholder="analyst@example.com"
+                      required
+                      type="email"
+                    />
+                    <p className="mt-1 text-xs text-black/45 dark:text-white/45">
+                      Must already have a blindstats account.
+                    </p>
+                  </div>
+
+                  <label className="flex max-w-3xl items-start gap-3 text-sm">
+                    <input
+                      className="mt-1"
+                      name="acknowledgeRoleSeparation"
+                      required
+                      type="checkbox"
+                    />
+                    <span>
+                      I understand that this separates blinding and analysis
+                      responsibilities for this Study.
+                    </span>
+                  </label>
+
+                  <button
+                    className="rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background"
+                    type="submit"
+                  >
+                    Assign blinded analyst
+                  </button>
+                </form>
+              </details>
+            </>
+          )}
+        </section>
+      ) : null}
 
       {activePlan ? (
         <>

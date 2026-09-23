@@ -1,5 +1,5 @@
-import { BlindedAnalysisWorkflow } from "@/components/blinding/BlindedAnalysisWorkflow";
+import { redirect } from "next/navigation";
 
 export default function Home() {
-  return <BlindedAnalysisWorkflow />;
+  redirect("/studies");
 }

@@ -25,21 +25,42 @@ function getRequiredEmail(formData: FormData, name: string): string {
   return email;
 }
 
-function redirectToStudy(studyId: string, query: string): never {
+function redirectAfterAnalystAssignment(
+  studyId: string,
+  workflowId: string | null,
+  query: string,
+): never {
   revalidatePath("/studies");
   revalidatePath(`/studies/${studyId}`);
+
+  if (workflowId) {
+    revalidatePath(`/studies/${studyId}/blinding/${workflowId}`);
+    redirect(
+      `/studies/${studyId}/blinding/${workflowId}?${query}`,
+      RedirectType.replace,
+    );
+  }
 
   redirect(`/studies/${studyId}?${query}`, RedirectType.replace);
 }
 
 export async function assignBlindedAnalyst(formData: FormData) {
   const studyId = getRequiredString(formData, "studyId");
+  const workflowIdValue = formData.get("workflowId");
+  const workflowId =
+    typeof workflowIdValue === "string" && workflowIdValue.trim().length > 0
+      ? workflowIdValue.trim()
+      : null;
   const analystEmail = getRequiredEmail(formData, "analystEmail");
   const acknowledgeRoleSeparation =
     formData.get("acknowledgeRoleSeparation") === "on";
 
   if (!acknowledgeRoleSeparation) {
-    redirectToStudy(studyId, "analystError=acknowledgement_required");
+    redirectAfterAnalystAssignment(
+      studyId,
+      workflowId,
+      "analystError=acknowledgement_required",
+    );
   }
 
   const supabase = await createClient();
@@ -50,6 +71,31 @@ export async function assignBlindedAnalyst(formData: FormData) {
     redirect("/login");
   }
 
+  if (workflowId) {
+    const { data: workflow, error: workflowError } = await supabase
+      .from("blinding_workflows")
+      .select("state")
+      .eq("id", workflowId)
+      .eq("study_id", studyId)
+      .maybeSingle();
+
+    if (workflowError || !workflow) {
+      redirectAfterAnalystAssignment(
+        studyId,
+        workflowId,
+        "analystError=workflow_not_found",
+      );
+    }
+
+    if (workflow.state !== "setup") {
+      redirectAfterAnalystAssignment(
+        studyId,
+        workflowId,
+        "analystError=workflow_not_setup",
+      );
+    }
+  }
+
   const { error } = await supabase.rpc("assign_blinded_analyst_by_email", {
     p_study_id: studyId,
     p_email: analystEmail,
@@ -57,26 +103,26 @@ export async function assignBlindedAnalyst(formData: FormData) {
 
   if (error) {
     if (error.message.includes("No existing blindstats account was found")) {
-      redirectToStudy(studyId, "analystError=account_not_found");
+      redirectAfterAnalystAssignment(studyId, workflowId, "analystError=account_not_found");
     }
 
     if (error.message.includes("different authenticated account")) {
-      redirectToStudy(studyId, "analystError=same_account");
+      redirectAfterAnalystAssignment(studyId, workflowId, "analystError=same_account");
     }
 
     if (
       error.code === "42501" ||
       error.message.includes("not authorized to assign a blinded analyst")
     ) {
-      redirectToStudy(studyId, "analystError=not_authorized");
+      redirectAfterAnalystAssignment(studyId, workflowId, "analystError=not_authorized");
     }
 
     if (error.message.includes("custodian capabilities")) {
-      redirectToStudy(studyId, "analystError=custodian_capabilities");
+      redirectAfterAnalystAssignment(studyId, workflowId, "analystError=custodian_capabilities");
     }
 
-    redirectToStudy(studyId, "analystError=unable");
+    redirectAfterAnalystAssignment(studyId, workflowId, "analystError=unable");
   }
 
-  redirectToStudy(studyId, "analystAssigned=1");
+  redirectAfterAnalystAssignment(studyId, workflowId, "analystAssigned=1");
 }
