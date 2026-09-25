@@ -128,18 +128,11 @@ function FileSummary({
   label: string;
 }) {
   return (
-    <div className="mt-4 rounded-xl bg-slate-50 p-4">
-      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-        {label}
-      </p>
-      <p className="mt-1 break-all text-sm font-semibold text-slate-900">
-        {artifact.file.name}
-      </p>
-      <p className="mt-1 text-xs text-slate-500">
-        {artifact.bytes.length.toLocaleString()}{" "}
-        {artifact.bytes.length === 1 ? "byte" : "bytes"}
-      </p>
-    </div>
+    <p className="mt-3 text-sm text-slate-700">
+      <span className="font-medium text-slate-950">{label}:</span>{" "}
+      {artifact.file.name} · {artifact.bytes.length.toLocaleString()}{" "}
+      {artifact.bytes.length === 1 ? "byte" : "bytes"}
+    </p>
   );
 }
 
@@ -399,128 +392,125 @@ export function UnblindingWorkspace({
             : "mx-auto w-full max-w-5xl px-6 py-10 sm:px-8 sm:py-14"
         }
       >
-        <header className="mb-8">
-          <div className="flex flex-wrap items-center gap-3">
-            <p className="text-sm font-semibold tracking-wide text-slate-500">
-              blindstats
+        {!registrationEnabled ? (
+          <header className="mb-8">
+            <div className="flex flex-wrap items-center gap-3">
+              <p className="text-sm font-semibold tracking-wide text-slate-500">
+                blindstats
+              </p>
+              <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600">
+                Documented Unblinding v0
+              </span>
+            </div>
+
+            <h1 className="mt-4 max-w-3xl text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
+              Verify the locked workflow before releasing the mapping.
+            </h1>
+
+            <p className="mt-4 max-w-3xl text-base leading-7 text-slate-600">
+              Supply the public receipt, unblinding secret, and analysis-lock
+              receipt. blindstats verifies the artifact chain and decrypts the
+              sealed mapping.
             </p>
-            <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600">
-              Documented Unblinding v0
-            </span>
-          </div>
+          </header>
+        ) : null}
 
-          <h1 className="mt-4 max-w-3xl text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
+        <section className="mb-6 rounded-xl border border-amber-300 bg-amber-50 px-5 py-4">
+          <p className="text-sm leading-6 text-amber-950">
+            <span className="font-semibold">
+              Unblinding releases protected information.
+            </span>{" "}
             {registrationEnabled
-              ? "Complete the authorized unblinding locally."
-              : "Verify the locked workflow before releasing the mapping."}
-          </h1>
-
-          <p className="mt-4 max-w-3xl text-base leading-7 text-slate-600">
-            {registrationEnabled
-              ? "The exact registered public receipt and the request-selected AnalysisLock receipt are supplied automatically. Select only the local unblinding secret to verify the artifact chain and release the mapping."
-              : "Supply the public receipt, unblinding secret, and analysis-lock receipt. blindstats verifies the artifact chain and decrypts the sealed mapping."}
-          </p>
-        </header>
-
-        <section className="mb-8 rounded-2xl border border-amber-300 bg-amber-50 p-5">
-          <h2 className="text-sm font-semibold text-amber-950">
-            Unblinding releases protected information
-          </h2>
-          <p className="mt-2 text-sm leading-6 text-amber-900">
-            {registrationEnabled
-              ? "The unblinding secret and plaintext mapping remain in this browser. Registration sends only safe completion metadata; blindstats does not upload the secret, released mapping, or final unblinding-receipt text."
+              ? "The secret and released mapping stay in this browser; blindstats records safe completion metadata only."
               : "A successful unblinding receipt contains the original-to-blinded mapping and should be treated as unblinded material."}
           </p>
         </section>
 
-        <div className="space-y-6">
-          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-7">
-            {registrationEnabled && registration ? (
-              <>
-                <StageHeading
-                  number={1}
-                  title="Authorized workflow artifacts"
-                  description="Use the exact public receipt and request-selected AnalysisLock receipt already registered for this authorized workflow."
-                />
-
-                <dl className="mt-6 grid gap-5 sm:grid-cols-2">
-                  <div>
-                    <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                      Transformation ID
-                    </dt>
-                    <dd className="mt-1 break-all font-mono text-sm text-slate-900">
-                      {registration.transformationId}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                      Authorized lock ID
-                    </dt>
-                    <dd className="mt-1 break-all font-mono text-sm text-slate-900">
-                      {registration.lockId}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                      Public receipt SHA-256
-                    </dt>
-                    <dd>
-                      <HashValue value={registration.publicReceiptSha256} />
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                      AnalysisLock receipt SHA-256
-                    </dt>
-                    <dd>
-                      <HashValue
-                        value={registration.analysisLockReceiptSha256}
-                      />
-                    </dd>
-                  </div>
-                </dl>
-              </>
-            ) : (
-              <>
-                <StageHeading
-                  number={1}
-                  title="Select public blinding receipt"
-                  description="Choose the exact public receipt used when the blinded analysis was locked."
-                />
-
-                <div className="mt-6">
-                  <label
-                    htmlFor="unblind-blinding-receipt"
-                    className="block text-sm font-medium text-slate-800"
-                  >
-                    Public blinding receipt
-                  </label>
-                  <input
-                    id="unblind-blinding-receipt"
-                    type="file"
-                    accept=".json,application/json"
-                    onChange={(event) =>
-                      handleArtifactChange(event, "receipt", setReceipt)
-                    }
-                    className="mt-2 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 file:mr-4 file:rounded-lg file:border-0 file:bg-slate-950 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-slate-800"
+        {registrationEnabled && registration ? (
+          <details className="mb-6 rounded-xl border border-slate-200 bg-white px-5 py-4">
+            <summary className="cursor-pointer text-sm font-medium text-slate-800">
+              Authorized workflow artifacts
+            </summary>
+            <dl className="mt-4 grid gap-4 sm:grid-cols-2">
+              <div>
+                <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                  Transformation ID
+                </dt>
+                <dd className="mt-1 break-all font-mono text-xs text-slate-700">
+                  {registration.transformationId}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                  Authorized lock ID
+                </dt>
+                <dd className="mt-1 break-all font-mono text-xs text-slate-700">
+                  {registration.lockId}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                  Public receipt SHA-256
+                </dt>
+                <dd>
+                  <HashValue value={registration.publicReceiptSha256} />
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                  AnalysisLock receipt SHA-256
+                </dt>
+                <dd>
+                  <HashValue
+                    value={registration.analysisLockReceiptSha256}
                   />
+                </dd>
+              </div>
+            </dl>
+          </details>
+        ) : null}
 
-                  {workspaceError?.stage === "receipt" ? (
-                    <p
-                      className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"
-                      role="alert"
-                    >
-                      {workspaceError.message}
-                    </p>
-                  ) : null}
+        <div className="space-y-6">
+          {!registrationEnabled ? (
+            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-7">
+              <StageHeading
+                number={1}
+                title="Select public blinding receipt"
+                description="Choose the exact public receipt used when the blinded analysis was locked."
+              />
 
-                  {receipt ? (
-                    <FileSummary artifact={receipt} label="Public receipt" />
-                  ) : null}
-                </div>
-              </>
-            )}
-          </section>
+              <div className="mt-6">
+                <label
+                  htmlFor="unblind-blinding-receipt"
+                  className="block text-sm font-medium text-slate-800"
+                >
+                  Public blinding receipt
+                </label>
+                <input
+                  id="unblind-blinding-receipt"
+                  type="file"
+                  accept=".json,application/json"
+                  onChange={(event) =>
+                    handleArtifactChange(event, "receipt", setReceipt)
+                  }
+                  className="mt-2 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 file:mr-4 file:rounded-lg file:border-0 file:bg-slate-950 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-slate-800"
+                />
+
+                {workspaceError?.stage === "receipt" ? (
+                  <p
+                    className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"
+                    role="alert"
+                  >
+                    {workspaceError.message}
+                  </p>
+                ) : null}
+
+                {receipt ? (
+                  <FileSummary artifact={receipt} label="Public receipt" />
+                ) : null}
+              </div>
+            </section>
+          ) : null}
 
           <section
             className={`rounded-2xl border bg-white p-6 shadow-sm sm:p-7 ${
@@ -528,9 +518,9 @@ export function UnblindingWorkspace({
             }`}
           >
             <StageHeading
-              number={2}
+              number={registrationEnabled ? 1 : 2}
               title="Select unblinding secret"
-              description="Choose the local cryptographic secret released after authorization."
+              description="Choose the local secret released after authorization."
             />
 
             <div className="mt-6">
@@ -560,7 +550,7 @@ export function UnblindingWorkspace({
               ) : null}
 
               {secret ? (
-                <FileSummary artifact={secret} label="Unblinding secret" />
+                <FileSummary artifact={secret} label="Selected" />
               ) : null}
             </div>
           </section>
@@ -623,9 +613,9 @@ export function UnblindingWorkspace({
             }`}
           >
             <StageHeading
-              number={registrationEnabled ? 3 : 4}
+              number={registrationEnabled ? 2 : 4}
               title="Verify and unblind"
-              description="Verify the linked artifacts and release the mapping locally."
+              description="Verify the artifact chain and release the mapping locally."
             />
 
             <div className="mt-6">
@@ -657,61 +647,19 @@ export function UnblindingWorkspace({
                   <p className="text-sm font-semibold text-emerald-900">
                     Artifact chain verified. Mapping released.
                   </p>
+                  <p className="mt-2 text-sm text-emerald-950">
+                    Unblinded variable:{" "}
+                    <span className="font-semibold">
+                      {generatedReceipt.selectedColumn}
+                    </span>
+                  </p>
 
-                  <dl className="mt-4 space-y-4">
-                    <div>
-                      <dt className="text-xs font-medium uppercase tracking-wide text-emerald-800">
-                        Unblinding ID
-                      </dt>
-                      <dd className="mt-1 break-all font-mono text-sm text-emerald-950">
-                        {generatedReceipt.unblindingId}
-                      </dd>
-                    </div>
-
-                    <div>
-                      <dt className="text-xs font-medium uppercase tracking-wide text-emerald-800">
-                        Transformation ID
-                      </dt>
-                      <dd className="mt-1 break-all font-mono text-sm text-emerald-950">
-                        {generatedReceipt.transformationId}
-                      </dd>
-                    </div>
-
-                    <div>
-                      <dt className="text-xs font-medium uppercase tracking-wide text-emerald-800">
-                        Lock ID
-                      </dt>
-                      <dd className="mt-1 break-all font-mono text-sm text-emerald-950">
-                        {generatedReceipt.lockId}
-                      </dd>
-                    </div>
-
-                    <div>
-                      <dt className="text-xs font-medium uppercase tracking-wide text-emerald-800">
-                        Selected column
-                      </dt>
-                      <dd className="mt-1 break-all text-sm font-semibold text-emerald-950">
-                        {generatedReceipt.selectedColumn}
-                      </dd>
-                    </div>
-
-                    <div>
-                      <dt className="text-xs font-medium uppercase tracking-wide text-emerald-800">
-                        Final receipt SHA-256
-                      </dt>
-                      <dd>
-                        <HashValue value={generation.receiptSha256} />
-                      </dd>
-                    </div>
-                  </dl>
-
-                  <div className="mt-6 rounded-xl border border-amber-300 bg-amber-50 p-4">
+                  <div className="mt-5 rounded-xl border border-amber-300 bg-amber-50 p-4">
                     <h3 className="text-sm font-semibold text-amber-950">
                       Released mapping
                     </h3>
-                    <p className="mt-2 text-sm leading-6 text-amber-900">
-                      This is protected unblinded information. The mapping stays
-                      local unless you save or share the final receipt yourself.
+                    <p className="mt-1 text-sm text-amber-900">
+                      Protected unblinded information.
                     </p>
                     <div className="mt-4 overflow-x-auto rounded-lg border border-amber-200 bg-white">
                       <table className="w-full border-collapse text-left text-sm">
@@ -744,21 +692,58 @@ export function UnblindingWorkspace({
                     </div>
                   </div>
 
-                  <div className="mt-6 rounded-xl border border-amber-300 bg-amber-50 p-4">
-                    <h3 className="text-sm font-semibold text-amber-950">
-                      Unblinding receipt
-                    </h3>
-                    <p className="mt-2 text-sm leading-6 text-amber-900">
-                      Records the released mapping and linked workflow artifacts.
-                      Treat this receipt as unblinded material.
-                    </p>
+                  <details className="mt-4">
+                    <summary className="cursor-pointer text-sm font-medium text-emerald-900">
+                      Technical details
+                    </summary>
+                    <dl className="mt-4 grid gap-4 sm:grid-cols-2">
+                      <div>
+                        <dt className="text-xs font-medium uppercase tracking-wide text-emerald-800">
+                          Unblinding ID
+                        </dt>
+                        <dd className="mt-1 break-all font-mono text-xs text-emerald-950">
+                          {generatedReceipt.unblindingId}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs font-medium uppercase tracking-wide text-emerald-800">
+                          Transformation ID
+                        </dt>
+                        <dd className="mt-1 break-all font-mono text-xs text-emerald-950">
+                          {generatedReceipt.transformationId}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs font-medium uppercase tracking-wide text-emerald-800">
+                          Lock ID
+                        </dt>
+                        <dd className="mt-1 break-all font-mono text-xs text-emerald-950">
+                          {generatedReceipt.lockId}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs font-medium uppercase tracking-wide text-emerald-800">
+                          Final receipt SHA-256
+                        </dt>
+                        <dd>
+                          <HashValue value={generation.receiptSha256} />
+                        </dd>
+                      </div>
+                    </dl>
+                  </details>
+
+                  <div className="mt-5">
                     <button
                       type="button"
                       onClick={downloadReceipt}
-                      className="mt-4 rounded-lg bg-amber-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-amber-900"
+                      className="rounded-lg bg-amber-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-amber-900"
                     >
                       Download unblinding receipt
                     </button>
+                    <p className="mt-2 text-xs leading-5 text-amber-900">
+                      The receipt contains the released mapping. Treat it as
+                      unblinded material.
+                    </p>
                   </div>
                 </div>
               ) : (
@@ -782,9 +767,9 @@ export function UnblindingWorkspace({
               }`}
             >
               <StageHeading
-                number={4}
-                title="Register unblinding completion"
-                description="Persist safe completion metadata and move the workflow to unblinded."
+                number={3}
+                title="Register completion"
+                description="Record that authorized local unblinding was completed."
               />
 
               <div className="mt-6">
@@ -800,8 +785,8 @@ export function UnblindingWorkspace({
                   />
                   <span>
                     I saved the unblinding receipt and understand that blindstats
-                    stores only safe completion metadata, not the unblinding
-                    secret, plaintext released mapping, or final receipt text.
+                    does not store the secret, released mapping, or final
+                    receipt text.
                   </span>
                 </label>
 
@@ -826,6 +811,17 @@ export function UnblindingWorkspace({
                     {workspaceError.message}
                   </p>
                 ) : null}
+
+                <details className="mt-4">
+                  <summary className="cursor-pointer text-xs font-medium text-slate-600">
+                    What is registered?
+                  </summary>
+                  <p className="mt-2 max-w-3xl text-xs leading-5 text-slate-500">
+                    Safe completion metadata and artifact identities only. The
+                    unblinding secret, plaintext mapping, and final receipt text
+                    remain outside persistent server storage.
+                  </p>
+                </details>
               </div>
             </section>
           ) : null}

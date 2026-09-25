@@ -114,17 +114,11 @@ function FileSummary({
   label: string;
 }) {
   return (
-    <div className="mt-4 rounded-xl bg-slate-50 p-4">
-      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-        {label}
-      </p>
-      <p className="mt-1 break-all text-sm font-semibold text-slate-900">
-        {file.name}
-      </p>
-      <p className="mt-1 text-xs text-slate-500">
-        {file.size.toLocaleString()} {file.size === 1 ? "byte" : "bytes"}
-      </p>
-    </div>
+    <p className="mt-3 text-sm text-slate-700">
+      <span className="font-medium text-slate-950">{label}:</span>{" "}
+      {file.name} · {file.size.toLocaleString()}{" "}
+      {file.size === 1 ? "byte" : "bytes"}
+    </p>
   );
 }
 
@@ -173,6 +167,10 @@ export function AnalysisLockWorkspace({
 
   const canGenerate =
     Boolean(receiptReady && analysisFile && analysisBytes) && !isGenerating;
+
+  const analysisStepNumber = registrationEnabled ? 1 : 2;
+  const createStepNumber = registrationEnabled ? 2 : 3;
+  const registerStepNumber = 3;
 
   function invalidateGeneration(): void {
     setGeneration(null);
@@ -330,105 +328,101 @@ export function AnalysisLockWorkspace({
             : "mx-auto w-full max-w-5xl px-6 py-10 sm:px-8 sm:py-14"
         }
       >
-        <header className="mb-8">
-          <div className="flex flex-wrap items-center gap-3">
-            <p className="text-sm font-semibold tracking-wide text-slate-500">
-              blindstats
+        {!registrationEnabled ? (
+          <header className="mb-8">
+            <div className="flex flex-wrap items-center gap-3">
+              <p className="text-sm font-semibold tracking-wide text-slate-500">
+                blindstats
+              </p>
+              <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600">
+                Analysis Lock v0
+              </span>
+            </div>
+
+            <h1 className="mt-4 max-w-3xl text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
+              Lock an exact analysis artifact before unblinding.
+            </h1>
+
+            <p className="mt-4 max-w-3xl text-base leading-7 text-slate-600">
+              Select the public blinding receipt and the analysis artifact to
+              lock before unblinding.
             </p>
-            <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600">
-              Analysis Lock v0
-            </span>
-          </div>
+          </header>
+        ) : null}
 
-          <h1 className="mt-4 max-w-3xl text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
-            Lock an exact analysis artifact before unblinding.
-          </h1>
-
-          <p className="mt-4 max-w-3xl text-base leading-7 text-slate-600">
-            {registrationEnabled
-              ? "Select the exact analysis artifact to lock. The public blinding receipt already registered for this workflow is supplied automatically."
-              : "Select the public blinding receipt and the analysis artifact to lock before unblinding."}
-          </p>
-        </header>
-
-        <section className="mb-8 rounded-2xl border border-sky-200 bg-sky-50 p-5">
-          <h2 className="text-sm font-semibold text-sky-950">
-            Browser-local analysis lock
-          </h2>
-          <p className="mt-2 text-sm leading-6 text-sky-900">
-            blindstats hashes the exact analysis artifact locally and links it to
-            the exact public blinding receipt. The analysis artifact itself is
-            not uploaded during registration.
+        <section className="mb-6 rounded-xl border border-sky-200 bg-sky-50 px-5 py-4">
+          <p className="text-sm leading-6 text-sky-950">
+            <span className="font-semibold">Browser-local lock.</span>{" "}
+            The analysis artifact is hashed locally and is not uploaded to
+            blindstats.
           </p>
         </section>
 
+        {registrationEnabled && registration ? (
+          <details className="mb-6 rounded-xl border border-slate-200 bg-white px-5 py-4">
+            <summary className="cursor-pointer text-sm font-medium text-slate-800">
+              Registered blinding receipt
+            </summary>
+            <dl className="mt-4 space-y-4">
+              <div>
+                <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                  Transformation ID
+                </dt>
+                <dd className="mt-1 break-all font-mono text-xs text-slate-700">
+                  {registration.transformationId}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                  Public receipt SHA-256
+                </dt>
+                <dd>
+                  <HashValue value={registration.publicReceiptSha256} />
+                </dd>
+              </div>
+            </dl>
+          </details>
+        ) : null}
+
         <div className="space-y-6">
-          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-7">
-            {registrationEnabled && registration ? (
-              <>
-                <StageHeading
-                  number={1}
-                  title="Registered blinding receipt"
-                  description="Use the exact public receipt already registered for this blinded workflow."
-                />
-                <dl className="mt-6 space-y-4">
-                  <div>
-                    <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                      Transformation ID
-                    </dt>
-                    <dd className="mt-1 break-all font-mono text-sm text-slate-900">
-                      {registration.transformationId}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                      Public receipt SHA-256
-                    </dt>
-                    <dd>
-                      <HashValue value={registration.publicReceiptSha256} />
-                    </dd>
-                  </div>
-                </dl>
-              </>
-            ) : (
-              <>
-                <StageHeading
-                  number={1}
-                  title="Select public blinding receipt"
-                  description="Choose the exact public receipt associated with the blinded analysis."
+          {!registrationEnabled ? (
+            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-7">
+              <StageHeading
+                number={1}
+                title="Select public blinding receipt"
+                description="Choose the exact public receipt associated with the blinded analysis."
+              />
+
+              <div className="mt-6">
+                <label
+                  htmlFor="lock-blinding-receipt"
+                  className="block text-sm font-medium text-slate-800"
+                >
+                  Public blinding receipt
+                </label>
+                <input
+                  id="lock-blinding-receipt"
+                  type="file"
+                  accept=".json,application/json"
+                  onChange={handleReceiptChange}
+                  className="mt-2 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 file:mr-4 file:rounded-lg file:border-0 file:bg-slate-950 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-slate-800"
                 />
 
-                <div className="mt-6">
-                  <label
-                    htmlFor="lock-blinding-receipt"
-                    className="block text-sm font-medium text-slate-800"
+                {workspaceError?.stage === "receipt" ? (
+                  <p
+                    className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"
+                    role="alert"
                   >
-                    Public blinding receipt
-                  </label>
-                  <input
-                    id="lock-blinding-receipt"
-                    type="file"
-                    accept=".json,application/json"
-                    onChange={handleReceiptChange}
-                    className="mt-2 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 file:mr-4 file:rounded-lg file:border-0 file:bg-slate-950 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-slate-800"
-                  />
+                    {workspaceError.message}
+                  </p>
+                ) : null}
 
-                  {workspaceError?.stage === "receipt" ? (
-                    <p
-                      className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"
-                      role="alert"
-                    >
-                      {workspaceError.message}
-                    </p>
-                  ) : null}
-
-                  {receiptFile ? (
-                    <FileSummary file={receiptFile} label="Receipt file" />
-                  ) : null}
-                </div>
-              </>
-            )}
-          </section>
+                {receiptFile ? (
+                  <FileSummary file={receiptFile} label="Receipt file" />
+                ) : null}
+              </div>
+            </section>
+          ) : null}
 
           <section
             className={`rounded-2xl border bg-white p-6 shadow-sm sm:p-7 ${
@@ -438,9 +432,9 @@ export function AnalysisLockWorkspace({
             }`}
           >
             <StageHeading
-              number={2}
+              number={analysisStepNumber}
               title="Select analysis artifact"
-              description="Choose the exact analysis artifact to lock before unblinding."
+              description="Choose the exact file you want to identify as locked before unblinding."
             />
 
             <div className="mt-6">
@@ -458,8 +452,8 @@ export function AnalysisLockWorkspace({
               />
 
               <p className="mt-2 text-xs leading-5 text-slate-500">
-                This may be a manuscript, report, script, notebook, archive, or
-                another research artifact.
+                Manuscript, report, script, notebook, archive, or another
+                research artifact.
               </p>
 
               {workspaceError?.stage === "analysis" ? (
@@ -472,7 +466,7 @@ export function AnalysisLockWorkspace({
               ) : null}
 
               {analysisFile ? (
-                <FileSummary file={analysisFile} label="Analysis artifact" />
+                <FileSummary file={analysisFile} label="Selected" />
               ) : null}
             </div>
           </section>
@@ -485,9 +479,9 @@ export function AnalysisLockWorkspace({
             }`}
           >
             <StageHeading
-              number={3}
+              number={createStepNumber}
               title="Create analysis lock"
-              description="Hash the exact analysis artifact and link it to the public blinding receipt."
+              description="Hash the selected file and create its linked lock receipt."
             />
 
             <div className="mt-6">
@@ -519,57 +513,55 @@ export function AnalysisLockWorkspace({
                   <p className="text-sm font-semibold text-emerald-900">
                     Analysis lock created successfully.
                   </p>
+                  <p className="mt-2 break-all text-sm text-emerald-950">
+                    {generation.receipt.analysisArtifact.filename}
+                  </p>
 
-                  <dl className="mt-4 space-y-4">
-                    <div>
-                      <dt className="text-xs font-medium uppercase tracking-wide text-emerald-800">
-                        Lock ID
-                      </dt>
-                      <dd className="mt-1 break-all font-mono text-sm text-emerald-950">
-                        {generation.receipt.lockId}
-                      </dd>
-                    </div>
-
-                    <div>
-                      <dt className="text-xs font-medium uppercase tracking-wide text-emerald-800">
-                        Transformation ID
-                      </dt>
-                      <dd className="mt-1 break-all font-mono text-sm text-emerald-950">
-                        {generation.receipt.blinding.transformationId}
-                      </dd>
-                    </div>
-
-                    <div>
-                      <dt className="text-xs font-medium uppercase tracking-wide text-emerald-800">
-                        Blinded SHA-256
-                      </dt>
-                      <dd>
-                        <HashValue
-                          value={
-                            generation.receipt.blinding.blindedArtifactSha256
-                          }
-                        />
-                      </dd>
-                    </div>
-
-                    <div>
-                      <dt className="text-xs font-medium uppercase tracking-wide text-emerald-800">
-                        Analysis artifact
-                      </dt>
-                      <dd className="mt-1 break-all text-sm font-semibold text-emerald-950">
-                        {generation.receipt.analysisArtifact.filename}
-                      </dd>
-                    </div>
-
-                    <div>
-                      <dt className="text-xs font-medium uppercase tracking-wide text-emerald-800">
-                        Analysis SHA-256
-                      </dt>
-                      <dd>
-                        <HashValue value={generation.receipt.analysisArtifact.sha256} />
-                      </dd>
-                    </div>
-                  </dl>
+                  <details className="mt-4">
+                    <summary className="cursor-pointer text-sm font-medium text-emerald-900">
+                      Technical details
+                    </summary>
+                    <dl className="mt-4 space-y-4">
+                      <div>
+                        <dt className="text-xs font-medium uppercase tracking-wide text-emerald-800">
+                          Lock ID
+                        </dt>
+                        <dd className="mt-1 break-all font-mono text-xs text-emerald-950">
+                          {generation.receipt.lockId}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs font-medium uppercase tracking-wide text-emerald-800">
+                          Transformation ID
+                        </dt>
+                        <dd className="mt-1 break-all font-mono text-xs text-emerald-950">
+                          {generation.receipt.blinding.transformationId}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs font-medium uppercase tracking-wide text-emerald-800">
+                          Blinded SHA-256
+                        </dt>
+                        <dd>
+                          <HashValue
+                            value={
+                              generation.receipt.blinding.blindedArtifactSha256
+                            }
+                          />
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs font-medium uppercase tracking-wide text-emerald-800">
+                          Analysis SHA-256
+                        </dt>
+                        <dd>
+                          <HashValue
+                            value={generation.receipt.analysisArtifact.sha256}
+                          />
+                        </dd>
+                      </div>
+                    </dl>
+                  </details>
 
                   <button
                     type="button"
@@ -600,9 +592,9 @@ export function AnalysisLockWorkspace({
               }`}
             >
               <StageHeading
-                number={4}
+                number={registerStepNumber}
                 title="Register analysis lock"
-                description="Register the exact lock receipt and safe artifact metadata with this workflow. The analysis artifact contents stay local."
+                description="Add this lock to the workflow. The analysis file stays local."
               />
 
               <div className="mt-6">

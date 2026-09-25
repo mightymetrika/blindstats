@@ -69,6 +69,7 @@ function redirectToCurrentWorkflow(
   query:
     | "saved=1"
     | "activated=1"
+    | "activationError=independent_requires_two_actors"
     | "stale=1"
     | "requested=1"
     | "authorized=1"
@@ -230,6 +231,75 @@ export async function activateBlindingPlan(formData: FormData) {
 
   if (claimsError || !claimsData?.claims?.sub) {
     redirect("/login");
+  }
+
+  const [
+    { data: workflow, error: workflowError },
+    { data: draft, error: draftError },
+    { data: unblindingCapabilities, error: capabilitiesError },
+  ] = await Promise.all([
+    supabase
+      .from("blinding_workflows")
+      .select("id")
+      .eq("id", workflowId)
+      .eq("study_id", studyId)
+      .maybeSingle(),
+    supabase
+      .from("blinding_plan_drafts")
+      .select("authorization_policy")
+      .eq("workflow_id", workflowId)
+      .eq("study_id", studyId)
+      .maybeSingle(),
+    supabase
+      .from("study_capabilities")
+      .select("user_id, capability")
+      .eq("study_id", studyId)
+      .in("capability", ["unblinding.request", "unblinding.authorize"]),
+  ]);
+
+  if (workflowError || !workflow) {
+    throw new Error(
+      `Unable to verify blinding workflow: ${workflowError?.message ?? "Workflow not found."}`,
+    );
+  }
+
+  if (draftError || !draft) {
+    throw new Error(
+      `Unable to verify BlindingPlan draft: ${draftError?.message ?? "Draft not found."}`,
+    );
+  }
+
+  if (capabilitiesError) {
+    throw new Error(
+      `Unable to verify unblinding roles: ${capabilitiesError.message}`,
+    );
+  }
+
+  if (draft.authorization_policy === "independent") {
+    const requesterIds = new Set(
+      (unblindingCapabilities ?? [])
+        .filter((entry) => entry.capability === "unblinding.request")
+        .map((entry) => entry.user_id),
+    );
+    const authorizerIds = new Set(
+      (unblindingCapabilities ?? [])
+        .filter((entry) => entry.capability === "unblinding.authorize")
+        .map((entry) => entry.user_id),
+    );
+    const hasIndependentAuthorizationPair = Array.from(requesterIds).some(
+      (requesterId) =>
+        Array.from(authorizerIds).some(
+          (authorizerId) => authorizerId !== requesterId,
+        ),
+    );
+
+    if (!hasIndependentAuthorizationPair) {
+      redirectToCurrentWorkflow(
+        studyId,
+        workflowId,
+        "activationError=independent_requires_two_actors",
+      );
+    }
   }
 
   const { error } = await supabase.rpc("activate_blinding_plan", {

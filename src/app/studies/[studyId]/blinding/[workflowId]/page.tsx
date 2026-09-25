@@ -35,6 +35,7 @@ type BlindingWorkflowPageProps = {
     stale?: string;
     analystAssigned?: string;
     analystError?: string;
+    activationError?: string;
   }>;
 };
 
@@ -83,6 +84,7 @@ export default async function BlindingWorkflowPage({
     stale,
     analystAssigned,
     analystError,
+    activationError,
   } = await searchParams;
   const supabase = await createClient();
 
@@ -100,6 +102,7 @@ export default async function BlindingWorkflowPage({
     { data: workflow, error: workflowError },
     { data: draft, error: draftError },
     { data: currentCapabilities, error: capabilitiesError },
+    { data: unblindingCapabilities, error: unblindingCapabilitiesError },
   ] = await Promise.all([
     supabase
       .from("studies")
@@ -127,6 +130,11 @@ export default async function BlindingWorkflowPage({
       .select("capability")
       .eq("study_id", studyId)
       .eq("user_id", currentUserId),
+    supabase
+      .from("study_capabilities")
+      .select("user_id, capability")
+      .eq("study_id", studyId)
+      .in("capability", ["unblinding.request", "unblinding.authorize"]),
   ]);
 
   if (studyError) {
@@ -146,6 +154,12 @@ export default async function BlindingWorkflowPage({
   if (capabilitiesError) {
     throw new Error(
       `Unable to load Study capabilities: ${capabilitiesError.message}`,
+    );
+  }
+
+  if (unblindingCapabilitiesError) {
+    throw new Error(
+      `Unable to load unblinding capabilities: ${unblindingCapabilitiesError.message}`,
     );
   }
 
@@ -396,6 +410,26 @@ export default async function BlindingWorkflowPage({
     !draft.require_analysis_lock ||
     draft.authorization_policy === "self_authorization";
 
+  const unblindingRequesterIds = new Set(
+    (unblindingCapabilities ?? [])
+      .filter((entry) => entry.capability === "unblinding.request")
+      .map((entry) => entry.user_id),
+  );
+  const unblindingAuthorizerIds = new Set(
+    (unblindingCapabilities ?? [])
+      .filter((entry) => entry.capability === "unblinding.authorize")
+      .map((entry) => entry.user_id),
+  );
+  const hasIndependentAuthorizationPair = Array.from(
+    unblindingRequesterIds,
+  ).some((requesterId) =>
+    Array.from(unblindingAuthorizerIds).some(
+      (authorizerId) => authorizerId !== requesterId,
+    ),
+  );
+  const independentAuthorizationReady =
+    draft.authorization_policy !== "independent" ||
+    hasIndependentAuthorizationPair;
   return (
     <main className="mx-auto min-h-screen w-full max-w-5xl px-6 py-12">
       <Link
@@ -535,20 +569,15 @@ export default async function BlindingWorkflowPage({
 
           <section className="mt-8 rounded-2xl border border-black/10 p-6 dark:border-white/15">
             <div className="flex flex-wrap items-start justify-between gap-4">
-              <div>
-                <h2 className="text-lg font-semibold">
-                  BlindingPlan v{activePlan.version_number}
-                </h2>
-                <p className="mt-2 text-sm text-black/60 dark:text-white/60">
-                  This activated plan is immutable.
-                </p>
-              </div>
+              <h2 className="text-lg font-semibold">
+                BlindingPlan v{activePlan.version_number}
+              </h2>
               <span className="rounded-full border border-black/10 px-2.5 py-1 text-xs font-medium dark:border-white/15">
                 Active
               </span>
             </div>
 
-            <dl className="mt-6 grid gap-5 sm:grid-cols-2">
+            <dl className="mt-5 grid gap-5 sm:grid-cols-3">
               <div>
                 <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
                   Protection target
@@ -557,52 +586,26 @@ export default async function BlindingWorkflowPage({
                   {activePlan.protection_targets[0]}
                 </dd>
               </div>
-
               <div>
                 <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
                   Analysis lock
                 </dt>
                 <dd className="mt-1 text-sm">
-                  {activePlan.require_analysis_lock
-                    ? "Required"
-                    : "Not required"}
+                  {activePlan.require_analysis_lock ? "Required" : "Not required"}
                 </dd>
               </div>
-
               <div>
                 <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
-                  Unblinding authorization
+                  Authorization
                 </dt>
                 <dd className="mt-1 text-sm">
-                  {formatAuthorizationPolicy(
-                    activePlan.authorization_policy,
-                  )}
-                </dd>
-              </div>
-
-              <div>
-                <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
-                  Activated
-                </dt>
-                <dd className="mt-1 text-sm">
-                  {new Date(activePlan.activated_at).toLocaleString("en-US")}
+                  {formatAuthorizationPolicy(activePlan.authorization_policy)}
                 </dd>
               </div>
             </dl>
 
-            {activePlan.protection_rationale ? (
-              <div className="mt-6">
-                <p className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
-                  Protection rationale
-                </p>
-                <p className="mt-1 text-sm">
-                  {activePlan.protection_rationale}
-                </p>
-              </div>
-            ) : null}
-
             {activePlan.warning_acknowledgements.length > 0 ? (
-              <div className="mt-6 rounded-xl border border-black/10 p-4 dark:border-white/15">
+              <div className="mt-5 rounded-xl border border-black/10 p-4 dark:border-white/15">
                 <p className="text-sm font-medium">
                   Non-recommended settings acknowledged
                 </p>
@@ -620,26 +623,56 @@ export default async function BlindingWorkflowPage({
                 </ul>
               </div>
             ) : null}
+
+            <details className="mt-5">
+              <summary className="cursor-pointer text-sm font-medium">
+                Plan details
+              </summary>
+              <dl className="mt-4 grid gap-4 sm:grid-cols-2">
+                <div>
+                  <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+                    Activated
+                  </dt>
+                  <dd className="mt-1 text-sm">
+                    {new Date(activePlan.activated_at).toLocaleString("en-US")}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+                    Version status
+                  </dt>
+                  <dd className="mt-1 text-sm">Immutable</dd>
+                </div>
+              </dl>
+              {activePlan.protection_rationale ? (
+                <div className="mt-4">
+                  <p className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+                    Protection rationale
+                  </p>
+                  <p className="mt-1 text-sm">
+                    {activePlan.protection_rationale}
+                  </p>
+                </div>
+              ) : null}
+            </details>
           </section>
 
           {workflow.state === "setup" ? (
             <>
               <section className="mt-6 rounded-2xl border border-black/10 p-6 dark:border-white/15">
-                <h2 className="text-lg font-semibold">Ready for blinding</h2>
+                <h2 className="text-lg font-semibold">Next step</h2>
                 {canCreateBlinding ? (
-                  <p className="mt-2 max-w-3xl text-sm text-black/60 dark:text-white/60">
-                    Plan v{activePlan.version_number} is active. Create the blinded
-                    package locally and save all three artifacts. Transfer only
-                    the blinded dataset to the blinded analyst through an approved
-                    external secure file-transfer channel. Keep the unblinding
-                    secret under custodian control until unblinding is authorized.
-                  </p>
+                  <>
+                    <p className="mt-2 text-sm text-black/60 dark:text-white/60">
+                      Create and register the blinded package below.
+                    </p>
+                    <p className="mt-2 text-sm font-medium">
+                      After generation, keep the unblinding secret separate from analysis materials until unblinding is authorized.
+                    </p>
+                  </>
                 ) : (
-                  <p className="mt-2 max-w-3xl text-sm text-black/60 dark:text-white/60">
-                    Plan v{activePlan.version_number} is active. The blinding
-                    custodian must create and register the blinded package before
-                    analysis begins. Dataset contents are transferred outside
-                    blindstats.
+                  <p className="mt-2 text-sm text-black/60 dark:text-white/60">
+                    Waiting for the blinding custodian to create and register the blinded package.
                   </p>
                 )}
               </section>
@@ -661,161 +694,149 @@ export default async function BlindingWorkflowPage({
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
                     <h2 className="text-lg font-semibold">Blinding registered</h2>
-                    <p className="mt-2 max-w-3xl text-sm text-black/60 dark:text-white/60">
-                      The public receipt and safe transformation metadata are
-                      registered. Dataset contents and the unblinding secret were
-                      not uploaded as part of this registration.
+                    <p className="mt-2 text-sm text-black/60 dark:text-white/60">
+                      Blinded variable: <span className="font-medium text-foreground">{transformation.selected_column}</span>
                     </p>
                   </div>
                   <span className="rounded-full border border-black/10 px-2.5 py-1 text-xs font-medium dark:border-white/15">
-                    {workflow.state.replaceAll("_", " ")}
+                    Registered
                   </span>
                 </div>
 
                 {blinded === "1" ? (
                   <p className="mt-4 text-sm font-medium">
-                    Blinded package registered successfully.
+                    Blinded package recorded.
                   </p>
                 ) : null}
 
-                <dl className="mt-6 grid gap-5 sm:grid-cols-2">
-                  <div>
-                    <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
-                      Transformation ID
-                    </dt>
-                    <dd className="mt-1 break-all font-mono text-sm">
-                      {transformation.transformation_id}
-                    </dd>
-                  </div>
-
-                  <div>
-                    <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
-                      Blinded variable
-                    </dt>
-                    <dd className="mt-1 text-sm">
-                      {transformation.selected_column}
-                    </dd>
-                  </div>
-
-                  <div>
-                    <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
-                      Source SHA-256
-                    </dt>
-                    <dd className="mt-1 break-all font-mono text-xs">
-                      {transformation.source_artifact_sha256}
-                    </dd>
-                  </div>
-
-                  <div>
-                    <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
-                      Blinded SHA-256
-                    </dt>
-                    <dd className="mt-1 break-all font-mono text-xs">
-                      {transformation.blinded_artifact_sha256}
-                    </dd>
-                  </div>
-
-                  <div>
-                    <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
-                      Public receipt SHA-256
-                    </dt>
-                    <dd className="mt-1 break-all font-mono text-xs">
-                      {transformation.public_receipt_sha256}
-                    </dd>
-                  </div>
-
-                  <div>
-                    <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
-                      Registered
-                    </dt>
-                    <dd className="mt-1 text-sm">
-                      {new Date(transformation.registered_at).toLocaleString(
-                        "en-US",
-                      )}
-                    </dd>
-                  </div>
-                </dl>
+                <details className="mt-5">
+                  <summary className="cursor-pointer text-sm font-medium">
+                    Technical details
+                  </summary>
+                  <p className="mt-3 text-sm text-black/60 dark:text-white/60">
+                    The public receipt and safe transformation metadata are stored. Dataset contents and the unblinding secret are not.
+                  </p>
+                  <dl className="mt-4 grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+                        Transformation ID
+                      </dt>
+                      <dd className="mt-1 break-all font-mono text-xs">
+                        {transformation.transformation_id}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+                        Source SHA-256
+                      </dt>
+                      <dd className="mt-1 break-all font-mono text-xs">
+                        {transformation.source_artifact_sha256}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+                        Blinded SHA-256
+                      </dt>
+                      <dd className="mt-1 break-all font-mono text-xs">
+                        {transformation.blinded_artifact_sha256}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+                        Public receipt SHA-256
+                      </dt>
+                      <dd className="mt-1 break-all font-mono text-xs">
+                        {transformation.public_receipt_sha256}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+                        Registered
+                      </dt>
+                      <dd className="mt-1 text-sm">
+                        {new Date(transformation.registered_at).toLocaleString("en-US")}
+                      </dd>
+                    </div>
+                  </dl>
+                </details>
               </section>
 
-              <section className="mt-6 rounded-2xl border border-black/10 p-6 dark:border-white/15">
-                <h2 className="text-lg font-semibold">Dataset handoff</h2>
-                {isBlindingCustodian || canCreateBlinding ? (
-                  <p className="mt-2 max-w-3xl text-sm text-black/60 dark:text-white/60">
-                    Send the downloaded blinded dataset to the blinded analyst
-                    through the project&apos;s approved secure file-transfer channel.
-                    Do not send the unblinding secret yet. The exact public
-                    receipt is already registered in blindstats and will be
-                    supplied automatically when the analyst creates an
-                    AnalysisLock.
-                  </p>
-                ) : isBlindedAnalyst ? (
-                  <p className="mt-2 max-w-3xl text-sm text-black/60 dark:text-white/60">
-                    Analyze only the blinded dataset supplied by the custodian
-                    through the project&apos;s approved secure file-transfer channel.
-                    You do not need a separate copy of the public receipt to
-                    create the AnalysisLock because blindstats supplies the exact
-                    registered receipt automatically.
-                  </p>
-                ) : (
-                  <p className="mt-2 max-w-3xl text-sm text-black/60 dark:text-white/60">
-                    Dataset contents remain outside blindstats and should be
-                    transferred through the project&apos;s approved secure file-transfer
-                    channel.
-                  </p>
-                )}
-              </section>
+              {workflow.state === "blinded" && !unblindingRequest ? (
+                <section className="mt-6 rounded-2xl border border-black/10 p-6 dark:border-white/15">
+                  <h2 className="text-lg font-semibold">Next step</h2>
+                  {analysisLocks.length === 0 ? (
+                    isBlindingCustodian ? (
+                      <>
+                        <p className="mt-2 text-sm text-black/60 dark:text-white/60">
+                          Send the blinded dataset to the blinded analyst, then wait for the analyst to register an AnalysisLock.
+                        </p>
+                        <p className="mt-2 text-sm font-medium">
+                          Keep the unblinding secret until unblinding is authorized.
+                        </p>
+                      </>
+                    ) : isBlindedAnalyst ? (
+                      <p className="mt-2 text-sm text-black/60 dark:text-white/60">
+                        Analyze the blinded dataset supplied by the custodian, then register an AnalysisLock below.
+                      </p>
+                    ) : canCreateBlinding && canLockAnalysis ? (
+                      <>
+                        <p className="mt-2 text-sm text-black/60 dark:text-white/60">
+                          Complete the blinded analysis, then register an AnalysisLock below.
+                        </p>
+                        <p className="mt-2 text-sm font-medium">
+                          Keep the unblinding secret separate from analysis materials until unblinding is authorized.
+                        </p>
+                      </>
+                    ) : (
+                      <p className="mt-2 text-sm text-black/60 dark:text-white/60">
+                        Waiting for an AnalysisLock to be registered.
+                      </p>
+                    )
+                  ) : canRequestUnblinding ? (
+                    <p className="mt-2 text-sm text-black/60 dark:text-white/60">
+                      Request unblinding below using the appropriate registered AnalysisLock.
+                    </p>
+                  ) : (
+                    <p className="mt-2 text-sm text-black/60 dark:text-white/60">
+                      Waiting for the blinded analyst to request unblinding.
+                    </p>
+                  )}
+                </section>
+              ) : null}
 
               <section className="mt-6 rounded-2xl border border-black/10 p-6 dark:border-white/15">
-                <h2 className="text-lg font-semibold">Analysis locks</h2>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <h2 className="text-lg font-semibold">Analysis locks</h2>
+                  <span className="rounded-full border border-black/10 px-2.5 py-1 text-xs font-medium dark:border-white/15">
+                    {analysisLocks.length}
+                  </span>
+                </div>
                 <p className="mt-2 max-w-3xl text-sm text-black/60 dark:text-white/60">
-                  Each registered lock identifies one exact analysis artifact
-                  under the registered blinding receipt. Analysis artifact
-                  contents are not stored by blindstats.
+                  Locks preserve exact analysis-artifact identity without storing the artifact contents.
                 </p>
 
                 {locked === "1" ? (
-                  <p className="mt-4 text-sm font-medium">
-                    Analysis lock registered successfully.
-                  </p>
+                  <p className="mt-4 text-sm font-medium">Analysis lock recorded.</p>
                 ) : null}
 
                 {analysisLocks.length === 0 ? (
-                  <p className="mt-5 text-sm text-black/60 dark:text-white/60">
+                  <p className="mt-4 text-sm text-black/60 dark:text-white/60">
                     No analysis lock has been registered yet.
                   </p>
                 ) : (
-                  <div className="mt-5 space-y-4">
+                  <div className="mt-4 space-y-3">
                     {analysisLocks.map((lock, index) => (
-                      <div
+                      <details
                         className="rounded-xl border border-black/10 p-4 dark:border-white/15"
                         key={lock.id}
                       >
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                          <p className="text-sm font-medium">
-                            Analysis lock {analysisLocks.length - index}
-                          </p>
-                          <span className="text-xs text-black/50 dark:text-white/50">
-                            Registered {new Date(lock.registered_at).toLocaleString("en-US")}
-                          </span>
-                        </div>
-
+                        <summary className="cursor-pointer text-sm font-medium">
+                          Analysis lock {analysisLocks.length - index}: {lock.analysis_artifact_filename}
+                        </summary>
+                        <p className="mt-2 text-xs text-black/50 dark:text-white/50">
+                          Registered {new Date(lock.registered_at).toLocaleString("en-US")}
+                        </p>
                         <dl className="mt-4 grid gap-4 sm:grid-cols-2">
-                          <div>
-                            <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
-                              Analysis artifact
-                            </dt>
-                            <dd className="mt-1 break-all text-sm">
-                              {lock.analysis_artifact_filename}
-                            </dd>
-                          </div>
-                          <div>
-                            <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
-                              Byte length
-                            </dt>
-                            <dd className="mt-1 text-sm">
-                              {lock.analysis_artifact_byte_length.toLocaleString()}
-                            </dd>
-                          </div>
                           <div>
                             <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
                               Analysis SHA-256
@@ -842,6 +863,14 @@ export default async function BlindingWorkflowPage({
                           </div>
                           <div>
                             <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+                              Byte length
+                            </dt>
+                            <dd className="mt-1 text-sm">
+                              {lock.analysis_artifact_byte_length.toLocaleString()}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
                               Receipt created
                             </dt>
                             <dd className="mt-1 text-sm">
@@ -849,7 +878,7 @@ export default async function BlindingWorkflowPage({
                             </dd>
                           </div>
                         </dl>
-                      </div>
+                      </details>
                     ))}
                   </div>
                 )}
@@ -860,8 +889,7 @@ export default async function BlindingWorkflowPage({
                   <div>
                     <h2 className="text-lg font-semibold">Unblinding</h2>
                     <p className="mt-2 max-w-3xl text-sm text-black/60 dark:text-white/60">
-                      Request and authorization are durable governance events.
-                      Authorization does not itself expose the protected mapping.
+                      Request → authorization → local release. Authorization alone does not expose the protected mapping.
                     </p>
                   </div>
                   <span className="rounded-full border border-black/10 px-2.5 py-1 text-xs font-medium dark:border-white/15">
@@ -876,94 +904,39 @@ export default async function BlindingWorkflowPage({
                 </div>
 
                 {requested === "1" ? (
-                  <p className="mt-4 text-sm font-medium">
-                    Unblinding request registered successfully.
-                  </p>
+                  <p className="mt-4 text-sm font-medium">Request recorded.</p>
                 ) : null}
 
                 {authorized === "1" ? (
-                  <p className="mt-4 text-sm font-medium">
-                    Unblinding authorized successfully. The protected mapping
-                    has not been released by this authorization event.
-                  </p>
+                  <p className="mt-4 text-sm font-medium">Authorization recorded.</p>
                 ) : null}
 
                 {unblinded === "1" ? (
+                  <p className="mt-4 text-sm font-medium">Unblinding recorded.</p>
+                ) : null}
+
+                {unblindingAuthorization && !unblindingCompletion ? (
                   <p className="mt-4 text-sm font-medium">
-                    Authorized unblinding completed and registered successfully.
+                    Authorized. The protected mapping has not been released yet.
                   </p>
                 ) : null}
 
-                {unblindingRequest ? (
-                  <div className="mt-6 rounded-xl border border-black/10 p-4 dark:border-white/15">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <p className="text-sm font-medium">Unblinding request</p>
-                      <span className="text-xs text-black/50 dark:text-white/50">
-                        Requested {new Date(
-                          unblindingRequest.requested_at,
-                        ).toLocaleString("en-US")}
-                      </span>
-                    </div>
+                {unblindingCompletion ? (
+                  <p className="mt-4 text-sm font-medium">
+                    Authorized unblinding is complete.
+                  </p>
+                ) : null}
 
-                    <dl className="mt-4 grid gap-4 sm:grid-cols-2">
-                      <div>
-                        <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
-                          Request ID
-                        </dt>
-                        <dd className="mt-1 break-all font-mono text-xs">
-                          {unblindingRequest.id}
-                        </dd>
-                      </div>
-
-                      <div>
-                        <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
-                          Requested by
-                        </dt>
-                        <dd className="mt-1 text-sm">
-                          {unblindingRequest.requested_by === currentUserId
-                            ? "You"
-                            : "Another Study member"}
-                        </dd>
-                      </div>
-
-                      <div className="sm:col-span-2">
-                        <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
-                          Analysis lock for this request
-                        </dt>
-                        <dd className="mt-1 text-sm">
-                          {unblindingRequest.analysis_lock_id
-                            ? (() => {
-                                const selectedLockIndex = analysisLocks.findIndex(
-                                  (lock) =>
-                                    lock.id ===
-                                    unblindingRequest.analysis_lock_id,
-                                );
-                                const selectedLock =
-                                  selectedLockIndex >= 0
-                                    ? analysisLocks[selectedLockIndex]
-                                    : null;
-
-                                return selectedLock
-                                  ? `Analysis lock ${analysisLocks.length - selectedLockIndex}: ${selectedLock.analysis_artifact_filename}`
-                                  : "Registered analysis lock";
-                              })()
-                            : "No analysis lock selected (not required by the active Plan)."}
-                        </dd>
-                      </div>
-                    </dl>
-                  </div>
-                ) : workflow.state === "blinded" ? (
+                {!unblindingRequest && workflow.state === "blinded" ? (
                   <div className="mt-6">
                     {activePlan.require_analysis_lock &&
                     analysisLocks.length === 0 ? (
                       <div className="rounded-xl border border-black/10 p-4 dark:border-white/15">
                         <p className="text-sm font-medium">
-                          Analysis lock required before requesting unblinding
+                          Analysis lock required before unblinding
                         </p>
                         <p className="mt-1 text-sm text-black/60 dark:text-white/60">
-                          Plan v{activePlan.version_number} requires an Analysis
-                          Lock. Register at least one lock before creating the
-                          unblinding request.
+                          Register at least one AnalysisLock before requesting unblinding.
                         </p>
                       </div>
                     ) : canRequestUnblinding ? (
@@ -991,8 +964,8 @@ export default async function BlindingWorkflowPage({
                           >
                             <option value="">
                               {activePlan.require_analysis_lock
-                                ? "Select the registered Analysis Lock to use"
-                                : "No Analysis Lock (Plan does not require one)"}
+                                ? "Select a registered AnalysisLock"
+                                : "No AnalysisLock"}
                             </option>
                             {analysisLocks.map((lock, index) => (
                               <option key={lock.id} value={lock.id}>
@@ -1002,8 +975,8 @@ export default async function BlindingWorkflowPage({
                           </select>
                           <p className="mt-1 text-xs text-black/50 dark:text-white/50">
                             {activePlan.require_analysis_lock
-                              ? "The request will be permanently bound to the selected registered lock."
-                              : "A lock is optional under this Plan. If selected, the request will be permanently bound to it."}
+                              ? "The request will be permanently bound to the selected lock."
+                              : "A lock is optional under this Plan."}
                           </p>
                         </div>
 
@@ -1016,8 +989,7 @@ export default async function BlindingWorkflowPage({
                       </form>
                     ) : (
                       <p className="text-sm text-black/60 dark:text-white/60">
-                        You do not have the unblinding.request capability for
-                        this Study.
+                        Waiting for a Study member who can request unblinding.
                       </p>
                     )}
                   </div>
@@ -1025,27 +997,25 @@ export default async function BlindingWorkflowPage({
 
                 {unblindingRequest && !unblindingAuthorization ? (
                   <div className="mt-6 rounded-xl border border-black/10 p-4 dark:border-white/15">
-                    <p className="text-sm font-medium">Authorization</p>
-
                     {activePlan.authorization_policy === "independent" &&
                     unblindingRequest.requested_by === currentUserId ? (
                       <>
-                        <p className="mt-2 text-sm font-medium">
+                        <p className="text-sm font-medium">
                           Awaiting independent authorization
                         </p>
-                        <p className="mt-1 max-w-3xl text-sm text-black/60 dark:text-white/60">
-                          Plan v{activePlan.version_number} requires a different
-                          authenticated Study member with the
-                          unblinding.authorize capability. The requester cannot
-                          authorize their own request.
+                        <p className="mt-1 text-sm text-black/60 dark:text-white/60">
+                          A different Study member must authorize this request.
                         </p>
                       </>
                     ) : canAuthorizeUnblinding ? (
                       <>
-                        <p className="mt-2 max-w-3xl text-sm text-black/60 dark:text-white/60">
+                        <p className="text-sm font-medium">
+                          Authorization required
+                        </p>
+                        <p className="mt-1 text-sm text-black/60 dark:text-white/60">
                           {activePlan.authorization_policy === "independent"
-                            ? "You are a different Study member from the requester and may authorize this request if you hold the required capability."
-                            : "This Plan permits self-authorization. A user with the unblinding.authorize capability may authorize this request."}
+                            ? "This request was made by another Study member."
+                            : "This Plan permits self-authorization."}
                         </p>
                         <form action={authorizeUnblinding} className="mt-4">
                           <input
@@ -1072,132 +1042,190 @@ export default async function BlindingWorkflowPage({
                         </form>
                       </>
                     ) : (
-                      <p className="mt-2 text-sm text-black/60 dark:text-white/60">
-                        Authorization is pending. A Study member with the
-                        unblinding.authorize capability is required.
-                      </p>
+                      <>
+                        <p className="text-sm font-medium">Awaiting authorization</p>
+                        <p className="mt-1 text-sm text-black/60 dark:text-white/60">
+                          Another authorized Study member must complete this step.
+                        </p>
+                      </>
                     )}
                   </div>
                 ) : null}
 
-                {unblindingAuthorization ? (
-                  <div className="mt-6 rounded-xl border border-black/10 p-4 dark:border-white/15">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <p className="text-sm font-medium">
-                        Unblinding authorized
-                      </p>
-                      <span className="text-xs text-black/50 dark:text-white/50">
-                        Authorized {new Date(
-                          unblindingAuthorization.authorized_at,
-                        ).toLocaleString("en-US")}
-                      </span>
+                {unblindingRequest ||
+                unblindingAuthorization ||
+                unblindingCompletion ? (
+                  <details className="mt-6 rounded-xl border border-black/10 p-4 dark:border-white/15">
+                    <summary className="cursor-pointer text-sm font-medium">
+                      Unblinding history
+                    </summary>
+
+                    <div className="mt-4 space-y-5">
+                      {unblindingRequest ? (
+                        <div>
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <p className="text-sm font-medium">Request</p>
+                            <span className="text-xs text-black/50 dark:text-white/50">
+                              {new Date(
+                                unblindingRequest.requested_at,
+                              ).toLocaleString("en-US")}
+                            </span>
+                          </div>
+                          <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+                            <div>
+                              <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+                                Requested by
+                              </dt>
+                              <dd className="mt-1 text-sm">
+                                {unblindingRequest.requested_by === currentUserId
+                                  ? "You"
+                                  : "Another Study member"}
+                              </dd>
+                            </div>
+                            <div>
+                              <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+                                Request ID
+                              </dt>
+                              <dd className="mt-1 break-all font-mono text-xs">
+                                {unblindingRequest.id}
+                              </dd>
+                            </div>
+                            <div className="sm:col-span-2">
+                              <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+                                Analysis lock
+                              </dt>
+                              <dd className="mt-1 text-sm">
+                                {unblindingRequest.analysis_lock_id
+                                  ? (() => {
+                                      const selectedLockIndex = analysisLocks.findIndex(
+                                        (lock) =>
+                                          lock.id ===
+                                          unblindingRequest.analysis_lock_id,
+                                      );
+                                      const selectedLock =
+                                        selectedLockIndex >= 0
+                                          ? analysisLocks[selectedLockIndex]
+                                          : null;
+
+                                      return selectedLock
+                                        ? `Analysis lock ${analysisLocks.length - selectedLockIndex}: ${selectedLock.analysis_artifact_filename}`
+                                        : "Registered analysis lock";
+                                    })()
+                                  : "No AnalysisLock selected"}
+                              </dd>
+                            </div>
+                          </dl>
+                        </div>
+                      ) : null}
+
+                      {unblindingAuthorization ? (
+                        <div className="border-t border-black/10 pt-5 dark:border-white/15">
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <p className="text-sm font-medium">Authorization</p>
+                            <span className="text-xs text-black/50 dark:text-white/50">
+                              {new Date(
+                                unblindingAuthorization.authorized_at,
+                              ).toLocaleString("en-US")}
+                            </span>
+                          </div>
+                          <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+                            <div>
+                              <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+                                Policy
+                              </dt>
+                              <dd className="mt-1 text-sm">
+                                {formatAuthorizationPolicy(
+                                  unblindingAuthorization.authorization_policy,
+                                )}
+                              </dd>
+                            </div>
+                            <div>
+                              <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+                                Authorized by
+                              </dt>
+                              <dd className="mt-1 text-sm">
+                                {unblindingAuthorization.authorized_by === currentUserId
+                                  ? "You"
+                                  : "Another Study member"}
+                              </dd>
+                            </div>
+                          </dl>
+                        </div>
+                      ) : null}
+
+                      {unblindingCompletion ? (
+                        <div className="border-t border-black/10 pt-5 dark:border-white/15">
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <p className="text-sm font-medium">Completion</p>
+                            <span className="text-xs text-black/50 dark:text-white/50">
+                              {new Date(
+                                unblindingCompletion.registered_at,
+                              ).toLocaleString("en-US")}
+                            </span>
+                          </div>
+                          <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+                            <div>
+                              <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+                                Completed by
+                              </dt>
+                              <dd className="mt-1 text-sm">
+                                {unblindingCompletion.completed_by === currentUserId
+                                  ? "You"
+                                  : "Another Study member"}
+                              </dd>
+                            </div>
+                            <div>
+                              <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+                                Receipt created
+                              </dt>
+                              <dd className="mt-1 text-sm">
+                                {new Date(
+                                  unblindingCompletion.receipt_created_at,
+                                ).toLocaleString("en-US")}
+                              </dd>
+                            </div>
+                            <div>
+                              <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+                                Unblinding ID
+                              </dt>
+                              <dd className="mt-1 break-all font-mono text-xs">
+                                {unblindingCompletion.unblinding_id}
+                              </dd>
+                            </div>
+                            <div>
+                              <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+                                Receipt SHA-256
+                              </dt>
+                              <dd className="mt-1 break-all font-mono text-xs">
+                                {unblindingCompletion.unblinding_receipt_sha256}
+                              </dd>
+                            </div>
+                            <div>
+                              <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+                                Secret SHA-256
+                              </dt>
+                              <dd className="mt-1 break-all font-mono text-xs">
+                                {unblindingCompletion.unblinding_secret_sha256}
+                              </dd>
+                            </div>
+                            <div>
+                              <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+                                Trusted registration time
+                              </dt>
+                              <dd className="mt-1 text-sm">
+                                {new Date(
+                                  unblindingCompletion.registered_at,
+                                ).toLocaleString("en-US")}
+                              </dd>
+                            </div>
+                          </dl>
+                          <p className="mt-3 text-xs text-black/50 dark:text-white/50">
+                            The secret, plaintext mapping, and final receipt text were not uploaded.
+                          </p>
+                        </div>
+                      ) : null}
                     </div>
-                    <dl className="mt-4 grid gap-4 sm:grid-cols-2">
-                      <div>
-                        <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
-                          Authorization policy
-                        </dt>
-                        <dd className="mt-1 text-sm">
-                          {formatAuthorizationPolicy(
-                            unblindingAuthorization.authorization_policy,
-                          )}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
-                          Authorized by
-                        </dt>
-                        <dd className="mt-1 text-sm">
-                          {unblindingAuthorization.authorized_by === currentUserId
-                            ? "You"
-                            : "Another Study member"}
-                        </dd>
-                      </div>
-                    </dl>
-                    <p className="mt-4 text-sm text-black/60 dark:text-white/60">
-                      {unblindingCompletion
-                        ? "This authorization preceded the recorded unblinding completion."
-                        : "Authorization is complete. The protected mapping has not been released by the authorization event itself."}
-                    </p>
-                  </div>
-                ) : null}
-
-                {unblindingCompletion ? (
-                  <div className="mt-6 rounded-xl border border-black/10 p-4 dark:border-white/15">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <p className="text-sm font-medium">
-                        Unblinding completed
-                      </p>
-                      <span className="text-xs text-black/50 dark:text-white/50">
-                        Registered {new Date(
-                          unblindingCompletion.registered_at,
-                        ).toLocaleString("en-US")}
-                      </span>
-                    </div>
-
-                    <dl className="mt-4 grid gap-4 sm:grid-cols-2">
-                      <div>
-                        <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
-                          Unblinding ID
-                        </dt>
-                        <dd className="mt-1 break-all font-mono text-xs">
-                          {unblindingCompletion.unblinding_id}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
-                          Receipt created
-                        </dt>
-                        <dd className="mt-1 text-sm">
-                          {new Date(
-                            unblindingCompletion.receipt_created_at,
-                          ).toLocaleString("en-US")}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
-                          Unblinding receipt SHA-256
-                        </dt>
-                        <dd className="mt-1 break-all font-mono text-xs">
-                          {unblindingCompletion.unblinding_receipt_sha256}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
-                          Unblinding secret SHA-256
-                        </dt>
-                        <dd className="mt-1 break-all font-mono text-xs">
-                          {unblindingCompletion.unblinding_secret_sha256}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
-                          Completed by
-                        </dt>
-                        <dd className="mt-1 text-sm">
-                          {unblindingCompletion.completed_by === currentUserId
-                            ? "You"
-                            : "Another Study member"}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
-                          Trusted registration time
-                        </dt>
-                        <dd className="mt-1 text-sm">
-                          {new Date(
-                            unblindingCompletion.registered_at,
-                          ).toLocaleString("en-US")}
-                        </dd>
-                      </div>
-                    </dl>
-
-                    <p className="mt-4 text-sm text-black/60 dark:text-white/60">
-                      blindstats stored safe completion metadata only. The
-                      unblinding secret, plaintext mapping, and final receipt
-                      text were not uploaded.
-                    </p>
-                  </div>
+                  </details>
                 ) : null}
               </section>
 
@@ -1208,16 +1236,6 @@ export default async function BlindingWorkflowPage({
                 canReceiveUnblinded ? (
                   authorizedAnalysisLock ? (
                     <>
-                      <section className="mt-6 rounded-2xl border border-black/10 p-6 dark:border-white/15">
-                        <h2 className="text-lg font-semibold">Secret handoff</h2>
-                        <p className="mt-2 max-w-3xl text-sm text-black/60 dark:text-white/60">
-                          Unblinding has been authorized. Obtain the saved
-                          unblinding secret from the blinding custodian through
-                          the project&apos;s approved secure file-transfer channel,
-                          then select it locally below. The secret is not stored
-                          by blindstats.
-                        </p>
-                      </section>
                       <UnblindingWorkspace
                         registration={{
                           studyId: study.id,
@@ -1255,13 +1273,11 @@ export default async function BlindingWorkflowPage({
                   )
                 ) : (
                   <section className="mt-6 rounded-2xl border border-black/10 p-6 dark:border-white/15">
-                    <h2 className="text-lg font-semibold">
-                      Authorized secret release
-                    </h2>
+                    <h2 className="text-lg font-semibold">Secret handoff</h2>
                     <p className="mt-2 max-w-3xl text-sm text-black/60 dark:text-white/60">
                       {isBlindingCustodian || canAuthorizeUnblinding
-                        ? "Authorization is complete. Send the saved unblinding secret to the blinded analyst through the project&apos;s approved secure file-transfer channel. Do not upload the secret to blindstats; the analyst will select it locally to complete documented unblinding."
-                        : "You do not have the unblinded.receive capability required to receive and register unblinded information for this Study."}
+                        ? "Send the saved unblinding secret to the blinded analyst through the approved secure file-transfer channel. Do not upload the secret to blindstats."
+                        : "Waiting for the authorized recipient to complete local unblinding."}
                     </p>
                   </section>
                 )
@@ -1309,16 +1325,7 @@ export default async function BlindingWorkflowPage({
                       />
                     </details>
                   )
-                ) : (
-                  <section className="mt-6 rounded-2xl border border-black/10 p-6 dark:border-white/15">
-                    <h2 className="text-lg font-semibold">Analysis handoff</h2>
-                    <p className="mt-2 max-w-3xl text-sm text-black/60 dark:text-white/60">
-                      The blinded analyst is responsible for completing the
-                      analysis and registering its AnalysisLock. Your current
-                      Study role does not include analysis.lock.
-                    </p>
-                  </section>
-                )
+                ) : null
               ) : null}
             </>
           ) : (
@@ -1332,65 +1339,71 @@ export default async function BlindingWorkflowPage({
           )}
         </>
       ) : canConfigureBlinding ? (
-        <>
-          <section className="mt-10 rounded-2xl border border-black/10 p-6 dark:border-white/15">
-            <h2 className="text-lg font-semibold">BlindingPlan draft</h2>
-            <p className="mt-2 max-w-3xl text-sm text-black/60 dark:text-white/60">
-              Define the protection and governance rules for this workflow. The
-              draft remains editable until it is activated.
-            </p>
+        <section className="mt-10 rounded-2xl border border-black/10 p-6 dark:border-white/15">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold">Blinding plan</h2>
+            <span className="rounded-full border border-black/10 px-2.5 py-1 text-xs font-medium dark:border-white/15">
+              Draft
+            </span>
+          </div>
 
-            {saved === "1" ? (
-              <p className="mt-4 text-sm font-medium">Draft saved.</p>
-            ) : null}
+          {saved === "1" ? (
+            <p className="mt-3 text-sm font-medium">Draft saved.</p>
+          ) : null}
 
-            <form action={saveBlindingPlanDraft} className="mt-6 space-y-6">
-              <input type="hidden" name="studyId" value={study.id} />
-              <input type="hidden" name="workflowId" value={workflow.id} />
+          {activationError === "independent_requires_two_actors" ? (
+            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-950">
+              <p className="text-sm font-medium">Plan not activated</p>
+              <p className="mt-1 text-sm">
+                Independent authorization requires two different Study members:
+                one who can request unblinding and another who can authorize it.
+              </p>
+            </div>
+          ) : null}
 
-              <div>
-                <label
-                  className="text-sm font-medium"
-                  htmlFor="protectionTarget"
-                >
-                  Protection target
-                </label>
-                <input
-                  className="mt-1 w-full rounded-lg border border-black/15 bg-transparent px-3 py-2 outline-none focus:border-black/40 dark:border-white/20 dark:focus:border-white/50"
-                  defaultValue={protectionTarget}
-                  id="protectionTarget"
-                  maxLength={200}
-                  name="protectionTarget"
-                  placeholder="For example: treatment identity"
-                  type="text"
-                />
-                <p className="mt-1 text-xs text-black/50 dark:text-white/50">
-                  Describe the substantive information the workflow is intended
-                  to conceal. The dataset column used for the transformation
-                  will be selected separately.
-                </p>
-              </div>
+          <form action={saveBlindingPlanDraft} className="mt-5 space-y-5">
+            <input type="hidden" name="studyId" value={study.id} />
+            <input type="hidden" name="workflowId" value={workflow.id} />
 
-              <div>
-                <label
-                  className="text-sm font-medium"
-                  htmlFor="protectionRationale"
-                >
-                  Protection rationale
-                </label>
-                <textarea
-                  className="mt-1 min-h-24 w-full rounded-lg border border-black/15 bg-transparent px-3 py-2 outline-none focus:border-black/40 dark:border-white/20 dark:focus:border-white/50"
-                  defaultValue={draft.protection_rationale ?? ""}
-                  id="protectionRationale"
-                  maxLength={1000}
-                  name="protectionRationale"
-                  placeholder="Optional short explanation of what the blinding is intended to protect."
-                />
-              </div>
+            <div>
+              <label
+                className="text-sm font-medium"
+                htmlFor="protectionTarget"
+              >
+                Protection target
+              </label>
+              <input
+                className="mt-1 w-full rounded-lg border border-black/15 bg-transparent px-3 py-2 outline-none focus:border-black/40 dark:border-white/20 dark:focus:border-white/50"
+                defaultValue={protectionTarget}
+                id="protectionTarget"
+                maxLength={200}
+                name="protectionTarget"
+                placeholder="Treatment identity"
+                type="text"
+              />
+              <p className="mt-1 text-xs text-black/50 dark:text-white/50">
+                What substantive information should the analyst not know?
+              </p>
+            </div>
 
+            <details open={Boolean(draft.protection_rationale)}>
+              <summary className="cursor-pointer text-sm font-medium">
+                Protection rationale <span className="font-normal text-black/45 dark:text-white/45">(optional)</span>
+              </summary>
+              <textarea
+                className="mt-3 min-h-24 w-full rounded-lg border border-black/15 bg-transparent px-3 py-2 outline-none focus:border-black/40 dark:border-white/20 dark:focus:border-white/50"
+                defaultValue={draft.protection_rationale ?? ""}
+                id="protectionRationale"
+                maxLength={1000}
+                name="protectionRationale"
+                placeholder="Briefly explain why this information is being blinded."
+              />
+            </details>
+
+            <div className="grid gap-5 sm:grid-cols-2">
               <div>
                 <label className="text-sm font-medium" htmlFor="lockPolicy">
-                  Analysis lock before ordinary unblinding
+                  Analysis lock
                 </label>
                 <select
                   className="mt-1 w-full rounded-lg border border-black/15 bg-transparent px-3 py-2 outline-none focus:border-black/40 dark:border-white/20 dark:focus:border-white/50"
@@ -1419,66 +1432,92 @@ export default async function BlindingWorkflowPage({
                   name="authorizationPolicy"
                 >
                   <option value="independent">
-                    Independent authorization (recommended)
+                    Independent (recommended)
                   </option>
                   <option value="self_authorization">
                     Self-authorization permitted
                   </option>
                 </select>
+                {draft.authorization_policy === "independent" &&
+                !hasIndependentAuthorizationPair ? (
+                  <p className="mt-2 text-xs text-amber-800 dark:text-amber-300">
+                    Independent authorization needs two different Study members:
+                    one who can request unblinding and another who can authorize it.
+                    Assign a separate blinded analyst above, or choose self-authorization
+                    and save the draft.
+                  </p>
+                ) : null}
               </div>
+            </div>
 
-              <button
-                className="rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background"
-                type="submit"
-              >
-                Save draft
-              </button>
-            </form>
-          </section>
+            <button
+              className="rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background"
+              type="submit"
+            >
+              Save draft
+            </button>
+          </form>
 
-          <section className="mt-6 rounded-2xl border border-black/10 p-6 dark:border-white/15">
-            <h2 className="text-lg font-semibold">Activate Plan v1</h2>
-            <p className="mt-2 max-w-3xl text-sm text-black/60 dark:text-white/60">
-              Activation freezes the current draft as an immutable historical
-              plan. It does not create a blinded dataset or move the workflow
-              into the blinded state.
-            </p>
+          <div className="mt-7 border-t border-black/10 pt-6 dark:border-white/15">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h3 className="text-sm font-semibold">Plan status</h3>
+              <span className="rounded-full border border-black/10 px-2.5 py-1 text-xs font-medium dark:border-white/15">
+                {!hasProtectionTarget
+                  ? "Needs protection target"
+                  : !independentAuthorizationReady
+                    ? "Needs second actor"
+                    : "Ready to activate"}
+              </span>
+            </div>
 
             {!hasProtectionTarget ? (
-              <p className="mt-4 text-sm font-medium">
-                Add and save a protection target before activation.
+              <p className="mt-3 text-sm text-black/60 dark:text-white/60">
+                Add a protection target and save the draft.
+              </p>
+            ) : !independentAuthorizationReady ? (
+              <p className="mt-3 text-sm text-black/60 dark:text-white/60">
+                The saved Plan requires independent authorization, but no two different Study members currently hold the request and authorization roles. Assign a separate blinded analyst above, or choose self-authorization and save the draft.
               </p>
             ) : (
-              <form action={activateBlindingPlan} className="mt-5">
-                <input type="hidden" name="studyId" value={study.id} />
-                <input type="hidden" name="workflowId" value={workflow.id} />
+              <>
+                <p className="mt-3 text-sm font-medium">
+                  Activating Plan v1 makes this saved plan immutable.
+                </p>
+                <p className="mt-1 text-sm text-black/60 dark:text-white/60">
+                  Save any changes above before activating. Activation does not create the blinded dataset.
+                </p>
 
-                {hasWeakerPolicy ? (
-                  <label className="flex max-w-3xl items-start gap-3 text-sm">
-                    <input
-                      className="mt-1"
-                      name="acknowledgeWeakerPolicies"
-                      type="checkbox"
-                      required
-                    />
-                    <span>
-                      I understand that this plan uses one or more
-                      non-recommended governance settings and want to activate
-                      it as specified.
-                    </span>
-                  </label>
-                ) : null}
+                <form action={activateBlindingPlan} className="mt-4">
+                  <input type="hidden" name="studyId" value={study.id} />
+                  <input type="hidden" name="workflowId" value={workflow.id} />
 
-                <button
-                  className="mt-5 rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background"
-                  type="submit"
-                >
-                  Activate Plan v1
-                </button>
-              </form>
+                  {hasWeakerPolicy ? (
+                    <label className="flex max-w-3xl items-start gap-3 text-sm">
+                      <input
+                        className="mt-1"
+                        name="acknowledgeWeakerPolicies"
+                        type="checkbox"
+                        required
+                      />
+                      <span>
+                        I understand that this plan uses one or more
+                        non-recommended governance settings and want to activate
+                        it as specified.
+                      </span>
+                    </label>
+                  ) : null}
+
+                  <button
+                    className="mt-4 rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background"
+                    type="submit"
+                  >
+                    Activate Plan v1
+                  </button>
+                </form>
+              </>
             )}
-          </section>
-        </>
+          </div>
+        </section>
       ) : (
         <section className="mt-10 rounded-2xl border border-black/10 p-6 dark:border-white/15">
           <h2 className="text-lg font-semibold">BlindingPlan setup</h2>

@@ -353,46 +353,42 @@ export function BlindingWorkspace({
       >
         {!registrationEnabled ? (
           <header className="mb-8">
-          <div className="flex flex-wrap items-center gap-3">
-            <p className="text-sm font-semibold tracking-wide text-slate-500">
-              blindstats
+            <div className="flex flex-wrap items-center gap-3">
+              <p className="text-sm font-semibold tracking-wide text-slate-500">
+                blindstats
+              </p>
+              <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600">
+                Blinding Workspace v0
+              </span>
+            </div>
+
+            <h1 className="mt-4 max-w-3xl text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
+              Create a blinded dataset.
+            </h1>
+            <p className="mt-3 max-w-3xl text-base leading-7 text-slate-600">
+              Select a CSV and one categorical variable to blind.
             </p>
-            <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600">
-              Blinding Workspace v0
-            </span>
-          </div>
-
-          <h1 className="mt-4 max-w-3xl text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
-            Create an auditable blinded dataset locally in your browser.
-          </h1>
-
-          <p className="mt-4 max-w-3xl text-base leading-7 text-slate-600">
-            Select a CSV, choose one categorical variable, and generate a
-            blinded CSV with a public receipt and separate unblinding secret.
-          </p>
           </header>
         ) : null}
 
-        <section className="mb-8 rounded-2xl border border-sky-200 bg-sky-50 p-5">
-          <h2 className="text-sm font-semibold text-sky-950">
-            Browser-local research files
-          </h2>
-          <p className="mt-2 text-sm leading-6 text-sky-900">
+        <section className="mb-6 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3">
+          <p className="text-sm text-sky-950">
+            <span className="font-semibold">Browser-local files.</span>{" "}
             {registrationEnabled
-              ? "Source and blinded dataset contents and the unblinding secret stay in this browser session. Registration sends only the public receipt and safe transformation metadata to blindstats."
-              : "Dataset contents and the generated unblinding secret are processed in this browser session. This standalone v0 workspace does not register workflow state or store research files on a server."}
+              ? "Dataset contents and the unblinding secret stay in this browser; blindstats registers only the public receipt and safe metadata."
+              : "Dataset contents and the unblinding secret stay in this browser session."}
           </p>
         </section>
 
-        <div className="space-y-6">
-          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-7">
+        <div className="space-y-5">
+          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <StageHeading
               number={1}
               title="Select data"
-              description="Choose one UTF-8, comma-delimited CSV file."
+              description="Choose a CSV file."
             />
 
-            <div className="mt-6">
+            <div className="mt-5">
               <label
                 htmlFor="source-file"
                 className="block text-sm font-medium text-slate-800"
@@ -417,50 +413,29 @@ export function BlindingWorkspace({
               ) : null}
 
               {sourceFile && parsed ? (
-                <div className="mt-5 grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-xl bg-slate-50 p-4">
-                    <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                      File
-                    </p>
-                    <p className="mt-1 truncate text-sm font-semibold text-slate-900">
-                      {sourceFile.name}
-                    </p>
-                  </div>
-                  <div className="rounded-xl bg-slate-50 p-4">
-                    <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                      Rows
-                    </p>
-                    <p className="mt-1 text-sm font-semibold text-slate-900">
-                      {parsed.rows.length.toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="rounded-xl bg-slate-50 p-4">
-                    <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                      Columns
-                    </p>
-                    <p className="mt-1 text-sm font-semibold text-slate-900">
-                      {parsed.columns.length.toLocaleString()}
-                    </p>
-                  </div>
-                </div>
+                <p className="mt-3 text-sm text-slate-600">
+                  <span className="font-medium text-slate-900">
+                    {sourceFile.name}
+                  </span>{" "}
+                  · {parsed.rows.length.toLocaleString()} rows ·{" "}
+                  {parsed.columns.length.toLocaleString()} columns
+                </p>
               ) : null}
             </div>
           </section>
 
           <section
-            className={`rounded-2xl border bg-white p-6 shadow-sm sm:p-7 ${
-              parsed
-                ? "border-slate-200"
-                : "border-slate-200 opacity-60"
+            className={`rounded-2xl border bg-white p-6 shadow-sm ${
+              parsed ? "border-slate-200" : "border-slate-200 opacity-60"
             }`}
           >
             <StageHeading
               number={2}
               title="Select variable"
-              description="Choose exactly one column to replace with randomized neutral group labels (Group_A, Group_B, …)."
+              description="Choose one categorical column to replace with neutral group labels."
             />
 
-            <div className="mt-6">
+            <div className="mt-5">
               <label
                 htmlFor="blinding-column"
                 className="block text-sm font-medium text-slate-800"
@@ -483,77 +458,67 @@ export function BlindingWorkspace({
               </select>
 
               {selectedColumn ? (
-                <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <span className="rounded-full bg-white px-3 py-1.5 text-sm text-slate-700 ring-1 ring-slate-200">
-                      {categoryCount.toLocaleString()} distinct nonmissing{" "}
-                      {categoryCount === 1 ? "category" : "categories"}
+                <div className="mt-4">
+                  <div className="flex flex-wrap items-center gap-2 text-sm">
+                    <span className="rounded-full border border-slate-200 px-3 py-1 text-slate-700">
+                      {categoryCount.toLocaleString()} {categoryCount === 1 ? "category" : "categories"}
                     </span>
-                    <span className="rounded-full bg-white px-3 py-1.5 text-sm text-slate-700 ring-1 ring-slate-200">
-                      {missingCount.toLocaleString()} missing{" "}
-                      {missingCount === 1 ? "cell" : "cells"}
+                    <span className="rounded-full border border-slate-200 px-3 py-1 text-slate-700">
+                      {missingCount.toLocaleString()} missing
                     </span>
-
                     {selectedColumnIsEligible ? (
-                      <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-800">
-                        Meets v0 requirements
+                      <span className="rounded-full bg-emerald-50 px-3 py-1 font-medium text-emerald-800">
+                        Ready to blind
                       </span>
                     ) : (
-                      <span className="rounded-full bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-800">
+                      <span className="rounded-full bg-amber-50 px-3 py-1 font-medium text-amber-800">
                         At least 2 categories required
                       </span>
                     )}
                   </div>
 
-                  <div className="mt-5">
-                    <h3 className="text-sm font-semibold text-slate-900">
-                      Observed categories
-                    </h3>
-                    <p className="mt-1 text-xs leading-5 text-slate-500">
-                      Previewed in first-observed source order.
-                    </p>
+                  <details className="mt-3 text-sm text-slate-600">
+                    <summary className="cursor-pointer font-medium text-slate-700">
+                      Preview categories
+                    </summary>
+                    <div className="mt-3 rounded-xl bg-slate-50 p-4">
+                      {categoryPreview.length > 0 ? (
+                        <ul className="grid gap-2 sm:grid-cols-2">
+                          {categoryPreview.map((category) => (
+                            <li
+                              key={category}
+                              className="min-w-0 rounded-lg border border-slate-200 bg-white px-3 py-2"
+                            >
+                              <code className="block whitespace-pre-wrap break-all font-mono text-xs leading-5 text-slate-700">
+                                {category}
+                              </code>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p>No nonmissing category values were found.</p>
+                      )}
 
-                    {categoryPreview.length > 0 ? (
-                      <ul className="mt-3 grid gap-2 sm:grid-cols-2">
-                        {categoryPreview.map((category) => (
-                          <li
-                            key={category}
-                            className="min-w-0 rounded-lg border border-slate-200 bg-white px-3 py-2"
-                          >
-                            <code className="block whitespace-pre-wrap break-all font-mono text-xs leading-5 text-slate-700">
-                              {category}
-                            </code>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="mt-3 text-sm text-slate-600">
-                        No nonmissing category values were found.
+                      {additionalCategoryCount > 0 ? (
+                        <p className="mt-3 text-xs text-slate-500">
+                          {additionalCategoryCount.toLocaleString()} additional{" "}
+                          {additionalCategoryCount === 1 ? "category" : "categories"}{" "}
+                          not shown.
+                        </p>
+                      ) : null}
+
+                      <p className="mt-3 text-xs leading-5 text-slate-500">
+                        Missing means an empty CSV cell. Text such as NA or N/A is treated as an observed category.
                       </p>
-                    )}
-
-                    {additionalCategoryCount > 0 ? (
-                      <p className="mt-3 text-sm text-slate-600">
-                        {additionalCategoryCount.toLocaleString()} additional{" "}
-                        {additionalCategoryCount === 1
-                          ? "category is"
-                          : "categories are"}{" "}
-                        not shown.
-                      </p>
-                    ) : null}
-
-                    <p className="mt-3 text-xs leading-5 text-slate-500">
-                      Missing counts refer to empty CSV cells. Text values such
-                      as NA or N/A remain observed categories.
-                    </p>
-                  </div>
+                    </div>
+                  </details>
                 </div>
               ) : null}
             </div>
           </section>
 
           <section
-            className={`rounded-2xl border bg-white p-6 shadow-sm sm:p-7 ${
+            className={`rounded-2xl border bg-white p-6 shadow-sm ${
               selectedColumnIsEligible
                 ? "border-slate-200"
                 : "border-slate-200 opacity-60"
@@ -561,20 +526,18 @@ export function BlindingWorkspace({
           >
             <StageHeading
               number={3}
-              title="Generate blinded package"
-              description="Create the blinded dataset and linked audit artifacts."
+              title="Generate package"
+              description="Create the blinded dataset and linked artifacts."
             />
 
-            <div className="mt-6">
+            <div className="mt-5">
               <button
                 type="button"
                 onClick={handleGenerate}
                 disabled={!canGenerate}
                 className="inline-flex min-h-11 items-center justify-center rounded-xl bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
               >
-                {isGenerating
-                  ? "Generating..."
-                  : "Generate blinded package"}
+                {isGenerating ? "Generating..." : "Generate blinded package"}
               </button>
 
               {workspaceError?.stage === "generation" ? (
@@ -588,73 +551,69 @@ export function BlindingWorkspace({
 
               {generation ? (
                 <div
-                  className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50 p-5"
+                  className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4"
                   aria-live="polite"
                 >
                   <p className="text-sm font-semibold text-emerald-900">
                     Blinded package created successfully.
                   </p>
-
-                  <dl className="mt-4 space-y-4">
-                    <div>
-                      <dt className="text-xs font-medium uppercase tracking-wide text-emerald-800">
-                        Transformation ID
-                      </dt>
-                      <dd className="mt-1 break-all font-mono text-sm text-emerald-950">
-                        {generation.receipt.transformationId}
-                      </dd>
-                    </div>
-
-                    <div>
-                      <dt className="text-xs font-medium uppercase tracking-wide text-emerald-800">
-                        Source SHA-256
-                      </dt>
-                      <dd>
-                        <HashValue value={generation.source.sha256} />
-                      </dd>
-                    </div>
-
-                    <div>
-                      <dt className="text-xs font-medium uppercase tracking-wide text-emerald-800">
-                        Blinded SHA-256
-                      </dt>
-                      <dd>
-                        <HashValue value={generation.blinded.sha256} />
-                      </dd>
-                    </div>
-                  </dl>
+                  <details className="mt-3 text-sm text-emerald-900">
+                    <summary className="cursor-pointer font-medium">
+                      Technical details
+                    </summary>
+                    <dl className="mt-3 space-y-4">
+                      <div>
+                        <dt className="text-xs font-medium uppercase tracking-wide text-emerald-800">
+                          Transformation ID
+                        </dt>
+                        <dd className="mt-1 break-all font-mono text-xs text-emerald-950">
+                          {generation.receipt.transformationId}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs font-medium uppercase tracking-wide text-emerald-800">
+                          Source SHA-256
+                        </dt>
+                        <dd>
+                          <HashValue value={generation.source.sha256} />
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs font-medium uppercase tracking-wide text-emerald-800">
+                          Blinded SHA-256
+                        </dt>
+                        <dd>
+                          <HashValue value={generation.blinded.sha256} />
+                        </dd>
+                      </div>
+                    </dl>
+                  </details>
                 </div>
               ) : null}
             </div>
           </section>
 
           <section
-            className={`rounded-2xl border bg-white p-6 shadow-sm sm:p-7 ${
-              generation
-                ? "border-slate-200"
-                : "border-slate-200 opacity-60"
+            className={`rounded-2xl border bg-white p-6 shadow-sm ${
+              generation ? "border-slate-200" : "border-slate-200 opacity-60"
             }`}
           >
             <StageHeading
               number={4}
-              title="Download artifacts"
-              description="Keep the unblinding secret separate from materials supplied to a blinded analyst."
+              title="Save artifacts"
+              description="Download the files created for this blinding."
             />
 
-            <div className="mt-6 grid gap-4 md:grid-cols-3">
+            <div className="mt-5 grid gap-3 md:grid-cols-3">
               <div className="rounded-xl border border-slate-200 p-4">
                 <h3 className="text-sm font-semibold text-slate-950">
                   Blinded CSV
                 </h3>
-                <p className="mt-2 text-sm leading-6 text-slate-600">
-                  The transformed dataset containing neutral labels in the
-                  selected column.
-                </p>
                 <button
                   type="button"
                   onClick={downloadBlindedCsv}
                   disabled={!generation}
-                  className="mt-4 w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
+                  className="mt-3 w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
                 >
                   Download blinded CSV
                 </button>
@@ -664,15 +623,11 @@ export function BlindingWorkspace({
                 <h3 className="text-sm font-semibold text-slate-950">
                   Public receipt
                 </h3>
-                <p className="mt-2 text-sm leading-6 text-slate-600">
-                  Transformation metadata, artifact hashes, and the sealed
-                  mapping.
-                </p>
                 <button
                   type="button"
                   onClick={downloadReceipt}
                   disabled={!generation}
-                  className="mt-4 w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
+                  className="mt-3 w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
                 >
                   Download receipt
                 </button>
@@ -682,15 +637,14 @@ export function BlindingWorkspace({
                 <h3 className="text-sm font-semibold text-amber-950">
                   Unblinding secret
                 </h3>
-                <p className="mt-2 text-sm leading-6 text-amber-900">
-                  Cryptographic key used to decrypt the sealed mapping. Keep
-                  it separate until unblinding is authorized.
+                <p className="mt-1 text-xs leading-5 text-amber-900">
+                  Keep separate until unblinding is authorized.
                 </p>
                 <button
                   type="button"
                   onClick={downloadUnblindingSecret}
                   disabled={!generation}
-                  className="mt-4 w-full rounded-lg bg-amber-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-amber-900 disabled:cursor-not-allowed disabled:bg-amber-200"
+                  className="mt-3 w-full rounded-lg bg-amber-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-amber-900 disabled:cursor-not-allowed disabled:bg-amber-200"
                 >
                   Download unblinding secret
                 </button>
@@ -700,19 +654,17 @@ export function BlindingWorkspace({
 
           {registrationEnabled && registration ? (
             <section
-              className={`rounded-2xl border bg-white p-6 shadow-sm sm:p-7 ${
-                generation
-                  ? "border-slate-200"
-                  : "border-slate-200 opacity-60"
+              className={`rounded-2xl border bg-white p-6 shadow-sm ${
+                generation ? "border-slate-200" : "border-slate-200 opacity-60"
               }`}
             >
               <StageHeading
                 number={5}
-                title="Register blinding"
-                description={`Bind this package to active BlindingPlan v${registration.planVersionNumber} and move the workflow from setup to blinded.`}
+                title="Register package"
+                description={`Bind this package to BlindingPlan v${registration.planVersionNumber}.`}
               />
 
-              <div className="mt-6">
+              <div className="mt-5">
                 <label className="flex max-w-3xl items-start gap-3 text-sm leading-6 text-slate-700">
                   <input
                     type="checkbox"
@@ -724,25 +676,17 @@ export function BlindingWorkspace({
                     className="mt-1"
                   />
                   <span>
-                    I have saved the blinded CSV, public receipt, and unblinding
-                    secret, and I understand that blindstats does not store the
-                    unblinding secret.
+                    I have saved the blinded CSV, public receipt, and unblinding secret, and I understand that blindstats does not store the unblinding secret.
                   </span>
                 </label>
 
                 <button
                   type="button"
                   onClick={handleRegister}
-                  disabled={
-                    !generation ||
-                    !custodyAcknowledged ||
-                    isRegistering
-                  }
+                  disabled={!generation || !custodyAcknowledged || isRegistering}
                   className="mt-5 inline-flex min-h-11 items-center justify-center rounded-xl bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
                 >
-                  {isRegistering
-                    ? "Registering..."
-                    : "Register blinded package"}
+                  {isRegistering ? "Registering..." : "Register blinded package"}
                 </button>
 
                 {workspaceError?.stage === "registration" ? (
@@ -754,16 +698,18 @@ export function BlindingWorkspace({
                   </p>
                 ) : null}
 
-                <p className="mt-4 max-w-3xl text-xs leading-5 text-slate-500">
-                  Registration stores the exact public receipt and safe artifact
-                  metadata. It does not upload the source CSV, blinded CSV, or
-                  unblinding secret.
-                </p>
+                <details className="mt-4 max-w-3xl text-xs leading-5 text-slate-500">
+                  <summary className="cursor-pointer font-medium text-slate-600">
+                    What is registered?
+                  </summary>
+                  <p className="mt-2">
+                    blindstats stores the exact public receipt and safe artifact metadata. It does not upload the source CSV, blinded CSV, or unblinding secret.
+                  </p>
+                </details>
               </div>
             </section>
           ) : null}
         </div>
-
       </div>
     </div>
   );
