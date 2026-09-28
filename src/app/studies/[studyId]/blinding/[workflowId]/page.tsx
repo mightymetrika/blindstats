@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { AnalysisLockWorkspace } from "@/components/blinding/AnalysisLockWorkspace";
+import { AuthorizationPolicyField } from "@/components/blinding/AuthorizationPolicyField";
 import { BlindingWorkspace } from "@/components/blinding/BlindingWorkspace";
 import { UnblindingWorkspace } from "@/components/blinding/UnblindingWorkspace";
 import { createClient } from "@/lib/supabase/server";
@@ -1418,36 +1419,10 @@ export default async function BlindingWorkflowPage({
                 </select>
               </div>
 
-              <div>
-                <label
-                  className="text-sm font-medium"
-                  htmlFor="authorizationPolicy"
-                >
-                  Unblinding authorization
-                </label>
-                <select
-                  className="mt-1 w-full rounded-lg border border-black/15 bg-transparent px-3 py-2 outline-none focus:border-black/40 dark:border-white/20 dark:focus:border-white/50"
-                  defaultValue={draft.authorization_policy}
-                  id="authorizationPolicy"
-                  name="authorizationPolicy"
-                >
-                  <option value="independent">
-                    Independent (recommended)
-                  </option>
-                  <option value="self_authorization">
-                    Self-authorization permitted
-                  </option>
-                </select>
-                {draft.authorization_policy === "independent" &&
-                !hasIndependentAuthorizationPair ? (
-                  <p className="mt-2 text-xs text-amber-800 dark:text-amber-300">
-                    Independent authorization needs two different Study members:
-                    one who can request unblinding and another who can authorize it.
-                    Assign a separate blinded analyst above, or choose self-authorization
-                    and save the draft.
-                  </p>
-                ) : null}
-              </div>
+              <AuthorizationPolicyField
+                hasIndependentAuthorizationPair={hasIndependentAuthorizationPair}
+                initialPolicy={draft.authorization_policy}
+              />
             </div>
 
             <button
@@ -1476,7 +1451,7 @@ export default async function BlindingWorkflowPage({
               </p>
             ) : !independentAuthorizationReady ? (
               <p className="mt-3 text-sm text-black/60 dark:text-white/60">
-                The saved Plan requires independent authorization, but no two different Study members currently hold the request and authorization roles. Assign a separate blinded analyst above, or choose self-authorization and save the draft.
+                The saved Plan requires independent authorization, but no two different Study members currently hold the request and authorization roles. Assign a blinded analyst in Analysis roles, or choose self-authorization and save the draft.
               </p>
             ) : (
               <>
@@ -1484,7 +1459,7 @@ export default async function BlindingWorkflowPage({
                   Activating Plan v1 makes this saved plan immutable.
                 </p>
                 <p className="mt-1 text-sm text-black/60 dark:text-white/60">
-                  Save any changes above before activating. Activation does not create the blinded dataset.
+                  Save any plan changes before activating. Activation does not create the blinded dataset.
                 </p>
 
                 <form action={activateBlindingPlan} className="mt-4">
