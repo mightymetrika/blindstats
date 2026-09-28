@@ -13,40 +13,15 @@ afterEach(() => {
 });
 
 describe("AuthorizationPolicyField", () => {
-  it("hides the independent-authorization warning immediately when self-authorization is selected", async () => {
+  it("renders the saved policy and allows a different policy to be selected before saving", async () => {
     const user = userEvent.setup();
 
-    render(
-      <AuthorizationPolicyField
-        hasIndependentAuthorizationPair={false}
-        initialPolicy="independent"
-      />,
-    );
+    render(<AuthorizationPolicyField initialPolicy="independent" />);
 
-    expect(
-      screen.getByText(/Independent authorization needs two different Study members/i),
-    ).toBeInTheDocument();
+    const select = screen.getByLabelText("Unblinding authorization");
+    expect(select).toHaveValue("independent");
 
-    await user.selectOptions(
-      screen.getByLabelText("Unblinding authorization"),
-      "self_authorization",
-    );
-
-    expect(
-      screen.queryByText(/Independent authorization needs two different Study members/i),
-    ).not.toBeInTheDocument();
-  });
-
-  it("does not show the warning when an independent requester-authorizer pair exists", () => {
-    render(
-      <AuthorizationPolicyField
-        hasIndependentAuthorizationPair
-        initialPolicy="independent"
-      />,
-    );
-
-    expect(
-      screen.queryByText(/Independent authorization needs two different Study members/i),
-    ).not.toBeInTheDocument();
+    await user.selectOptions(select, "self_authorization");
+    expect(select).toHaveValue("self_authorization");
   });
 });

@@ -37,6 +37,7 @@ type BlindingWorkflowPageProps = {
     analystAssigned?: string;
     analystError?: string;
     activationError?: string;
+    view?: string;
   }>;
 };
 
@@ -86,6 +87,7 @@ export default async function BlindingWorkflowPage({
     analystAssigned,
     analystError,
     activationError,
+    view,
   } = await searchParams;
   const supabase = await createClient();
 
@@ -431,6 +433,594 @@ export default async function BlindingWorkflowPage({
   const independentAuthorizationReady =
     draft.authorization_policy !== "independent" ||
     hasIndependentAuthorizationPair;
+
+  if (workflow.state === "setup") {
+    type SetupView = "roles" | "plan" | "blinding";
+
+    const requestedSetupView: SetupView | null =
+      view === "roles" || view === "plan" || view === "blinding"
+        ? view
+        : null;
+
+    const roleSeparationRequired =
+      (activePlan?.authorization_policy ?? draft.authorization_policy) ===
+        "independent" &&
+      (Boolean(activePlan) || hasProtectionTarget);
+
+    const recommendedSetupView: SetupView = activePlan
+      ? "blinding"
+      : analystError
+        ? "roles"
+        : roleSeparationRequired && !hasIndependentAuthorizationPair
+          ? "roles"
+          : "plan";
+
+    const requestedSetupViewIsAvailable =
+      requestedSetupView === "plan" ||
+      (requestedSetupView === "roles" && roleSeparationRequired) ||
+      (requestedSetupView === "blinding" && Boolean(activePlan));
+
+    const setupView: SetupView =
+      requestedSetupView && requestedSetupViewIsAvailable
+        ? requestedSetupView
+        : recommendedSetupView;
+
+    const workflowHref = `/studies/${study.id}/blinding/${workflow.id}`;
+
+    const setupNavItems: {
+      id: SetupView;
+      label: string;
+      status: string;
+      available: boolean;
+    }[] = [
+      {
+        id: "plan",
+        label: "Blinding plan",
+        status: activePlan
+          ? "Active"
+          : !hasProtectionTarget
+            ? "Draft"
+            : roleSeparationRequired && !hasIndependentAuthorizationPair
+              ? "Waiting on roles"
+              : "Ready to activate",
+        available: true,
+      },
+    ];
+
+    if (roleSeparationRequired) {
+      setupNavItems.push({
+        id: "roles",
+        label: "Analysis roles",
+        status: hasIndependentAuthorizationPair ? "Complete" : "Required",
+        available: true,
+      });
+    }
+
+    setupNavItems.push({
+      id: "blinding",
+      label: "Blinding",
+      status: activePlan ? "Current" : "Locked",
+      available: Boolean(activePlan),
+    });
+
+    return (
+      <main className="mx-auto min-h-screen w-full max-w-7xl px-6 py-10">
+        <Link
+          className="text-sm font-medium text-black/60 underline underline-offset-4 dark:text-white/60"
+          href={`/studies/${study.id}`}
+        >
+          Back to Study
+        </Link>
+
+        <header className="mt-6">
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-3xl font-semibold">Blinding workflow</h1>
+            <span className="rounded-full border border-black/10 px-2.5 py-1 text-xs font-medium capitalize text-black/60 dark:border-white/15 dark:text-white/60">
+              Setup
+            </span>
+          </div>
+          <p className="mt-2 text-sm text-black/60 dark:text-white/60">
+            {study.name}
+          </p>
+          {isBlindedAnalyst ? (
+            <p className="mt-2 text-sm font-medium">Role: Blinded analyst</p>
+          ) : isBlindingCustodian ? (
+            <p className="mt-2 text-sm font-medium">Role: Blinding custodian</p>
+          ) : null}
+        </header>
+
+        <div className="mt-8 grid gap-8 lg:grid-cols-[230px_minmax(0,1fr)]">
+          <aside className="lg:sticky lg:top-8 lg:self-start">
+            <nav
+              aria-label="Blinding workflow sections"
+              className="flex gap-2 overflow-x-auto pb-2 lg:flex-col lg:overflow-visible lg:pb-0"
+            >
+              {setupNavItems.map((item) => {
+                const isActive = setupView === item.id;
+
+                if (!item.available) {
+                  return (
+                    <div
+                      className="min-w-40 rounded-xl border border-black/10 px-4 py-3 opacity-45 dark:border-white/15 lg:min-w-0"
+                      key={item.id}
+                    >
+                      <div className="text-sm font-medium">{item.label}</div>
+                      <div className="mt-1 text-xs text-black/50 dark:text-white/50">
+                        {item.status}
+                      </div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <Link
+                    aria-current={isActive ? "page" : undefined}
+                    className={`min-w-40 rounded-xl border px-4 py-3 transition lg:min-w-0 ${
+                      isActive
+                        ? "border-black bg-black text-white dark:border-white dark:bg-white dark:text-black"
+                        : "border-black/10 hover:border-black/30 dark:border-white/15 dark:hover:border-white/35"
+                    }`}
+                    href={`${workflowHref}?view=${item.id}`}
+                    key={item.id}
+                  >
+                    <div className="text-sm font-medium">{item.label}</div>
+                    <div
+                      className={`mt-1 text-xs ${
+                        isActive
+                          ? "text-white/70 dark:text-black/60"
+                          : "text-black/50 dark:text-white/50"
+                      }`}
+                    >
+                      {item.status}
+                    </div>
+                  </Link>
+                );
+              })}
+            </nav>
+          </aside>
+
+          <div className="min-w-0">
+            {setupView === "roles" && roleSeparationRequired ? (
+              <section className="rounded-2xl border border-black/10 p-6 dark:border-white/15 sm:p-8">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-xl font-semibold">Analysis roles</h2>
+                    <p className="mt-2 text-sm text-black/60 dark:text-white/60">
+                      Independent authorization requires a separate blinded
+                      analyst.
+                    </p>
+                  </div>
+                  <span className="rounded-full border border-black/10 px-2.5 py-1 text-xs font-medium dark:border-white/15">
+                    {hasIndependentAuthorizationPair ? "Complete" : "Required"}
+                  </span>
+                </div>
+
+                {hasIndependentAuthorizationPair ? (
+                  <p className="mt-5 text-sm text-black/60 dark:text-white/60">
+                    A separate blinded analyst is assigned.
+                    {isBlindingCustodian
+                      ? " You are the blinding custodian."
+                      : isBlindedAnalyst
+                        ? " You are the blinded analyst."
+                        : ""}
+                  </p>
+                ) : canAssignBlindedAnalyst ? (
+                  <>
+                    {analystErrorMessage ? (
+                      <div className="mt-5 rounded-xl border border-red-200 bg-red-50 p-4 text-red-900">
+                        <p className="text-sm font-medium">
+                          Unable to assign blinded analyst
+                        </p>
+                        <p className="mt-1 text-sm">{analystErrorMessage}</p>
+                      </div>
+                    ) : null}
+
+                    <form
+                      action={assignBlindedAnalyst}
+                      className="mt-5 space-y-4"
+                    >
+                      <input type="hidden" name="studyId" value={study.id} />
+                      <input
+                        type="hidden"
+                        name="workflowId"
+                        value={workflow.id}
+                      />
+
+                      <div>
+                        <label
+                          className="text-sm font-medium"
+                          htmlFor="analystEmail"
+                        >
+                          Blinded analyst email
+                        </label>
+                        <input
+                          autoComplete="off"
+                          className="mt-1 w-full rounded-lg border border-black/15 bg-transparent px-3 py-2 outline-none placeholder:text-black/35 focus:border-black/40 dark:border-white/20 dark:placeholder:text-white/35 dark:focus:border-white/50"
+                          id="analystEmail"
+                          name="analystEmail"
+                          placeholder="analyst@example.com"
+                          required
+                          type="email"
+                        />
+                        <p className="mt-1 text-xs text-black/45 dark:text-white/45">
+                          The analyst must already have a blindstats account.
+                        </p>
+                      </div>
+
+                      <label className="flex max-w-3xl items-start gap-3 text-sm">
+                        <input
+                          className="mt-1"
+                          name="acknowledgeRoleSeparation"
+                          required
+                          type="checkbox"
+                        />
+                        <span>
+                          I understand that this separates blinding and analysis
+                          responsibilities for this Study.
+                        </span>
+                      </label>
+
+                      <button
+                        className="rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background"
+                        type="submit"
+                      >
+                        Assign blinded analyst
+                      </button>
+                    </form>
+                  </>
+                ) : isBlindedAnalyst ? (
+                  <p className="mt-5 text-sm text-black/60 dark:text-white/60">
+                    You are assigned as the blinded analyst. The blinding
+                    custodian manages role separation.
+                  </p>
+                ) : (
+                  <p className="mt-5 text-sm text-black/60 dark:text-white/60">
+                    Your current Study role cannot change analysis-role
+                    assignments.
+                  </p>
+                )}
+              </section>
+            ) : null}
+
+            {setupView === "plan" ? (
+              activePlan ? (
+                <section className="rounded-2xl border border-black/10 p-6 dark:border-white/15 sm:p-8">
+                  <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                      <h2 className="text-xl font-semibold">
+                        BlindingPlan v{activePlan.version_number}
+                      </h2>
+                      <p className="mt-2 text-sm text-black/60 dark:text-white/60">
+                        This plan is active and immutable.
+                      </p>
+                    </div>
+                    <span className="rounded-full border border-black/10 px-2.5 py-1 text-xs font-medium dark:border-white/15">
+                      Active
+                    </span>
+                  </div>
+
+                  {stale === "1" ? (
+                    <p className="mt-5 text-sm font-medium">
+                      The draft was not changed because this plan is already
+                      active.
+                    </p>
+                  ) : null}
+
+                  <dl className="mt-6 grid gap-5 sm:grid-cols-3">
+                    <div>
+                      <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+                        Protection target
+                      </dt>
+                      <dd className="mt-1 text-sm">
+                        {activePlan.protection_targets[0]}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+                        Analysis lock
+                      </dt>
+                      <dd className="mt-1 text-sm">
+                        {activePlan.require_analysis_lock
+                          ? "Required"
+                          : "Not required"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+                        Authorization
+                      </dt>
+                      <dd className="mt-1 text-sm">
+                        {formatAuthorizationPolicy(
+                          activePlan.authorization_policy,
+                        )}
+                      </dd>
+                    </div>
+                  </dl>
+
+                  {activePlan.warning_acknowledgements.length > 0 ? (
+                    <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-950">
+                      <p className="text-sm font-medium">
+                        Non-recommended settings were acknowledged
+                      </p>
+                      <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
+                        {activePlan.warning_acknowledgements.includes(
+                          "analysis_lock_not_required",
+                        ) ? (
+                          <li>Analysis lock is not required.</li>
+                        ) : null}
+                        {activePlan.warning_acknowledgements.includes(
+                          "self_authorization_permitted",
+                        ) ? (
+                          <li>Self-authorization for unblinding is permitted.</li>
+                        ) : null}
+                      </ul>
+                    </div>
+                  ) : null}
+
+                  <details className="mt-6">
+                    <summary className="cursor-pointer text-sm font-medium">
+                      Plan details
+                    </summary>
+                    <dl className="mt-4 grid gap-4 sm:grid-cols-2">
+                      <div>
+                        <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+                          Activated
+                        </dt>
+                        <dd className="mt-1 text-sm">
+                          {new Date(activePlan.activated_at).toLocaleString(
+                            "en-US",
+                          )}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+                          Version status
+                        </dt>
+                        <dd className="mt-1 text-sm">Immutable</dd>
+                      </div>
+                    </dl>
+
+                    {activePlan.protection_rationale ? (
+                      <div className="mt-4">
+                        <p className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
+                          Protection rationale
+                        </p>
+                        <p className="mt-1 text-sm">
+                          {activePlan.protection_rationale}
+                        </p>
+                      </div>
+                    ) : null}
+                  </details>
+                </section>
+              ) : canConfigureBlinding ? (
+                <section className="rounded-2xl border border-black/10 p-6 dark:border-white/15 sm:p-8">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <h2 className="text-xl font-semibold">Blinding plan</h2>
+                      <p className="mt-2 text-sm text-black/60 dark:text-white/60">
+                        Define the protection and governance rules for this
+                        workflow.
+                      </p>
+                    </div>
+                    <span className="rounded-full border border-black/10 px-2.5 py-1 text-xs font-medium dark:border-white/15">
+                      Draft
+                    </span>
+                  </div>
+
+                  {saved === "1" ? (
+                    <p className="mt-4 text-sm font-medium">Draft saved.</p>
+                  ) : null}
+
+                  {activationError === "independent_requires_two_actors" ? (
+                    <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-950">
+                      <p className="text-sm font-medium">Plan not activated</p>
+                      <p className="mt-1 text-sm">
+                        Independent authorization requires two different Study
+                        members: one who can request unblinding and another who
+                        can authorize it.
+                      </p>
+                    </div>
+                  ) : null}
+
+                  <form
+                    action={saveBlindingPlanDraft}
+                    className="mt-6 space-y-5"
+                  >
+                    <input type="hidden" name="studyId" value={study.id} />
+                    <input type="hidden" name="workflowId" value={workflow.id} />
+
+                    <div>
+                      <label
+                        className="text-sm font-medium"
+                        htmlFor="protectionTarget"
+                      >
+                        Protection target
+                      </label>
+                      <input
+                        className="mt-1 w-full rounded-lg border border-black/15 bg-transparent px-3 py-2 outline-none focus:border-black/40 dark:border-white/20 dark:focus:border-white/50"
+                        defaultValue={protectionTarget}
+                        id="protectionTarget"
+                        maxLength={200}
+                        name="protectionTarget"
+                        placeholder="Treatment identity"
+                        type="text"
+                      />
+                      <p className="mt-1 text-xs text-black/50 dark:text-white/50">
+                        What substantive information should the analyst not know?
+                      </p>
+                    </div>
+
+                    <details open={Boolean(draft.protection_rationale)}>
+                      <summary className="cursor-pointer text-sm font-medium">
+                        Protection rationale{" "}
+                        <span className="font-normal text-black/45 dark:text-white/45">
+                          (optional)
+                        </span>
+                      </summary>
+                      <textarea
+                        className="mt-3 min-h-24 w-full rounded-lg border border-black/15 bg-transparent px-3 py-2 outline-none focus:border-black/40 dark:border-white/20 dark:focus:border-white/50"
+                        defaultValue={draft.protection_rationale ?? ""}
+                        id="protectionRationale"
+                        maxLength={1000}
+                        name="protectionRationale"
+                        placeholder="Briefly explain why this information is being blinded."
+                      />
+                    </details>
+
+                    <div className="grid gap-5 sm:grid-cols-2">
+                      <div>
+                        <label
+                          className="text-sm font-medium"
+                          htmlFor="lockPolicy"
+                        >
+                          Analysis lock
+                        </label>
+                        <select
+                          className="mt-1 w-full rounded-lg border border-black/15 bg-transparent px-3 py-2 outline-none focus:border-black/40 dark:border-white/20 dark:focus:border-white/50"
+                          defaultValue={
+                            draft.require_analysis_lock
+                              ? "required"
+                              : "not_required"
+                          }
+                          id="lockPolicy"
+                          name="lockPolicy"
+                        >
+                          <option value="required">
+                            Required (recommended)
+                          </option>
+                          <option value="not_required">Not required</option>
+                        </select>
+                      </div>
+
+                      <AuthorizationPolicyField
+                        initialPolicy={draft.authorization_policy}
+                      />
+                    </div>
+
+                    <button
+                      className="rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background"
+                      type="submit"
+                    >
+                      Save draft
+                    </button>
+                  </form>
+
+                  <div className="mt-7 border-t border-black/10 pt-6 dark:border-white/15">
+                    {!hasProtectionTarget ? (
+                      <p className="text-sm text-black/60 dark:text-white/60">
+                        Save a protection target before activating the plan.
+                      </p>
+                    ) : roleSeparationRequired &&
+                      !hasIndependentAuthorizationPair ? (
+                      <div>
+                        <p className="text-sm font-medium">
+                          Analysis roles are required before activation.
+                        </p>
+                        <Link
+                          className="mt-2 inline-block text-sm font-medium underline underline-offset-4"
+                          href={`${workflowHref}?view=roles`}
+                        >
+                          Continue to Analysis roles
+                        </Link>
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-sm font-medium">
+                          Activating Plan v1 makes this saved plan immutable.
+                        </p>
+
+                        <form
+                          action={activateBlindingPlan}
+                          className="mt-4"
+                        >
+                          <input
+                            type="hidden"
+                            name="studyId"
+                            value={study.id}
+                          />
+                          <input
+                            type="hidden"
+                            name="workflowId"
+                            value={workflow.id}
+                          />
+
+                          {hasWeakerPolicy ? (
+                            <label className="flex max-w-3xl items-start gap-3 text-sm">
+                              <input
+                                className="mt-1"
+                                name="acknowledgeWeakerPolicies"
+                                type="checkbox"
+                                required
+                              />
+                              <span>
+                                I understand that this plan uses one or more
+                                non-recommended governance settings and want to
+                                activate it as specified.
+                              </span>
+                            </label>
+                          ) : null}
+
+                          <button
+                            className="mt-4 rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background"
+                            type="submit"
+                          >
+                            Activate Plan v1
+                          </button>
+                        </form>
+                      </>
+                    )}
+                  </div>
+                </section>
+              ) : (
+                <section className="rounded-2xl border border-black/10 p-6 dark:border-white/15 sm:p-8">
+                  <h2 className="text-xl font-semibold">Blinding plan</h2>
+                  <p className="mt-3 text-sm text-black/60 dark:text-white/60">
+                    The blinding custodian is responsible for configuring and
+                    activating this Study&apos;s BlindingPlan. Your current role
+                    is read-only during setup.
+                  </p>
+                </section>
+              )
+            ) : null}
+
+            {setupView === "blinding" && activePlan ? (
+              <section>
+                <div className="mb-6">
+                  <div>
+                    <h2 className="text-xl font-semibold">
+                      Create blinded package
+                    </h2>
+                    <p className="mt-2 text-sm text-black/60 dark:text-white/60">
+                      Generate the blinded dataset and register its safe metadata.
+                    </p>
+                  </div>
+                </div>
+
+                {canCreateBlinding ? (
+                  <BlindingWorkspace
+                    registration={{
+                      studyId: study.id,
+                      workflowId: workflow.id,
+                      planVersionNumber: activePlan.version_number,
+                    }}
+                    registerAction={registerBlindingTransformation}
+                  />
+                ) : (
+                  <div className="rounded-2xl border border-black/10 p-6 dark:border-white/15">
+                    <p className="text-sm text-black/60 dark:text-white/60">
+                      Waiting for the blinding custodian to create and register
+                      the blinded package.
+                    </p>
+                  </div>
+                )}
+              </section>
+            ) : null}
+          </div>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="mx-auto min-h-screen w-full max-w-5xl px-6 py-12">
       <Link
@@ -1420,7 +2010,6 @@ export default async function BlindingWorkflowPage({
               </div>
 
               <AuthorizationPolicyField
-                hasIndependentAuthorizationPair={hasIndependentAuthorizationPair}
                 initialPolicy={draft.authorization_policy}
               />
             </div>
