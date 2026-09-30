@@ -11,6 +11,32 @@ type StudyPageProps = {
   }>;
 };
 
+function hasDistinctDescription(
+  name: string,
+  description: string | null,
+): boolean {
+  if (!description?.trim()) {
+    return false;
+  }
+
+  return description.trim().toLocaleLowerCase() !== name.trim().toLocaleLowerCase();
+}
+
+function formatWorkflowState(state: string): string {
+  switch (state) {
+    case "setup":
+      return "Setup";
+    case "blinded":
+      return "Blinded";
+    case "unblinding_authorized":
+      return "Authorized";
+    case "unblinded":
+      return "Unblinded";
+    default:
+      return state.replaceAll("_", " ");
+  }
+}
+
 export default async function StudyPage({ params }: StudyPageProps) {
   const { studyId } = await params;
   const supabase = await createClient();
@@ -93,6 +119,14 @@ export default async function StudyPage({ params }: StudyPageProps) {
     !canRequestUnblinding &&
     !canReceiveUnblinded;
 
+  const roleLabel = workflow
+    ? isBlindedAnalyst
+      ? "Blinded analyst"
+      : isBlindingCustodian
+        ? "Blinding custodian"
+        : null
+    : null;
+
   return (
     <main className="mx-auto min-h-screen w-full max-w-5xl px-6 py-12">
       <Link
@@ -110,61 +144,67 @@ export default async function StudyPage({ params }: StudyPageProps) {
           </span>
         </div>
 
-        {study.description ? (
+        {hasDistinctDescription(study.name, study.description) ? (
           <p className="mt-3 max-w-3xl text-black/65 dark:text-white/65">
             {study.description}
           </p>
         ) : null}
       </header>
 
-      <section className="mt-10 rounded-2xl border border-black/10 p-6 dark:border-white/15">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h2 className="text-lg font-semibold">Blinding workflow</h2>
-            {workflow && isBlindedAnalyst ? (
-              <p className="mt-1 text-sm text-black/55 dark:text-white/55">
-                Your role: Blinded analyst
+      <section className="mt-10">
+        <div>
+          <h2 className="text-xl font-semibold">Research workflows</h2>
+          <p className="mt-1 text-sm text-black/60 dark:text-white/60">
+            Open a workflow to continue the Study.
+          </p>
+        </div>
+
+        <article className="mt-5 rounded-2xl border border-black/10 p-6 dark:border-white/15">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h3 className="text-lg font-semibold">Blinding</h3>
+              <p className="mt-1 text-sm text-black/60 dark:text-white/60">
+                Auditable analyst blinding.
               </p>
-            ) : workflow && isBlindingCustodian ? (
-              <p className="mt-1 text-sm text-black/55 dark:text-white/55">
-                Your role: Blinding custodian
-              </p>
-            ) : null}
+              {roleLabel ? (
+                <p className="mt-3 text-sm text-black/55 dark:text-white/55">
+                  Role: {roleLabel}
+                </p>
+              ) : null}
+            </div>
+
+            <span className="rounded-full border border-black/10 px-2.5 py-1 text-xs font-medium text-black/60 dark:border-white/15 dark:text-white/60">
+              {workflow ? formatWorkflowState(workflow.state) : "Not started"}
+            </span>
           </div>
 
           {workflow ? (
-            <span className="rounded-full border border-black/10 px-2.5 py-1 text-xs font-medium capitalize text-black/60 dark:border-white/15 dark:text-white/60">
-              {workflow.state.replaceAll("_", " ")}
-            </span>
-          ) : null}
-        </div>
-
-        {workflow ? (
-          <Link
-            className="mt-5 inline-block rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background"
-            href={`/studies/${study.id}/blinding/${workflow.id}`}
-          >
-            Open workflow
-          </Link>
-        ) : canConfigureBlinding ? (
-          <form action={createBlindingWorkflow} className="mt-5">
-            <input type="hidden" name="studyId" value={study.id} />
-            <button
-              className="rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background"
-              type="submit"
+            <Link
+              className="mt-5 inline-block rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background"
+              href={`/studies/${study.id}/blinding/${workflow.id}`}
             >
-              Create blinding workflow
-            </button>
-          </form>
-        ) : (
-          <p className="mt-4 text-sm text-black/60 dark:text-white/60">
-            Waiting for a Study member with blinding configuration access to
-            create the workflow.
-          </p>
-        )}
+              Open workflow
+            </Link>
+          ) : canConfigureBlinding ? (
+            <form action={createBlindingWorkflow} className="mt-5">
+              <input type="hidden" name="studyId" value={study.id} />
+              <button
+                className="rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background"
+                type="submit"
+              >
+                Create workflow
+              </button>
+            </form>
+          ) : (
+            <p className="mt-5 text-sm text-black/60 dark:text-white/60">
+              Waiting for a Study member with blinding configuration access to
+              create the workflow.
+            </p>
+          )}
+        </article>
       </section>
 
-      <details className="mt-6 rounded-2xl border border-black/10 p-5 text-sm dark:border-white/15">
+      <details className="mt-8 rounded-2xl border border-black/10 p-5 text-sm dark:border-white/15">
         <summary className="cursor-pointer font-medium">Study details</summary>
         <dl className="mt-4 grid gap-4 sm:grid-cols-2">
           <div>

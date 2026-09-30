@@ -5,7 +5,27 @@ import { createClient } from "@/lib/supabase/server";
 
 import { createStudy } from "./actions";
 
-export default async function StudiesPage() {
+type StudiesPageProps = {
+  searchParams: Promise<{
+    create?: string;
+  }>;
+};
+
+function hasDistinctDescription(
+  name: string,
+  description: string | null,
+): boolean {
+  if (!description?.trim()) {
+    return false;
+  }
+
+  return description.trim().toLocaleLowerCase() !== name.trim().toLocaleLowerCase();
+}
+
+export default async function StudiesPage({
+  searchParams,
+}: StudiesPageProps) {
+  const { create } = await searchParams;
   const supabase = await createClient();
   const { data: claimsData, error: claimsError } =
     await supabase.auth.getClaims();
@@ -40,78 +60,115 @@ export default async function StudiesPage() {
 
   const email = typeof claims.email === "string" ? claims.email : null;
   const identity = profile.display_name || email || "Signed-in user";
+  const showCreateForm = studies.length === 0 || create === "1";
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-5xl px-6 py-12">
-      <header className="flex items-start justify-between gap-6">
+      <header className="flex flex-wrap items-start justify-between gap-6">
         <div>
           <p className="text-sm font-medium text-black/60 dark:text-white/60">
             blindstats
           </p>
           <h1 className="mt-2 text-3xl font-semibold">Studies</h1>
           <p className="mt-2 text-sm text-black/60 dark:text-white/60">
+            Your research workspaces.
+          </p>
+          <p className="mt-1 text-sm text-black/45 dark:text-white/45">
             Signed in as {identity}.
           </p>
         </div>
 
-        <form action="/auth/signout" method="post">
-          <button
-            className="rounded-lg border border-black/15 px-4 py-2 text-sm font-medium dark:border-white/20"
-            type="submit"
-          >
-            Sign out
-          </button>
-        </form>
+        <div className="flex items-center gap-2">
+          {studies.length > 0 && !showCreateForm ? (
+            <Link
+              className="rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background"
+              href="/studies?create=1"
+            >
+              New Study
+            </Link>
+          ) : null}
+
+          <form action="/auth/signout" method="post">
+            <button
+              className="rounded-lg border border-black/15 px-4 py-2 text-sm font-medium dark:border-white/20"
+              type="submit"
+            >
+              Sign out
+            </button>
+          </form>
+        </div>
       </header>
 
-      <section className="mt-10 rounded-2xl border border-black/10 p-6 dark:border-white/15">
-        <h2 className="text-lg font-semibold">Create Study</h2>
-        <p className="mt-1 text-sm text-black/60 dark:text-white/60">
-          Create a persistent workspace for a research study.
-        </p>
+      {showCreateForm ? (
+        <section className="mt-10 rounded-2xl border border-black/10 p-6 dark:border-white/15">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-semibold">
+                {studies.length === 0 ? "Create your first Study" : "New Study"}
+              </h2>
+              <p className="mt-1 text-sm text-black/60 dark:text-white/60">
+                Create a workspace for a research study.
+              </p>
+            </div>
 
-        <form action={createStudy} className="mt-5 space-y-4">
-          <div>
-            <label className="text-sm font-medium" htmlFor="name">
-              Study name
-            </label>
-            <input
-              className="mt-1 w-full rounded-lg border border-black/15 bg-transparent px-3 py-2 outline-none focus:border-black/40 dark:border-white/20 dark:focus:border-white/50"
-              id="name"
-              name="name"
-              type="text"
-              maxLength={200}
-              required
-            />
+            {studies.length > 0 ? (
+              <Link
+                className="text-sm font-medium text-black/55 underline underline-offset-4 dark:text-white/55"
+                href="/studies"
+              >
+                Cancel
+              </Link>
+            ) : null}
           </div>
 
-          <div>
-            <label className="text-sm font-medium" htmlFor="description">
-              Description
-            </label>
-            <textarea
-              className="mt-1 min-h-24 w-full rounded-lg border border-black/15 bg-transparent px-3 py-2 outline-none focus:border-black/40 dark:border-white/20 dark:focus:border-white/50"
-              id="description"
-              name="description"
-              maxLength={2000}
-            />
-          </div>
+          <form action={createStudy} className="mt-5 space-y-4">
+            <div>
+              <label className="text-sm font-medium" htmlFor="name">
+                Study name
+              </label>
+              <input
+                className="mt-1 w-full rounded-lg border border-black/15 bg-transparent px-3 py-2 outline-none focus:border-black/40 dark:border-white/20 dark:focus:border-white/50"
+                id="name"
+                name="name"
+                placeholder="For example: Texas Science ANCOVA"
+                type="text"
+                maxLength={200}
+                required
+              />
+            </div>
 
-          <button
-            className="rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background"
-            type="submit"
-          >
-            Create Study
-          </button>
-        </form>
-      </section>
+            <div>
+              <label className="text-sm font-medium" htmlFor="description">
+                Description{" "}
+                <span className="font-normal text-black/45 dark:text-white/45">
+                  (optional)
+                </span>
+              </label>
+              <textarea
+                className="mt-1 min-h-20 w-full rounded-lg border border-black/15 bg-transparent px-3 py-2 outline-none focus:border-black/40 dark:border-white/20 dark:focus:border-white/50"
+                id="description"
+                name="description"
+                placeholder="Short description of the study."
+                maxLength={2000}
+              />
+            </div>
+
+            <button
+              className="rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background"
+              type="submit"
+            >
+              Create Study
+            </button>
+          </form>
+        </section>
+      ) : null}
 
       <section className="mt-10">
         <div className="flex items-end justify-between gap-4">
           <div>
             <h2 className="text-xl font-semibold">Your Studies</h2>
             <p className="mt-1 text-sm text-black/60 dark:text-white/60">
-              Studies you can access appear here.
+              Open a Study to continue its research workflows.
             </p>
           </div>
           <p className="text-sm text-black/50 dark:text-white/50">
@@ -127,7 +184,7 @@ export default async function StudiesPage() {
             </p>
           </div>
         ) : (
-          <div className="mt-5 grid gap-4">
+          <div className="mt-5 grid gap-3">
             {studies.map((study) => (
               <Link
                 className="rounded-2xl border border-black/10 p-5 transition hover:border-black/25 dark:border-white/15 dark:hover:border-white/30"
@@ -137,8 +194,8 @@ export default async function StudiesPage() {
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <h3 className="font-semibold">{study.name}</h3>
-                    {study.description ? (
-                      <p className="mt-2 text-sm text-black/60 dark:text-white/60">
+                    {hasDistinctDescription(study.name, study.description) ? (
+                      <p className="mt-1.5 text-sm text-black/60 dark:text-white/60">
                         {study.description}
                       </p>
                     ) : null}

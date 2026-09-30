@@ -47,6 +47,23 @@ function formatAuthorizationPolicy(policy: string) {
     : "Self-authorization permitted";
 }
 
+function formatWorkflowState(state: string) {
+  switch (state) {
+    case "setup":
+      return "Setup";
+    case "blinded":
+      return "Blinded";
+    case "unblinding_authorized":
+      return "Authorized";
+    case "unblinded":
+      return "Unblinded";
+    default:
+      return state
+        .replaceAll("_", " ")
+        .replace(/\b\w/g, (letter) => letter.toUpperCase());
+  }
+}
+
 function getAnalystErrorMessage(code: string | undefined): string | null {
   switch (code) {
     case "account_not_found":
@@ -470,8 +487,8 @@ export default async function BlindingWorkflowPage({
           : !hasProtectionTarget
             ? "Draft"
             : roleSeparationRequired && !hasIndependentAuthorizationPair
-              ? "Waiting on roles"
-              : "Ready to activate",
+              ? "Needs roles"
+              : "Ready",
         available: true,
       },
     ];
@@ -480,15 +497,15 @@ export default async function BlindingWorkflowPage({
       setupNavItems.push({
         id: "roles",
         label: "Analysis roles",
-        status: hasIndependentAuthorizationPair ? "Complete" : "Required",
+        status: hasIndependentAuthorizationPair ? "Separated" : "Required",
         available: true,
       });
     }
 
     setupNavItems.push({
       id: "blinding",
-      label: "Blinding",
-      status: activePlan ? "Current" : "Locked",
+      label: "Blinded package",
+      status: activePlan ? "Ready" : "Locked",
       available: Boolean(activePlan),
     });
 
@@ -580,7 +597,7 @@ export default async function BlindingWorkflowPage({
                     </p>
                   </div>
                   <span className="rounded-full border border-black/10 px-2.5 py-1 text-xs font-medium dark:border-white/15">
-                    {hasIndependentAuthorizationPair ? "Complete" : "Required"}
+                    {hasIndependentAuthorizationPair ? "Separated" : "Required"}
                   </span>
                 </div>
 
@@ -664,7 +681,7 @@ export default async function BlindingWorkflowPage({
                   </p>
                 ) : (
                   <p className="mt-5 text-sm text-black/60 dark:text-white/60">
-                    Your current Study role cannot change analysis-role
+                    Your current study role cannot change analysis-role
                     assignments.
                   </p>
                 )}
@@ -677,7 +694,7 @@ export default async function BlindingWorkflowPage({
                   <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
                       <h2 className="text-xl font-semibold">
-                        BlindingPlan v{activePlan.version_number}
+                        Blinding plan v{activePlan.version_number}
                       </h2>
                       <p className="mt-2 text-sm text-black/60 dark:text-white/60">
                         This plan is active and immutable.
@@ -915,7 +932,7 @@ export default async function BlindingWorkflowPage({
                     ) : (
                       <>
                         <p className="text-sm font-medium">
-                          Activating Plan v1 makes this saved plan immutable.
+                          Activating plan v1 makes this saved plan immutable.
                         </p>
 
                         <form
@@ -953,7 +970,7 @@ export default async function BlindingWorkflowPage({
                             className="mt-4 rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background"
                             type="submit"
                           >
-                            Activate Plan v1
+                            Activate plan v1
                           </button>
                         </form>
                       </>
@@ -965,7 +982,7 @@ export default async function BlindingWorkflowPage({
                   <h2 className="text-xl font-semibold">Blinding plan</h2>
                   <p className="mt-3 text-sm text-black/60 dark:text-white/60">
                     The blinding custodian is responsible for configuring and
-                    activating this Study&apos;s BlindingPlan. Your current role
+                    activating this study&apos;s blinding plan. Your current role
                     is read-only during setup.
                   </p>
                 </section>
@@ -1077,10 +1094,10 @@ export default async function BlindingWorkflowPage({
 
   const analysisStatus = activePlan.require_analysis_lock
     ? analysisLocks.length > 0
-      ? "Complete"
-      : "Current"
+      ? "Locked"
+      : "Required"
     : analysisLocks.length > 0
-      ? "Complete"
+      ? "Locked"
       : "Optional";
 
   const unblindingStatus = unblindingCompletion
@@ -1090,7 +1107,7 @@ export default async function BlindingWorkflowPage({
       : unblindingRequest
         ? "Requested"
         : unblindingUnlocked
-          ? "Current"
+          ? "Ready"
           : "Locked";
 
   const postSetupNavItems: {
@@ -1111,7 +1128,7 @@ export default async function BlindingWorkflowPage({
     postSetupNavItems.push({
       id: "roles",
       label: "Analysis roles",
-      status: "Complete",
+      status: "Separated",
       available: true,
     });
   }
@@ -1119,13 +1136,13 @@ export default async function BlindingWorkflowPage({
   postSetupNavItems.push(
     {
       id: "blinding",
-      label: "Blinding",
-      status: "Complete",
+      label: "Blinded package",
+      status: "Registered",
       available: true,
     },
     {
       id: "analysis",
-      label: "Analysis",
+      label: "Analysis lock",
       status: analysisStatus,
       available: true,
     },
@@ -1137,8 +1154,8 @@ export default async function BlindingWorkflowPage({
     },
     {
       id: "history",
-      label: "History / audit",
-      status: "Records",
+      label: "Audit history",
+      status: "Available",
       available: true,
     },
   );
@@ -1164,7 +1181,7 @@ export default async function BlindingWorkflowPage({
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-3xl font-semibold">Blinding workflow</h1>
           <span className="rounded-full border border-black/10 px-2.5 py-1 text-xs font-medium capitalize text-black/60 dark:border-white/15 dark:text-white/60">
-            {workflow.state.replaceAll("_", " ")}
+            {formatWorkflowState(workflow.state)}
           </span>
         </div>
         <p className="mt-2 text-sm text-black/60 dark:text-white/60">
@@ -1233,10 +1250,10 @@ export default async function BlindingWorkflowPage({
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
                   <h2 className="text-xl font-semibold">
-                    BlindingPlan v{activePlan.version_number}
+                    Blinding plan v{activePlan.version_number}
                   </h2>
                   <p className="mt-2 text-sm text-black/60 dark:text-white/60">
-                    The active governance plan is immutable.
+                    This plan is active and immutable.
                   </p>
                 </div>
                 <span className="rounded-full border border-black/10 px-2.5 py-1 text-xs font-medium dark:border-white/15">
@@ -1331,11 +1348,11 @@ export default async function BlindingWorkflowPage({
                 <div>
                   <h2 className="text-xl font-semibold">Analysis roles</h2>
                   <p className="mt-2 text-sm text-black/60 dark:text-white/60">
-                    Independent authorization is configured with separate request and authorization responsibilities.
+                    Independent authorization uses separate request and authorization responsibilities.
                   </p>
                 </div>
                 <span className="rounded-full border border-black/10 px-2.5 py-1 text-xs font-medium dark:border-white/15">
-                  Complete
+                  Separated
                 </span>
               </div>
 
@@ -1344,7 +1361,7 @@ export default async function BlindingWorkflowPage({
                   ? "You are the blinding custodian. The blinded analyst holds the analysis and unblinding-request responsibilities."
                   : isBlindedAnalyst
                     ? "You are the blinded analyst. The blinding custodian retains the authorization responsibility."
-                    : "Two different Study members hold the request and authorization responsibilities required by this Plan."}
+                    : "Two different study members hold the request and authorization responsibilities required by this plan."}
               </p>
             </section>
           ) : null}
@@ -1353,13 +1370,13 @@ export default async function BlindingWorkflowPage({
             <section className="rounded-2xl border border-black/10 p-6 dark:border-white/15">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
-                  <h2 className="text-xl font-semibold">Blinding</h2>
+                  <h2 className="text-xl font-semibold">Blinded package</h2>
                   <p className="mt-2 text-sm text-black/60 dark:text-white/60">
                     The blinded package has been registered.
                   </p>
                 </div>
                 <span className="rounded-full border border-black/10 px-2.5 py-1 text-xs font-medium dark:border-white/15">
-                  Complete
+                  Registered
                 </span>
               </div>
 
@@ -1391,11 +1408,11 @@ export default async function BlindingWorkflowPage({
               <div className="rounded-2xl border border-black/10 p-6 dark:border-white/15">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
-                    <h2 className="text-xl font-semibold">Analysis</h2>
+                    <h2 className="text-xl font-semibold">Analysis lock</h2>
                     <p className="mt-2 text-sm text-black/60 dark:text-white/60">
                       {activePlan.require_analysis_lock
-                        ? "Register the exact analysis artifact that is finalized before unblinding."
-                        : "An AnalysisLock is optional under this Plan."}
+                        ? "Register the exact analysis artifact finalized before unblinding."
+                        : "An analysis lock is optional under this plan."}
                     </p>
                   </div>
                   <span className="rounded-full border border-black/10 px-2.5 py-1 text-xs font-medium dark:border-white/15">
@@ -1423,7 +1440,7 @@ export default async function BlindingWorkflowPage({
 
                 {analysisLocks.length === 0 && !canLockAnalysis ? (
                   <p className="mt-6 text-sm text-black/60 dark:text-white/60">
-                    Waiting for the blinded analyst to register an AnalysisLock.
+                    Waiting for the blinded analyst to register an analysis lock.
                   </p>
                 ) : null}
               </div>
@@ -1510,8 +1527,8 @@ export default async function BlindingWorkflowPage({
                         >
                           <option value="">
                             {activePlan.require_analysis_lock
-                              ? "Select a registered AnalysisLock"
-                              : "No AnalysisLock"}
+                              ? "Select a registered analysis lock"
+                              : "No analysis lock"}
                           </option>
                           {analysisLocks.map((lock, index) => (
                             <option key={lock.id} value={lock.id}>
@@ -1521,8 +1538,8 @@ export default async function BlindingWorkflowPage({
                         </select>
                         <p className="mt-1 text-xs text-black/50 dark:text-white/50">
                           {activePlan.require_analysis_lock
-                            ? "The request will be permanently bound to the selected lock."
-                            : "A lock is optional under this Plan."}
+                            ? "The request will be permanently linked to the selected analysis lock."
+                            : "An analysis lock is optional under this plan."}
                         </p>
                       </div>
 
@@ -1535,7 +1552,7 @@ export default async function BlindingWorkflowPage({
                     </form>
                   ) : (
                     <p className="mt-6 text-sm text-black/60 dark:text-white/60">
-                      Waiting for the Study member who can request unblinding.
+                      Waiting for the study member who can request unblinding.
                     </p>
                   )
                 ) : null}
@@ -1549,7 +1566,7 @@ export default async function BlindingWorkflowPage({
                           Awaiting independent authorization
                         </p>
                         <p className="mt-1 text-sm text-black/60 dark:text-white/60">
-                          A different Study member must authorize this request.
+                          A different study member must authorize this request.
                         </p>
                       </>
                     ) : canAuthorizeUnblinding ? (
@@ -1557,8 +1574,8 @@ export default async function BlindingWorkflowPage({
                         <p className="text-sm font-medium">Authorization required</p>
                         <p className="mt-1 text-sm text-black/60 dark:text-white/60">
                           {activePlan.authorization_policy === "independent"
-                            ? "This request was made by another Study member."
-                            : "This Plan permits self-authorization."}
+                            ? "This request was made by another study member."
+                            : "This plan permits self-authorization."}
                         </p>
                         <form action={authorizeUnblinding} className="mt-4">
                           <input type="hidden" name="studyId" value={study.id} />
@@ -1584,7 +1601,7 @@ export default async function BlindingWorkflowPage({
                       <>
                         <p className="text-sm font-medium">Awaiting authorization</p>
                         <p className="mt-1 text-sm text-black/60 dark:text-white/60">
-                          Another authorized Study member must complete this step.
+                          Another authorized study member must complete this step.
                         </p>
                       </>
                     )}
@@ -1637,7 +1654,7 @@ export default async function BlindingWorkflowPage({
                 ) : (
                   <div className="mt-6 rounded-2xl border border-black/10 p-6 dark:border-white/15">
                     <p className="text-sm font-medium">
-                      A registered AnalysisLock is required for the current documented completion path.
+                      A registered analysis lock is required for the current documented completion path.
                     </p>
                   </div>
                 )
@@ -1648,9 +1665,9 @@ export default async function BlindingWorkflowPage({
           {postSetupView === "history" ? (
             <section className="space-y-6">
               <div className="rounded-2xl border border-black/10 p-6 dark:border-white/15">
-                <h2 className="text-xl font-semibold">History / audit</h2>
+                <h2 className="text-xl font-semibold">Audit history</h2>
                 <p className="mt-2 text-sm text-black/60 dark:text-white/60">
-                  Inspect the durable workflow records and technical identities without crowding the live workflow.
+                  Review durable workflow records and technical identifiers.
                 </p>
               </div>
 
@@ -1738,7 +1755,7 @@ export default async function BlindingWorkflowPage({
 
                 {analysisLocks.length === 0 ? (
                   <p className="mt-4 text-sm text-black/60 dark:text-white/60">
-                    No AnalysisLock has been registered.
+                    No analysis lock has been registered.
                   </p>
                 ) : (
                   <div className="mt-4 space-y-3">
@@ -1830,7 +1847,7 @@ export default async function BlindingWorkflowPage({
                           <dd className="mt-1 text-sm">
                             {unblindingRequest.requested_by === currentUserId
                               ? "You"
-                              : "Another Study member"}
+                              : "Another study member"}
                           </dd>
                         </div>
                         <div>
@@ -1848,7 +1865,7 @@ export default async function BlindingWorkflowPage({
                           <dd className="mt-1 text-sm">
                             {selectedRequestLock
                               ? `Analysis lock ${analysisLocks.length - selectedRequestLockIndex}: ${selectedRequestLock.analysis_artifact_filename}`
-                              : "No AnalysisLock selected"}
+                              : "No analysis lock selected"}
                           </dd>
                         </div>
                       </dl>
@@ -1880,7 +1897,7 @@ export default async function BlindingWorkflowPage({
                             <dd className="mt-1 text-sm">
                               {unblindingAuthorization.authorized_by === currentUserId
                                 ? "You"
-                                : "Another Study member"}
+                                : "Another study member"}
                             </dd>
                           </div>
                         </dl>
@@ -1903,7 +1920,7 @@ export default async function BlindingWorkflowPage({
                             <dd className="mt-1 text-sm">
                               {unblindingCompletion.completed_by === currentUserId
                                 ? "You"
-                                : "Another Study member"}
+                                : "Another study member"}
                             </dd>
                           </div>
                           <div>
