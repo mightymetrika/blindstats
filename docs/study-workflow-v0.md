@@ -1,24 +1,48 @@
 # Server-Backed Study and Blinding Workflow v0
 
 - **Project:** blindstats
-- **Status:** first design draft
-- **Scope:** first server-backed study workflow
-- **Current browser-local artifact schema:** `0.3`
-- **Updated:** 2026-09-09
+- **Status:** implemented first server-backed workflow; pre-release
+- **Scope:** current Study + analyst-blinding governance architecture
+- **Browser-local artifact schema:** `0.3`
+- **Updated:** 2026-10-01
 
 ## 1. Purpose
 
-This document defines the first server-backed study/workflow architecture for blindstats.
+This document describes the current server-backed Study and blinding workflow in
+blindstats.
 
-The goal is to place the proven browser-local blinding protocol inside a persistent study, membership, authorization, workflow-state, and audit architecture without prematurely taking custody of substantive research files or protected unblinding information.
+The original design goal was to place the browser-local blinding protocol inside a
+persistent Study, membership, authorization, workflow-state, and audit
+architecture without requiring blindstats to take custody of substantive research
+files or plaintext unblinding information.
 
-The current scientific sequence remains:
+That architecture is now substantially implemented.
 
-> **Blind → analyze while blinded → optionally lock an exact analysis artifact → authorize unblinding → unblind → document**
+The current scientific sequence is:
 
-The first online release should strengthen coordination and auditability while preserving the current protocol's narrow, inspectable artifact relationships.
+> **Plan → blind → analyze while blinded → lock → request → authorize → unblind → document**
 
-This document is a workflow and requirements specification. It does **not** select a database provider, ORM, authentication provider, object-storage provider, or server-side key-management system.
+The implementation combines two layers:
+
+1. **browser-local artifact operations**
+   - create the blinded package;
+   - hash the source, blinded, and analysis artifacts;
+   - create the analysis-lock receipt;
+   - authenticate/decrypt the mapping after authorization; and
+   - create the final unblinding receipt;
+
+2. **persistent server-backed governance**
+   - authenticate users;
+   - maintain Studies, membership, and capabilities;
+   - preserve an immutable active BlindingPlan version;
+   - register the exact public blinding receipt;
+   - register exact analysis-lock receipts;
+   - record unblinding requests and authorizations;
+   - register safe completion metadata; and
+   - expose a durable workflow audit history.
+
+The current server-backed implementation uses **Supabase PostgreSQL and Auth**.
+Substantive research-file storage remains intentionally out of scope.
 
 See also:
 
@@ -34,390 +58,476 @@ A **Study** is the durable research and collaboration container.
 
 A **Workflow** is a specific research process operating within a Study.
 
-Blinding is the first workflow implemented within a Study, but it should not define the Study itself.
+Blinding is the first workflow implemented within a Study, but it does not define
+the Study itself.
 
-This separation is intentional. Future Study workflows may include, for example:
+This separation is now reflected in the application UI:
 
-- random assignment;
-- allocation concealment and allocation release;
-- preregistration or protocol-freeze workflows;
-- data-collection tools;
-- study documentation and versioning;
-- additional research-integrity workflows; and
-- other study-management capabilities.
+```text
+Studies
+  └── Study
+        └── Research workflows
+              └── Blinding
+```
 
-The long-term direction is therefore closer to a study-management platform with multiple research workflows than to a single-purpose blinding utility.
+The current application effectively supports one blinding workflow per Study.
+Creating another blinding workflow for the same Study redirects to the existing
+workflow.
 
-For the first online release, blindstats may support only one active blinding workflow per Study in the user interface. The underlying domain model should avoid making that limitation permanent.
+The longer-term product direction remains closer to a modular research-management
+system than to a single-purpose blinding utility. Possible future modules include
+randomization, preregistration/freeze workflows, study documentation, and other
+research-integrity tools.
 
-## 3. First-release scope
+Those modules are intentionally deferred until researcher feedback supports them.
 
-The first server-backed release should add:
+## 3. Current first-release scope
 
-- authenticated users;
+The current implementation provides:
+
+- authenticated users through Supabase Auth;
 - persistent Studies;
-- team/study membership;
-- server-enforced permissions;
-- a persistent BlindingPlan;
-- explicit blinding-workflow state;
-- persistent public-receipt records;
-- persistent analysis-lock records;
-- unblinding-authorization records;
-- server timestamps for workflow events;
-- durable audit history; and
-- known-exposure history for protected information released through blindstats.
+- Study membership;
+- Study-scoped capability-based authorization;
+- persistent blinding workflows;
+- editable BlindingPlan drafts during setup;
+- immutable activated BlindingPlan v1 records;
+- explicit workflow state;
+- browser-local blinded-package creation;
+- exact persistent public-receipt registration;
+- persistent analysis-lock registration;
+- persistent unblinding requests;
+- persistent unblinding authorizations;
+- browser-local authorized unblinding;
+- persistent safe unblinding-completion metadata;
+- database-generated registration timestamps; and
+- a durable Audit history assembled from the persistent workflow records.
 
-The first release should **not** require blindstats to store substantive research-file contents.
+The current release does **not** require blindstats to store substantive
+research-file contents.
 
-In particular, the initial architecture should keep the following local to the user's browser/device:
+The following remain browser-local or outside blindstats custody:
 
-- source datasets;
-- generated blinded datasets;
-- substantive analysis files;
-- the unblinding secret;
-- plaintext original-to-neutral mappings; and
-- the plaintext contents of the final unblinding receipt, unless a later design deliberately adds protected-artifact storage.
+- source dataset contents;
+- generated blinded dataset contents;
+- substantive analysis-artifact contents;
+- the plaintext unblinding secret;
+- the plaintext original-to-neutral mapping; and
+- the plaintext final unblinding receipt.
 
-The first online release is therefore a persistent **coordination, authorization, integrity-metadata, and audit layer**, not a general research-data repository.
+The current application is therefore primarily a persistent **coordination,
+authorization, artifact-identity, and audit layer**, not a general research-data
+repository.
 
 ## 4. Enforcement boundary
 
-blindstats should distinguish among three kinds of controls.
+blindstats distinguishes among hard system invariants, Study-chosen governance
+rules, and user-facing defaults/warnings.
 
 ### 4.1 Hard system invariants
 
-These are properties blindstats must enforce because allowing an override would make the system's own integrity claims false or misleading.
+The current implementation enforces integrity-critical properties at the
+database and/or browser protocol boundary.
 
 Examples include:
 
-- supported cryptographic operations must validate correctly;
-- exact artifact hashes must be computed and compared correctly;
-- receipt relationships must be internally consistent;
-- server-side permission checks must be applied to protected actions;
-- immutable historical records must not be silently overwritten;
-- a previously recorded workflow event must not disappear through ordinary editing;
-- a later artifact revision must not silently retain the identity of an earlier locked artifact; and
-- if the first-release architecture declares the unblinding secret non-persistent, the server must not retain its contents.
+- authenticated access to persistent workflow actions;
+- Row Level Security for Study-scoped records;
+- capability checks for protected actions;
+- supported receipt structure and artifact hashes;
+- exact binding of transformations and analysis locks to the active plan;
+- immutable activated plan versions;
+- immutable registered transformation/lock/request/authorization/completion
+  records under ordinary application use;
+- state-transition requirements;
+- independent authorization requiring a different requester and authorizer;
+- independent-plan activation requiring a genuine two-actor configuration;
+- no server persistence of the plaintext unblinding secret or plaintext mapping;
+  and
+- exact-retry idempotence for selected registration/authorization operations.
 
-Integrity-critical operations should fail closed rather than silently fall back to weaker behavior.
+Integrity-critical operations fail rather than silently degrading to a weaker
+relationship.
 
 ### 4.2 Study-chosen rules that become enforceable commitments
 
-Some methodological and governance choices legitimately vary across studies.
+The current BlindingPlan supports two configurable governance choices:
 
-Examples include:
+- whether an analysis lock is required before an unblinding request may proceed;
+- whether authorization is `independent` or `self_authorization`.
 
-- who is intended to remain blinded;
-- who will custody the unblinding secret;
-- whether an analysis lock is required before ordinary unblinding;
-- whether independent authorization is required;
-- who may authorize unblinding; and
-- who may receive unblinded information.
+The plan also records:
 
-blindstats should provide evidence-informed defaults and warnings but allow reasonable study-to-study variation.
+- one substantive protection target; and
+- an optional short protection rationale.
 
-Once a Study adopts one of these rules in an active BlindingPlan, blindstats should enforce that declared rule until it is prospectively amended.
+Once activated, these values are frozen into the immutable active plan version
+used by later workflow checks.
 
 ### 4.3 Defaults, explanations, and warnings
 
-Where reasonable researchers may make different choices, blindstats should generally guide rather than prohibit.
+The application currently recommends:
 
-The interface should:
+- requiring an analysis lock; and
+- using independent authorization.
 
-- use sensible defaults;
-- explain the methodological consequence of weaker settings;
-- warn when a choice reduces role separation or blinding protection;
-- require acknowledgment for important deviations when appropriate; and
-- preserve the selected choice and acknowledgment in the audit history.
+A Study may choose:
 
-The application should not claim that one configuration is universally correct.
+- analysis lock not required; and/or
+- self-authorization.
 
-## 5. Conceptual domain model
+Those weaker settings require explicit acknowledgment when the plan is activated,
+and the acknowledgments are retained in the plan version.
 
-The exact relational schema is deferred, but the server-backed design should support at least the following concepts.
+The software does not claim that one policy is universally appropriate for every
+study.
+
+## 5. Current domain model
+
+The current relational implementation centers on the following persisted
+concepts.
 
 ### 5.1 Study-level concepts
 
-- `User`
-- `Team` or organizational container
-- `TeamMembership`
-- `Study`
-- `StudyMembership`
-- study-level capabilities/permissions
+- Supabase Auth user;
+- `profiles`;
+- `studies`;
+- `study_memberships`;
+- `study_capabilities`.
+
+Study lifecycle currently permits:
+
+```text
+active
+archived
+```
+
+The current user interface creates active Studies. A broader Study-lifecycle
+management UI is not yet implemented.
 
 ### 5.2 Blinding-workflow concepts
 
-- `BlindingWorkflow`
-- `BlindingPlan`
-- `BlindingPlanVersion`
-- `BlindingTarget`
-- `BlindingTransformation`
-- `ArtifactRecord`
-- `AnalysisLock`
-- `UnblindingAuthorization`
-- `UnblindingEvent`
-- `ProtectedInformationExposure`
-- `AuditEvent`
+- `blinding_workflows`;
+- `blinding_plan_drafts`;
+- `blinding_plan_versions`;
+- `blinding_transformations`;
+- `analysis_locks`;
+- `unblinding_requests`;
+- `unblinding_authorizations`;
+- `unblinding_completions`.
 
-The names above are conceptual and do not commit the implementation to specific database table or TypeScript type names.
+The current implementation does **not** use a generic `AuditEvent` table. The
+Audit history is derived from these durable domain records.
+
+The current implementation also does not yet persist a general
+`ProtectedInformationExposure` record. Successful completion records who completed
+the governed unblinding workflow, but broader exposure tracking remains a future
+capability.
 
 ## 6. BlindingPlan
 
-The BlindingPlan defines the intended governance and protection rules for one blinding workflow.
+The BlindingPlan defines the protection target and governance rules for one
+blinding workflow.
 
-It should be readable by study members with appropriate permissions and should be preserved as a versioned historical record.
+The UI uses the human-readable term **Blinding plan**. `BlindingPlan` remains
+useful as a technical/domain name.
 
-### 6.1 Blinding targets
+### 6.1 Protection target versus transformed variable
 
-The current browser-local implementation blinds one selected categorical column.
+The current plan records one **protection target**: the substantive information
+the workflow is intended to keep from the blinded analyst.
 
-The first server-backed implementation may retain that user-facing limitation so the database transition can be completed without simultaneously expanding the blinding algorithm.
+Examples include:
 
-However, the conceptual plan should represent:
+- treatment identity;
+- intervention identity;
+- geographic category identity; or
+- another substantive group identity.
+
+This is deliberately distinct from the concrete dataset column later selected
+during the blinding transformation.
+
+For example:
 
 ```text
-blindingTargets[]
+Protection target: Treatment identity
+Transformed CSV column: treatment
 ```
 
-rather than permanently defining a single `selectedColumn`.
+The current database stores protection targets as an array but requires exactly
+one element.
 
-This allows later support for multiple blinded variables, which may be especially useful in single-group or observational designs where researchers may want to mask several substantive variables such as demographic or geographic categories.
+Multiple protection targets or blinded variables remain deferred.
 
-For the first implementation, the supported configuration may simply require:
+### 6.2 Protection rationale
 
-```text
-blindingTargets.length === 1
-```
-
-The single-target limitation should be documented as an implementation scope, not a permanent methodological requirement.
-
-### 6.2 Protection purpose and rationale
-
-The plan may include an optional short rationale describing why the selected information is being blinded.
+The plan supports an optional short rationale.
 
 Examples include:
 
 - conceal treatment identity during statistical analysis;
-- conceal geographic category identity;
-- reduce the possibility that model/reporting decisions are influenced by substantive group labels.
+- reduce the possibility that model/reporting decisions are influenced by
+  substantive group labels.
 
-This field should be optional and should not require users to write an extensive methodological justification.
+The current rationale is limited in length and is intended to remain concise.
 
-### 6.3 Intended blinded members
+### 6.3 Analysis-lock policy
 
-The plan should identify which study members are intended to remain blinded to the protected mapping during the blinded-analysis phase.
-
-Defaults should encourage separation between:
-
-- members conducting blinded analysis; and
-- members who custody or can access the unblinding secret.
-
-The exact team structure must remain configurable because study staffing varies.
-
-Intended blinding is a declared governance condition, not proof of a person's actual knowledge outside blindstats.
-
-### 6.4 Secret custody
-
-The BlindingPlan should identify one or more designated custodians of the unblinding secret.
-
-For the first online release:
-
-- the secret is generated in the browser;
-- the secret is exported to the designated custodian;
-- the server does not retain the secret contents; and
-- the audit record documents the relevant workflow event and designated custodian without storing the secret itself.
-
-A configuration in which an intended blinded analyst is also the secret custodian should be allowed only with a clear warning and recorded acknowledgment.
-
-The system should not claim to prove that a custodian actually stored the exported secret safely.
-
-Loss of the export-only secret may make ordinary unblinding difficult or impossible. This is a deliberate custody consequence that should be clearly communicated.
-
-### 6.5 Analysis-lock policy
-
-The BlindingPlan should make the pre-unblinding analysis-lock requirement configurable.
-
-Recommended/default configuration:
+The current plan supports:
 
 ```text
-Require a qualifying analysis lock before ordinary unblinding: Yes
+required
+not required
 ```
 
-Alternative configuration:
+The recommended/default configuration is **required**.
 
-```text
-Require a qualifying analysis lock before ordinary unblinding: No
-```
+If the Study selects `not required`, plan activation requires explicit
+acknowledgment that this weakens the pre-unblinding commitment.
 
-Turning the requirement off should produce a concise methodological warning and a durable record of the decision.
+An analysis lock identifies an exact declared artifact. It does not establish that
+the artifact is scientifically complete, that it was the only analysis performed,
+or that later work did not occur.
 
-A mandatory lock is not universally sufficient evidence of a strong analysis process. In the first release, blindstats will establish the exact identity of a declared artifact but will not assess whether that artifact is scientifically meaningful or complete.
+#### Current completion limitation
 
-The analysis-lock mechanism therefore documents a researcher's declared pre-unblinding artifact rather than certifying its substantive adequacy.
+The request and authorization functions honor the plan's `require_analysis_lock`
+setting: a request may omit a lock when the active plan does not require one.
 
-### 6.6 Unblinding-authorization policy
+However, the current persistent unblinding-completion registration still requires
+the authorized request to be bound to a registered AnalysisLock.
 
-The BlindingPlan should define the authorization rule used before ordinary unblinding.
+Therefore, **a fully completed persistent unblinding workflow currently still
+needs an AnalysisLock even when the plan says it is not required**.
 
-Initial choices:
+This is a known implementation mismatch that should be resolved before presenting
+"analysis lock not required" as a fully supported end-to-end path in the first
+field release.
+
+### 6.4 Unblinding-authorization policy
+
+The current plan supports:
 
 **Independent authorization — recommended/default**
 
-- a user with the required authorization capability must approve unblinding;
-- the user who submitted the qualifying analysis lock may not approve their own unblinding when the plan requires independence.
+- the request and authorization must be performed by different authenticated
+  users; and
+- both users must hold the relevant Study capability.
 
 **Self-authorization permitted**
 
-- a user with the required capability may both submit the analysis lock and authorize unblinding.
+- the same user may request and authorize if the active plan permits
+  self-authorization and the user holds both required capabilities.
 
-The interface should explain that independent authorization provides stronger separation between analysis and release.
+The database enforces the independent-requester/authorizer distinction at
+authorization time.
 
-Multi-party authorization may be supported later if concrete use cases justify it. The domain model should not make it impossible.
+It also enforces two-actor readiness when an independent plan is activated, so
+the requirement cannot be bypassed by calling the activation RPC directly.
 
-### 6.7 Permitted unblinded recipients
+### 6.5 Role separation is Study-scoped, not embedded in the plan
 
-Authorization to approve unblinding and permission to receive the released mapping should be treated as separate capabilities.
+The current plan does not directly store a list of blinded users, secret
+custodians, or permitted recipients.
 
-A Study may therefore permit a principal investigator, administrator, or other member to approve release without requiring that person to receive the mapping.
+Those responsibilities are currently represented through Study membership and
+capabilities.
 
-The plan should identify which members or capabilities may receive unblinded information through blindstats.
+This is an intentional simplification for the first release.
 
-### 6.8 Recommended initial defaults
+### 6.6 Secret custody
 
-The first-release interface should generally default toward:
+The unblinding secret is generated locally and exported by the person creating the
+blinded package.
 
-- blinded analysts separate from secret custodians;
-- an analysis lock required before ordinary unblinding;
-- independent unblinding authorization;
-- limited unblinded access; and
-- export-only custody of the unblinding secret.
+The server does not store the plaintext secret.
 
-These defaults guide users toward stronger separation while preserving the ability to document justified alternatives.
+The current workflow expects the custodian to retain the secret outside blindstats
+and transfer it to the analyst only after authorization.
 
-## 7. Plan finalization, versioning, and amendment
+blindstats does not currently prove where the custodian stored the secret or
+whether the external transfer channel was secure.
 
-### 7.1 Setup state
+### 6.7 Unblinded recipient capability
 
-While the workflow is in `setup`, authorized users may edit the draft BlindingPlan.
-
-The plan is not yet an immutable historical commitment.
-
-### 7.2 Activation
-
-When the plan is complete and the blinding transformation is successfully created/registered, blindstats should preserve the exact active plan as an immutable `BlindingPlanVersion`.
-
-The initial active version may be represented conceptually as:
+Permission to complete the local unblinding workflow is represented by:
 
 ```text
-BlindingPlan v1
+unblinded.receive
 ```
 
-Activation should record at least:
+This capability is distinct from:
 
-- plan version identity;
-- workflow identity;
-- Study identity;
-- actor;
-- server timestamp;
-- selected blinding configuration;
-- intended blinded members;
-- secret custodian configuration;
-- analysis-lock policy;
-- authorization policy;
-- permitted unblinded recipients; and
-- warnings/deviations acknowledged at activation.
+```text
+unblinding.authorize
+```
 
-The workflow then leaves `setup`.
+The distinction allows an authorizer to approve unblinding without necessarily
+being the person who performs the local release.
 
-### 7.3 Historical versions are not edited in place
+## 7. Plan activation, immutability, and amendment status
 
-After activation, a historical plan version must never be silently rewritten.
+### 7.1 Draft during setup
 
-If a meaningful governance setting changes, the system should create a new plan version or amendment that records:
+When a workflow is created, blindstats maintains an editable BlindingPlan draft.
 
-- what changed;
-- who made the change;
-- server timestamp;
-- workflow state at the time;
-- optional or required reason, as appropriate; and
-- any warning or weaker-setting acknowledgment.
+While:
 
-For example, changing from independent authorization to self-authorization after blinding begins must not make it appear that self-authorization was the original plan.
+```text
+workflow.state = setup
+active_plan_version_id = null
+```
 
-### 7.4 Prospective amendments
+a user with `blinding.configure` can edit the supported draft fields.
 
-Examples of settings that may be prospectively amended within an existing workflow include:
+### 7.2 Activation creates immutable Plan v1
 
-- authorization personnel;
-- permitted recipients;
-- secret custodian;
-- lock requirement; and
-- independent versus self-authorization policy.
+Plan activation:
 
-The active plan version used to evaluate a later action should be identifiable from the audit record.
+1. verifies authentication and `blinding.configure`;
+2. requires workflow state `setup`;
+3. validates one nonblank protection target;
+4. validates the configured policies;
+5. requires acknowledgment for weaker settings;
+6. enforces independent two-actor readiness when applicable;
+7. inserts immutable `blinding_plan_versions` version `1`; and
+8. stores that version as `active_plan_version_id`.
 
-### 7.5 Changes that create a new workflow/transformation
+Importantly, **plan activation does not move the workflow to `blinded`**.
 
-Some changes should not be treated as ordinary amendments after a blinded package exists.
+After activation the workflow remains in `setup` until the blinded package is
+successfully created and registered.
 
-Examples include changing:
+This separation lets the user review/freeze governance before creating the actual
+blinded transformation.
 
-- the underlying source artifact;
-- the actual blinded variable(s);
-- the generated mapping;
-- the blinding transformation mechanism; or
-- another identity-defining element of the generated blinded artifact.
+### 7.3 Historical plan versions
 
-Those changes describe a new blinding transformation and should preserve the prior transformation and its history rather than rewriting it.
+Activated plan rows are read-only to normal authenticated clients and are treated
+as immutable historical records.
 
-## 8. Capabilities and permissions
+The current first-release UI/logic supports one active plan version (`v1`).
 
-Capabilities should be defined before fixed role names.
+### 7.4 Prospective amendments are deferred
 
-Initial conceptual capabilities include:
+The earlier design anticipated later plan amendments and multiple historical plan
+versions.
 
-- administer ordinary Study metadata;
-- manage Study membership;
-- assign workflow capabilities;
-- configure the BlindingPlan;
-- create/register a blinded package;
-- participate in blinded analysis;
-- submit an analysis lock;
-- request unblinding;
-- authorize unblinding;
-- receive/access released unblinded information; and
-- view audit history.
+That mechanism is **not yet implemented**.
 
-Convenient role bundles may later group these capabilities into names such as Study Administrator, Blinded Analyst, Secret Custodian, or Unblinding Approver.
+After Plan v1 is activated, the current workflow does not expose ordinary edits to
+the active plan.
 
-The implementation should not assume that study administration implies access to unblinded information.
+A future amendment model should preserve prior plan versions rather than silently
+rewriting history.
 
-Likewise, authorization to approve unblinding should not automatically imply permission to receive the released mapping.
+## 8. Capabilities and current role bundles
 
-Permissions must ultimately be enforced server-side. Hiding a control or value in the browser is not sufficient authorization.
+Authorization is Study-scoped and capability-based.
 
-## 9. Authorization versus known exposure
+The current allowed capabilities are:
 
-Current authorization and historical knowledge are different concepts.
+```text
+study.manage
+membership.manage
+capability.manage
+blinding.configure
+blinding.create
+analysis.lock
+unblinding.request
+unblinding.authorize
+unblinded.receive
+audit.view
+```
 
-Removing a user's permission to access unblinded information cannot make that person blinded again after the information has already been released to them.
+### 8.1 Initial Study creator
 
-blindstats should therefore distinguish:
+Creating a Study automatically:
 
-- **authorization:** what a member is currently permitted to do or receive; and
-- **known exposure:** what protected information blindstats has recorded as released to that member.
+- creates the creator's Study membership; and
+- grants the creator all ten capabilities.
 
-Known exposure should be monotonic for a given protected workflow event. Ordinary permission changes must not erase it.
+This makes a fresh Study usable by one authenticated person.
 
-This distinction also permits future support for partial or role-specific unblinding in which one member becomes unblinded while another remains intended to stay blinded.
+### 8.2 Blinding custodian bundle
 
-blindstats can record exposure that occurs through blindstats. It cannot certify that a person did not learn protected information elsewhere.
+The current separated two-party workflow uses a custodian side with:
+
+```text
+study.manage
+membership.manage
+capability.manage
+blinding.configure
+blinding.create
+unblinding.authorize
+audit.view
+```
+
+The custodian does not retain the analyst-side capabilities after the dedicated
+analyst role is assigned.
+
+### 8.3 Blinded analyst bundle
+
+The current analyst assignment grants exactly:
+
+```text
+analysis.lock
+unblinding.request
+unblinded.receive
+```
+
+The selected analyst must already have a blindstats account and must be a
+different authenticated user from the assigning custodian.
+
+Assigning the blinded analyst replaces that account's existing Study capabilities
+with the narrow analyst bundle.
+
+### 8.4 Independent authorizer helper
+
+A separate database helper can add an existing authenticated Study member/account
+with only:
+
+```text
+unblinding.authorize
+```
+
+The current primary UI flow instead emphasizes the simpler custodian/analyst
+split.
+
+### 8.5 Study-scoped limitation
+
+Capabilities currently apply to the entire Study, not to an individual workflow.
+
+That is acceptable while the product effectively supports one blinding workflow
+per Study.
+
+If multiple concurrent workflows become a real requirement, capability scope
+should be revisited rather than assumed to generalize automatically.
+
+## 9. Authorization versus exposure
+
+The product preserves the conceptual distinction:
+
+> **Request ≠ authorization ≠ exposure**
+
+Current persistent records directly represent:
+
+- request;
+- authorization; and
+- successful completion of the governed local unblinding workflow.
+
+The current implementation does **not** maintain a generalized exposure ledger
+for every person who may have learned protected information.
+
+The completion record identifies the authenticated user who completed unblinding.
+It cannot establish whether other people learned the mapping outside blindstats.
+
+A future exposure model should therefore be treated as an extension, not as a
+claim of the current system.
 
 ## 10. Workflow state machine
 
-The first blinding workflow should use a small explicit state machine.
-
-Core states:
+The implemented blinding workflow uses:
 
 ```text
 setup
@@ -429,420 +539,514 @@ unblinding_authorized
 unblinded
 ```
 
-`AnalysisLock` is treated as a durable artifact/event rather than a universal workflow state.
-
-This allows the plan to determine whether a qualifying lock is required and avoids making the workflow state model depend on the eventual number of analysis locks.
+`AnalysisLock` is a durable artifact/event, not a universal workflow state.
 
 ### 10.1 `setup`
 
 Meaning:
 
 - the workflow exists;
-- the plan is still being configured;
-- no active blinded transformation has yet been registered.
+- the plan may still be a draft, or Plan v1 may already be active;
+- no blinded transformation has yet been registered.
 
-Permitted actions may include:
+During setup:
 
-- configure plan;
-- assign relevant permissions;
-- prepare/generate a blinded package; and
-- cancel the workflow.
+- the plan can be edited before activation;
+- role separation can be configured when independent authorization requires it;
+- the active plan can be frozen; and
+- after plan activation the blinded package can be created locally.
 
-### 10.2 Transition: `setup → blinded`
+### 10.2 Plan activation while remaining in setup
 
-The transition should require:
+This is an explicit intermediate condition:
 
-- a sufficiently complete BlindingPlan;
-- required membership/capability assignments for the selected configuration;
-- successful creation/validation of a supported blinded package;
-- registration of the corresponding public receipt;
-- preservation of the active plan version; and
-- acknowledgment of required custody/warning messages.
+```text
+workflow.state = setup
+active_plan_version_id = Plan v1
+```
 
-The server should create a durable, server-timestamped activation/blinding event.
+The UI describes this as ready for blinding.
 
-### 10.3 `blinded`
+### 10.3 Transition: `setup → blinded`
+
+The transition occurs when a supported browser-local blinded package is
+successfully registered.
+
+Registration requires:
+
+- authentication;
+- `blinding.create`;
+- workflow state `setup`;
+- an active immutable plan version;
+- a valid schema-`0.3` public receipt;
+- supported transformation metadata; and
+- successful server-side verification of the submitted receipt.
+
+The registration:
+
+- stores the exact public receipt text;
+- computes/preserves its exact identity;
+- records safe transformation metadata;
+- binds the transformation to the active plan; and
+- atomically moves the workflow to `blinded`.
+
+### 10.4 `blinded`
 
 Meaning:
 
-- a valid blinding transformation is active;
-- the public receipt is registered;
-- blinded analysis may proceed;
-- no ordinary unblinding authorization has yet been granted.
+- a registered blinding transformation exists;
+- the exact public receipt is persistent;
+- the workflow is bound to the active Plan v1;
+- blinded analysis may proceed; and
+- unblinding has not yet been authorized.
 
-While `blinded`, users may, subject to permissions and the active plan:
+While blinded, authorized members may:
 
-- conduct analysis outside blindstats;
-- submit one or more analysis-lock records;
-- amend permitted governance settings prospectively;
-- request unblinding; and
-- close the workflow without unblinding.
+- register one or more AnalysisLocks;
+- submit one ordinary unblinding request; and
+- authorize that request when the active plan permits the actor to do so.
 
-### 10.4 AnalysisLock event
+### 10.5 AnalysisLock event
 
-An `AnalysisLock` records an exact locally supplied analysis artifact without requiring blindstats to persist the artifact contents.
+An AnalysisLock is created from a local analysis artifact.
 
-At minimum, it should preserve:
+The browser creates an analysis-lock receipt containing the linked public-receipt
+identity and analysis-artifact identity.
+
+Persistent registration stores:
 
 - lock identity;
-- Study/workflow identity;
-- associated blinding transformation;
-- exact public-receipt identity;
-- analysis artifact filename;
-- analysis artifact SHA-256;
-- analysis artifact byte length;
-- optional short description/declaration;
-- submitting user; and
-- server timestamp.
-
-A useful declaration may be:
-
-> I am registering this artifact as an analysis record intended to precede unblinding.
-
-blindstats should not attempt to determine whether the artifact is a complete or scientifically adequate analysis.
-
-If the active plan requires a qualifying lock, unblinding authorization is not permitted until the required lock condition is satisfied.
-
-### 10.5 Transition: `blinded → unblinding_authorized`
-
-This transition requires:
-
-- a valid active plan;
-- a user with the required authorization capability;
-- satisfaction of the plan's lock policy;
-- satisfaction of the plan's independent/self-authorization policy; and
-- any required warning acknowledgments.
-
-The authorization record should identify:
-
-- authorizing user;
+- workflow and Study identity;
+- linked transformation;
 - active plan version;
-- relevant analysis lock(s), if applicable;
-- workflow state at authorization;
-- authorization policy applied; and
-- trusted server timestamp.
+- exact lock receipt text;
+- exact lock-receipt SHA-256;
+- analysis filename;
+- analysis-artifact SHA-256;
+- byte length;
+- registering user; and
+- database registration time.
 
-Authorization should be a durable event even if actual unblinding follows immediately.
+The analysis artifact contents are not stored.
 
-### 10.6 `unblinding_authorized`
+Multiple AnalysisLocks may be registered for the same blinded workflow.
+
+### 10.6 Unblinding request
+
+A user with `unblinding.request` may create the workflow's ordinary unblinding
+request while state is `blinded`.
+
+The request is bound to:
+
+- the active Plan v1;
+- the registered transformation;
+- the requester; and
+- a selected AnalysisLock when supplied/required.
+
+One ordinary request is currently supported per workflow.
+
+Repeating the exact same request by the same user is treated idempotently.
+
+### 10.7 Transition: `blinded → unblinding_authorized`
+
+Authorization requires:
+
+- a valid request;
+- `unblinding.authorize`;
+- workflow state `blinded`;
+- binding to the active plan/transformation;
+- satisfaction of the plan's lock rule; and
+- satisfaction of the plan's independent/self-authorization rule.
+
+For independent authorization, `authorized_by` must differ from `requested_by`.
+
+Successful authorization:
+
+- creates a persistent authorization record; and
+- atomically moves the workflow to `unblinding_authorized`.
+
+It does **not** decrypt or release the mapping.
+
+### 10.8 `unblinding_authorized`
 
 Meaning:
 
-- ordinary release of the protected mapping has been approved under the active plan;
-- the mapping has not necessarily yet been successfully decrypted/released through blindstats.
+- release has been approved under the active governance rule;
+- the server still does not possess the plaintext secret or mapping; and
+- the analyst may complete the local unblinding operation after receiving the
+  secret externally.
 
-This state should remain distinguishable from `unblinded` because approval and actual information release are separate events.
+### 10.9 Transition: `unblinding_authorized → unblinded`
 
-### 10.7 Transition: `unblinding_authorized → unblinded`
-
-A permitted user supplies the export-only unblinding secret locally.
+A user with `unblinded.receive` selects the local secret.
 
 The browser:
 
-- validates the relevant workflow artifacts;
+- uses the exact registered public receipt;
+- uses the request-selected analysis-lock receipt;
 - authenticates/decrypts the sealed mapping;
-- displays the readable mapping to a permitted recipient; and
-- creates the final unblinding receipt.
+- displays/releases the mapping locally; and
+- generates the final unblinding receipt.
 
-The server should record successful completion without requiring storage of the plaintext mapping.
+The application then registers safe completion metadata.
 
-### 10.8 `unblinded`
+The server verifies the nonsecret governed relationships it can verify and
+atomically transitions the workflow to `unblinded`.
+
+Because the plaintext secret and mapping remain local, the server does **not**
+independently repeat the cryptographic decryption.
+
+### 10.10 `unblinded`
 
 Meaning:
 
-- blindstats has recorded successful authorized release of the mapping through the workflow.
+- blindstats has persistently recorded completion of the authorized local
+  unblinding workflow.
 
-The audit record should preserve the release event and known recipient exposure.
+The correct claim is narrow:
 
-The state does not imply that every study member has become unblinded.
+> blindstats recorded completion of the authorized local unblinding workflow and
+> linked it to the governed artifact chain.
+
+The state does not prove that no earlier or external exposure occurred.
 
 ## 11. Workflow closure without unblinding
 
-A workflow should not be forced to reveal its mapping merely because work has stopped.
-
-The design should permit terminal closure without unblinding.
-
-Conceptually useful outcomes include:
+The earlier design proposed terminal concepts such as:
 
 ```text
 cancelled
 closed_without_unblinding
 ```
 
-A workflow may be cancelled during setup.
+These workflow states are **not currently implemented**.
 
-A blinded workflow may be closed without release if the study is discontinued, analysis is abandoned, or the team otherwise elects not to unblind.
+A future release may add explicit closure without forcing mapping release.
 
-Closure should be explicit, server-timestamped, and auditable.
+Until then, the implemented workflow state machine remains limited to:
 
-The exact naming and implementation of terminal states may be finalized when the state model is implemented.
+```text
+setup
+blinded
+unblinding_authorized
+unblinded
+```
 
 ## 12. Study lifecycle
 
 Study lifecycle is separate from blinding-workflow state.
 
-Initial lifecycle concepts:
+The database currently permits:
 
 ```text
 active
 archived
 ```
 
-Archiving a Study should not be treated as equivalent to unblinding.
+The current UI creates active Studies and displays the lifecycle value.
 
-This separation also allows a future Study to contain multiple workflows with different histories.
+A complete archive/restore management workflow is not yet part of the first
+researcher-feedback UI.
 
-## 13. First-release artifact and persistence boundary
+Archiving a Study, when exposed later, must remain conceptually distinct from
+unblinding.
 
-Research artifacts have two conceptually distinct layers:
+## 13. Artifact and persistence boundary
 
-1. artifact identity/metadata; and
-2. artifact contents.
+The current architecture intentionally separates artifact identity/governance from
+substantive file contents.
 
-The first online release should primarily persist the first layer.
+### 13.1 Persisted information
 
-### 13.1 Server-persisted information
+Current persistent records include:
 
-The server may persist:
-
-- users/accounts;
-- teams and memberships;
-- Studies and Study membership;
-- capabilities/permissions;
-- BlindingPlan versions;
+- authenticated users/profiles;
+- Studies;
+- Study memberships;
+- Study capabilities;
+- BlindingPlan draft and immutable active version;
 - workflow state;
-- transformation identifiers;
-- exact public-receipt representation;
-- parsed public-receipt metadata for querying;
-- analysis-lock records/receipts;
-- artifact filenames, hashes, and byte lengths;
-- unblinding requests and authorizations;
-- final unblinding-event metadata;
-- final receipt hash/identity;
-- known-exposure records; and
-- append-only/durable audit events.
+- exact public blinding receipt;
+- parsed transformation metadata and hashes;
+- exact analysis-lock receipt;
+- analysis-artifact filename/hash/byte length;
+- unblinding request;
+- unblinding authorization;
+- safe unblinding-completion metadata; and
+- database registration timestamps.
 
-### 13.2 Browser-local/export-only information
+### 13.2 Information not persistently stored
 
-The first release should keep the following outside persistent server custody:
+The current server does not store:
 
 - source dataset contents;
 - blinded dataset contents;
-- analysis artifact contents;
-- unblinding secret/key material;
-- plaintext mapping; and
-- final unblinding receipt plaintext, unless protected server-side storage is deliberately added later.
+- analysis-artifact contents;
+- plaintext unblinding secret/key material;
+- plaintext released mapping; or
+- plaintext final unblinding receipt.
 
-### 13.3 Exact-byte identity-bearing artifacts
+### 13.3 Exact-byte identity-bearing JSON artifacts
 
-The existing protocol hashes exact artifact bytes.
+The public blinding receipt and analysis-lock receipt are persisted as exact text.
 
-If the server stores an identity-bearing JSON artifact such as the public blinding receipt, it must preserve the exact submitted UTF-8 representation used in the integrity chain.
+Their exact submitted representation matters because the integrity chain depends
+on exact bytes/UTF-8 text rather than normalized semantic JSON equivalence.
 
-Parsed or normalized JSON may also be stored for querying, but it must not replace the exact representation used to compute the artifact hash.
-
-Equivalent JSON that has been reformatted is not byte-identical.
+Reformatting otherwise equivalent JSON can therefore change its artifact
+identity.
 
 ## 14. Unblinding secret and mapping custody
 
-The unblinding secret is the clearest example of an export-only protected artifact in the first release.
+The unblinding secret remains an export-only protected artifact.
 
-The system should:
+Current behavior:
 
-- generate the secret locally;
-- require the user to export it;
-- clearly warn that loss may prevent ordinary unblinding;
-- record that the workflow reached the export/custody step;
-- identify the designated custodian; and
-- avoid storing the secret contents server-side.
+- secret generated in the browser;
+- custodian downloads/saves it;
+- server does not persist it;
+- custodian retains it outside blindstats;
+- after authorization, custodian transfers it externally to the analyst;
+- analyst selects it locally; and
+- local authenticated decryption releases the mapping.
 
-The plaintext mapping should also not be automatically persisted server-side in the first release.
+The plaintext mapping also remains outside server persistence.
 
-After authorized unblinding, the mapping is revealed locally and may be included in an exported unblinding receipt.
+This boundary limits the consequences of a compromise of persistent blindstats
+metadata, but it means external handoff security is outside the application's
+control.
 
-This is important because the mapping may itself contain sensitive or re-identifying information. A blinded variable could represent treatment, location, demographic categories, or another characteristic whose identity the research team intentionally protected.
-
-Not persisting the plaintext mapping reduces the protected information exposed by a compromise of the blindstats server.
+A possible future feature is an ephemeral in-app handoff layer. That idea is
+deferred until field testing establishes whether external transfer is a material
+usability barrier and what security model researchers would accept.
 
 ## 15. Final unblinding receipt
 
-The current browser-local protocol produces a final unblinding receipt containing the readable mapping.
+The browser creates the final unblinding receipt after successful local
+decryption.
 
-The server-backed workflow should preserve this functionality.
+The readable receipt contains the released mapping and is offered to the analyst
+for download.
 
-For the first release:
+The server stores only safe completion metadata, including the final receipt's
+SHA-256 identity, not the readable receipt itself.
 
-- the readable final receipt is generated locally;
-- the user may export/download it;
-- the server may record its SHA-256 and other non-plaintext identity metadata;
-- the server records the successful unblinding event and recipient exposure; and
-- the server need not retain the receipt's readable contents.
+The persistent completion record also contains identities linking the completion
+to:
 
-A later protected-artifact storage design may revisit this boundary.
+- the plan;
+- request;
+- authorization;
+- transformation;
+- AnalysisLock;
+- analysis artifact;
+- source/blinded artifacts; and
+- secret hash.
 
 ## 16. Audit model
 
-The first online release should create durable audit events for important workflow actions.
+The current application does not use a separate generic append-only audit-event
+table.
 
-Potential event types include:
+Instead, Audit history is assembled from durable workflow records:
 
-- Study created;
-- Study metadata changed;
-- membership added/removed;
-- capability granted/revoked;
-- blinding workflow created;
-- BlindingPlan created;
-- BlindingPlan activated;
-- BlindingPlan amended;
-- warning/deviation acknowledged;
-- blinding transformation registered;
-- public receipt registered;
-- unblinding secret generated/export step completed;
-- analysis lock submitted;
-- unblinding requested;
-- unblinding authorized;
-- successful unblinding;
-- protected information released to a recipient;
-- workflow cancelled;
-- workflow closed without unblinding; and
-- Study archived/restored.
+- active immutable plan version;
+- blinding transformation registration;
+- one or more analysis locks;
+- unblinding request;
+- authorization; and
+- unblinding completion.
 
-Each audit event should generally capture:
+The Audit history UI exposes technical identifiers, hashes, actor relationships,
+and timestamps without placing this dense detail in the primary live workflow.
 
-- event identity;
-- Study identity;
-- workflow identity where applicable;
-- actor;
-- server timestamp;
-- event type;
-- relevant plan version;
-- relevant artifact or authorization identifiers;
-- safe structured metadata; and
-- relationship to prior/superseded records where relevant.
+This design gives the first release an auditable chain while avoiding a second
+parallel event model before there is a demonstrated need for one.
 
-Audit records must be designed so they do not themselves leak the protected mapping, secret key, or sensitive research-file contents.
+A future generic audit-event layer may still be useful for broader RMS features,
+Study metadata changes, membership changes, archival actions, or administrative
+events.
 
 ## 17. Trusted chronology and claim boundaries
 
-The server-backed release may provide server-generated timestamps for persistent workflow actions.
+Browser-generated artifact timestamps remain part of the schema-`0.3` receipts and
+are not independently trusted chronology.
 
-This is stronger than the current browser-only timestamps because the chronology is no longer based solely on the user's local browser clock.
+Persistent records additionally receive database-generated timestamps such as:
 
-The system can establish facts such as:
+- plan `activated_at`;
+- transformation `registered_at`;
+- lock `registered_at`;
+- request `requested_at`;
+- authorization `authorized_at`; and
+- completion `registered_at`.
 
-- a particular receipt was registered with the server at a recorded time;
-- a particular artifact hash was declared locked at a recorded time;
-- a particular user authorized release at a recorded time; and
-- blindstats recorded successful mapping release at a recorded time.
+These timestamps support statements such as:
 
-The system cannot prove:
+- blindstats registered a particular public receipt at a recorded server time;
+- blindstats registered a particular lock identity at a recorded server time;
+- a particular authenticated actor requested/authorized at a recorded time; and
+- blindstats registered completion at a recorded time.
+
+The system does **not** prove:
 
 - that nobody learned protected information outside blindstats;
-- that a local secret was not copied;
-- that the locked artifact was the only analysis conducted;
-- that an external statistical program used only the documented blinded data;
-- that a user safely retained an exported secret; or
-- that a scientifically weak configuration was methodologically appropriate merely because it was documented.
+- that an exported secret was never copied;
+- that an external handoff was secure;
+- that the locked artifact was the only analysis performed;
+- that the blinded dataset was the only data used;
+- that a browser-generated artifact timestamp reflects trusted real-world
+  chronology; or
+- that a documented methodological choice was scientifically appropriate merely
+  because blindstats enforced it.
 
 The goal is auditable workflow evidence, not certification of researcher behavior.
 
 ## 18. User-interface principles
 
-The interface should make the stronger workflow easy to choose without overwhelming users with infrastructure details.
+The current workflow UI follows this operating principle:
 
-User-facing text should focus on:
+> **Show the current state. Show the current action. Show critical warnings.
+> Move completed, explanatory, and technical detail out of the live task.**
 
-- what the user needs to do;
-- what a setting changes;
-- what information is protected;
-- what is stored versus export-only;
-- genuine security/custody warnings; and
-- methodological consequences of weaker settings.
+The workflow uses separate destinations for:
 
-The UI should not repeatedly narrate internal architecture or design history.
+- Blinding plan;
+- Analysis roles, when independent role separation is relevant;
+- Blinded package;
+- Analysis lock;
+- Unblinding; and
+- Audit history.
 
-Recommended settings should be clearly marked.
+The main panel renders one concern at a time.
 
-Warnings should be concise and specific rather than alarmist.
-
-When a user chooses a weaker but permitted configuration, the application should allow the choice after appropriate acknowledgment and preserve that choice in the Study record.
+The application intentionally avoids turning the live workflow into a long
+methodology document. Deeper education belongs in project documentation,
+walkthroughs, and future help material.
 
 ## 19. Deferred capabilities
 
-The following are intentionally outside the first server-backed milestone unless implementation experience shows that one is necessary earlier:
+The following are intentionally outside the first researcher-feedback release:
 
-- multi-column blinding in the user interface;
+- multi-column blinding;
+- multiple protection targets;
 - alternative blinding transformations;
 - simultaneous multiple active blinding workflows per Study;
+- plan amendments / multiple active historical plan versions beyond v1;
+- generalized role/capability editor UI;
+- Teams / Organizations hierarchy;
+- generic protected-information exposure ledger;
+- workflow cancellation/closure states;
+- complete Study archive/restore UI;
 - server custody of source or blinded datasets;
 - server custody of substantive analysis files;
-- server storage of the unblinding secret;
-- server-controlled decryption/key release;
+- server storage of the plaintext unblinding secret;
 - server storage of plaintext mappings;
 - protected storage of final unblinding receipts;
-- emergency or partial unblinding workflows;
-- multi-party approval;
-- complex quorum rules;
-- detailed policy templates by study design;
+- in-app secret or blinded-dataset transfer;
+- emergency or partial unblinding;
+- multi-party/quorum authorization;
 - automated substantive evaluation of analysis artifacts;
 - randomization/allocation workflows;
 - data-collection tools;
 - preregistration/freeze workflows; and
-- broader study-management modules.
+- broader RMS modules.
 
 These are deferred rather than prohibited.
 
-## 20. Infrastructure decisions intentionally deferred
+## 20. Infrastructure status and deferred infrastructure
 
-The following should be selected only after the workflow requirements are stable enough to make the tradeoffs concrete:
+### 20.1 Selected infrastructure
 
-- PostgreSQL provider;
-- ORM/query layer;
-- authentication provider;
-- authorization implementation details;
-- deployment provider;
-- object storage;
-- protected-file encryption;
-- key-management/KMS provider;
-- backup/restore strategy;
-- retention/deletion implementation; and
-- incident-response operations.
+The current implementation uses:
 
-A relational database remains a strong fit for persistent metadata because the domain is primarily relationships among users, teams, Studies, memberships, capabilities, plans, transformations, artifacts, workflow events, and audit records.
+- Next.js;
+- React;
+- TypeScript;
+- Tailwind CSS;
+- Supabase PostgreSQL;
+- Supabase Auth;
+- Supabase Row Level Security and PostgreSQL functions/RPCs;
+- Papa Parse;
+- Web Crypto; and
+- Vitest/Testing Library.
 
-## 21. First-release success criteria
+No ORM is currently used.
 
-The first server-backed milestone should be considered successful if a research team can:
+### 20.2 Deliberately unselected or deferred infrastructure
+
+The following remain deferred until a concrete requirement justifies them:
+
+- general object storage for substantive research files;
+- ephemeral transfer infrastructure;
+- protected-file encryption architecture for in-app handoff;
+- KMS/key-management service;
+- generalized backup/restore policy beyond provider/project operations;
+- product-level retention/deletion policy;
+- deployment-provider-specific hardening; and
+- formal incident-response operations.
+
+The first deployment-hardening pass should review these boundaries without adding
+new infrastructure merely for architectural completeness.
+
+## 21. First-release success criteria: current status
+
+The original server-backed milestone can now be assessed against implementation.
+
+### Implemented
+
+A research team can currently:
 
 1. authenticate and create a Study;
-2. add study members and assign capabilities;
-3. create and activate a versioned BlindingPlan;
-4. create a supported blinded package locally;
-5. register the public receipt without uploading the substantive dataset;
-6. preserve the unblinding secret outside server custody;
-7. analyze using the blinded data outside blindstats;
-8. optionally or mandatorily submit a qualifying analysis lock according to the active plan;
-9. request and authorize unblinding under the plan's declared policy;
-10. locally decrypt and reveal the mapping after authorization;
-11. export the final unblinding receipt;
-12. retain persistent server-side records linking the plan, transformation, artifact identities, lock, authorization, release event, and server timestamps; and
-13. inspect an audit history that documents what blindstats knows occurred without exposing the secret or plaintext mapping.
+2. use Study membership and capabilities;
+3. create and activate immutable BlindingPlan v1;
+4. configure a narrow two-party custodian/analyst split;
+5. create a supported blinded package locally;
+6. register the exact public receipt without uploading the substantive dataset;
+7. preserve the unblinding secret outside server custody;
+8. analyze using the blinded dataset outside blindstats;
+9. register one or more exact analysis locks;
+10. request unblinding against the governed workflow;
+11. authorize under independent or self-authorization policy;
+12. locally authenticate/decrypt the mapping after authorization;
+13. export the final unblinding receipt;
+14. register safe completion metadata; and
+15. inspect the durable workflow Audit history.
 
-## 22. Working design summary
+### Remaining before the first researcher-feedback deployment
 
-The first server-backed blindstats release should strengthen the existing browser-local scientific protocol without unnecessarily expanding server custody.
+The major remaining work is not another broad workflow build.
 
-The core design is:
+It is:
 
-> **Study container + modular workflows + configurable BlindingPlan + local research files + export-only secret + persistent artifact identity + server-enforced declared rules + trusted workflow timestamps + durable audit history**
+1. refresh stale project documentation;
+2. resolve or explicitly constrain the no-analysis-lock completion mismatch;
+3. perform deployment hardening;
+4. configure and validate production authentication/redirect behavior;
+5. deploy the research-preview environment; and
+6. perform a focused production smoke test, including a meaningful two-account
+   independent workflow.
 
-The design intentionally distinguishes:
+## 22. Working architecture summary
+
+The implemented first-release architecture is:
+
+> **Study container + modular workflow shell + immutable Blinding plan + local
+> substantive files + export-only secret + persistent exact artifact identity +
+> capability-based authorization + database-enforced governance + server
+> registration timestamps + durable Audit history**
+
+The current design intentionally distinguishes:
 
 - Study lifecycle from workflow state;
-- authorization from known exposure;
-- methodological defaults from hard system invariants;
-- plan amendments from historical rewriting;
-- artifact identity from artifact contents; and
-- authorization to release from permission to receive protected information.
+- protection target from transformed dataset variable;
+- plan activation from creation of the blinded transformation;
+- request from authorization from actual local release;
+- authorization capability from unblinded-recipient capability;
+- exact artifact identity from artifact contents;
+- browser-generated artifact timestamps from database registration timestamps;
+  and
+- auditable workflow evidence from proof of researcher behavior.
 
-The resulting platform should make stronger analyst-blinding practice easier and more transparent while documenting weaker or alternative configurations accurately when researchers deliberately choose them.
+This architecture is now sufficiently complete for a first researcher-feedback
+release once documentation and deployment hardening are finished.
