@@ -1,0 +1,839 @@
+blindstats PROJECT HANDOFF
+============================
+Updated: 2026-10-05
+Handoff version: v27
+Purpose: checkpoint after completing the technical documentation refresh; next phase is deployment hardening
+
+PROJECT
+-------
+Repository:
+  C:\Users\Mackson Ncube\Documents\blindstats
+
+Stack:
+  Next.js 16.3.4
+  React 19.2.8
+  TypeScript
+  Tailwind CSS
+  Supabase PostgreSQL + Auth
+  @supabase/supabase-js ^2.116.0
+  @supabase/ssr ^0.12.7
+  Supabase CLI ^2.117.0
+  Papa Parse 5.7.0
+  Vitest 4.1.11
+  Testing Library / jsdom
+  Web Crypto
+  Node 24.x
+  no ORM
+
+Supabase project ref:
+  kfrfemqoalzxwzecyjjf
+
+Local environment:
+  .env.local exists and is ignored
+  NEXT_PUBLIC_SUPABASE_URL
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+
+HANDOFF FILE POLICY
+-------------------
+This handoff now lives inside the repository root as:
+
+  PROJECT_HANDOFF.txt
+
+Policy:
+  - track PROJECT_HANDOFF.txt in Git;
+  - do NOT add it to .gitignore;
+  - overwrite/update the same file at meaningful checkpoints rather than keeping
+    many dated handoff files in the repository;
+  - Git history preserves prior versions;
+  - source exports should therefore include the current handoff automatically.
+
+Unlike an R package, this Next.js/TypeScript application does not need an
+.Rbuildignore-style entry for a root .txt handoff file. TypeScript compilation
+targets TypeScript source files, and the handoff is not imported into the
+application or placed under public/.
+
+If a deployment provider later needs a source-upload ignore file (for example,
+a provider-specific build-context ignore), decide that during deployment
+hardening rather than adding one speculatively now.
+
+Latest source export supplied at this checkpoint:
+  mightymetrika-blindstats-8a5edab282632443(20261005-225815).txt
+
+The latest source export confirms:
+  - current README
+  - refreshed docs/study-workflow-v0.md
+  - current workflow UI
+  - no-lock unblinding completion support
+  - migrations through:
+      20261002223000_allow_unblinding_completion_without_lock.sql
+
+
+CURRENT GIT CHECKPOINT
+----------------------
+Latest committed and pushed milestone:
+
+  6cd8e7a  Support unblinding completion without analysis lock
+
+Push succeeded:
+  4943bc6..6cd8e7a  main -> main
+
+Final status shown by user:
+
+  On branch main
+  Your branch is up to date with 'origin/main'.
+  nothing to commit, working tree clean
+
+Recent milestone history:
+
+  6cd8e7a Support unblinding completion without analysis lock
+  4943bc6 Refresh Study workflow documentation
+  ba794c8 Refresh README for current blindstats workflow
+  8a02c22 Polish workflow and study navigation UI
+  62854c3 Add post-setup workflow navigation
+  4c22be7 Add conditional blinding setup navigation
+  b4b5c46 Make authorization policy guidance responsive
+  05de142 Enforce independent authorization at plan activation
+
+This is a clean checkpoint and a good place to resume.
+
+
+CURRENT PRODUCT / SCIENTIFIC MODEL
+----------------------------------
+Study is the durable research container.
+
+Blinding is the first research-specific workflow/module inside a Study.
+
+Long-term product direction:
+  Study = durable shell/container
+  research workflows = modular apps inside the Study
+  possible future direction = Research Management System (RMS)
+
+Do NOT build broad RMS infrastructure before researcher feedback.
+
+Persistent blinding workflow states:
+
+  setup
+    ↓
+  blinded
+    ↓
+  unblinding_authorized
+    ↓
+  unblinded
+
+AnalysisLock is a durable artifact/event, not a universal workflow state.
+Multiple locks are supported.
+
+IMPORTANT:
+An AnalysisLock is recommended and is the default governance setting, but it is
+not universally required. If the active immutable Plan explicitly sets:
+
+  require_analysis_lock = false
+
+the workflow can now proceed end-to-end without an AnalysisLock.
+
+Core governance distinction remains:
+
+  Request != Authorization != Exposure
+
+Browser-local artifact schema remains:
+  0.3
+
+
+TWO-PARTY ANALYST BLINDING MODEL
+--------------------------------
+Blinding custodian / project lead:
+  - has source/unblinded dataset
+  - configures and activates Blinding plan
+  - creates blinded package locally
+  - retains unblinding secret
+  - sends blinded dataset externally to analyst
+  - later authorizes independent unblinding request
+  - sends saved secret externally after authorization
+
+Blinded analyst:
+  - receives blinded dataset externally
+  - analyzes while blinded
+  - usually registers AnalysisLock when required by the Plan
+  - requests unblinding
+  - cannot authorize own independent request
+  - receives secret only after authorization
+  - locally verifies/decrypts mapping
+  - downloads final unblinding receipt
+  - registers safe completion metadata
+
+Current external handoffs are intentional.
+blindstats does NOT currently store/transfer:
+  - source dataset contents
+  - blinded dataset contents
+  - substantive analysis artifact contents
+  - plaintext unblinding secret
+  - plaintext mapping
+  - final unblinding receipt text
+
+Persistent server records contain:
+  - authenticated Study/membership/capability data
+  - immutable Plan version
+  - workflow state
+  - exact public receipt
+  - exact AnalysisLock receipt when one exists
+  - safe artifact hashes/metadata
+  - request / authorization / completion records
+  - database registration timestamps
+
+
+CURRENT CAPABILITY MODEL
+------------------------
+Study capabilities:
+
+  study.manage
+  membership.manage
+  capability.manage
+  blinding.configure
+  blinding.create
+  analysis.lock
+  unblinding.request
+  unblinding.authorize
+  unblinded.receive
+  audit.view
+
+Separated-role assignment:
+
+Custodian:
+  study.manage
+  membership.manage
+  capability.manage
+  blinding.configure
+  blinding.create
+  unblinding.authorize
+  audit.view
+
+Blinded analyst:
+  analysis.lock
+  unblinding.request
+  unblinded.receive
+
+Capabilities remain Study-scoped.
+This is accepted for the first feedback release while a Study effectively has one
+blinding workflow.
+
+
+LATEST FIX: OPTIONAL ANALYSIS LOCK NOW WORKS END TO END
+------------------------------------------------------
+Problem discovered during documentation refresh:
+
+  request_unblinding() already honored the active Plan's
+  require_analysis_lock setting.
+
+  authorize_unblinding() also honored that setting.
+
+BUT:
+
+  register_unblinding_completion() still unconditionally required an
+  AnalysisLock-bound request and AnalysisLock metadata.
+
+Therefore the old behavior was inconsistent:
+
+  require_analysis_lock = false
+
+could:
+  - request without a lock
+  - authorize without a lock
+
+but could NOT:
+  - persistently register completion without a lock
+
+This mismatch is now fixed.
+
+Commit:
+  6cd8e7a Support unblinding completion without analysis lock
+
+Migration:
+  supabase/migrations/
+  20261002223000_allow_unblinding_completion_without_lock.sql
+
+
+DATABASE FIX DETAILS
+--------------------
+The new migration:
+
+  1. makes AnalysisLock-specific columns nullable in
+     public.unblinding_completions:
+
+       analysis_lock_id
+       analysis_lock_receipt_sha256
+       analysis_artifact_filename
+       analysis_artifact_sha256
+       analysis_artifact_byte_length
+
+  2. adds a consistency constraint so those fields must be:
+
+       all NULL
+       OR
+       all populated
+
+  3. replaces register_unblinding_completion() so completion follows the
+     active immutable Plan and the actual request:
+
+       - if the request is bound to an AnalysisLock:
+           preserve the existing strong AnalysisLock chain validation
+
+       - if the request has no AnalysisLock:
+           allow completion only when the active Plan does not require one
+
+  4. continues to verify:
+       - workflow
+       - Study
+       - active Plan
+       - registered transformation
+       - request
+       - authorization
+       - transformation ID
+       - selected column
+       - source hash
+       - public receipt hash
+       - blinded artifact hash
+       - safe receipt fields
+
+  5. still does NOT receive/store:
+       - plaintext secret
+       - plaintext released mapping
+       - final unblinding receipt text
+
+  6. still atomically transitions:
+
+       unblinding_authorized -> unblinded
+
+IMPORTANT:
+The previous deployed migration was not edited.
+This was implemented as a NEW migration.
+
+
+BROWSER / ARTIFACT FIX DETAILS
+------------------------------
+The browser-local schema 0.3 unblinding receipt now supports a legitimate
+no-AnalysisLock path.
+
+When no lock is used:
+
+  lockId = null
+  analysisLockReceiptSha256 = null
+  analysisArtifact = null
+
+The receipt still includes:
+  - transformation ID
+  - selected column
+  - source artifact SHA-256
+  - public blinding receipt SHA-256
+  - blinded artifact SHA-256
+  - unblinding secret SHA-256
+  - released mapping
+
+The persistent UnblindingWorkspace now:
+  - uses the registered exact public receipt
+  - does not require an AnalysisLock receipt when the request intentionally has no lock
+  - still requires the locally supplied secret
+  - locally verifies/decrypts the mapping
+  - allows the final receipt to be downloaded
+  - registers only safe completion metadata
+
+Standalone file-mediated unblinding behavior remains strict and unchanged:
+  - public receipt
+  - secret
+  - AnalysisLock receipt
+are still required in standalone mode.
+
+
+SERVER ACTION / UI BEHAVIOR
+---------------------------
+The persistent completion server action now accepts AnalysisLock completion
+metadata as optional only for the governed no-lock path.
+
+The workflow page now reflects the Plan correctly:
+
+If require_analysis_lock = true:
+  Analysis lock is required before request.
+
+If require_analysis_lock = false:
+  - sidebar shows Analysis lock: Optional
+  - unblinding request selector permits:
+      No analysis lock
+  - explanatory text says:
+      An analysis lock is optional under this plan.
+  - request can be made without a lock
+  - authorization can proceed
+  - authorized-artifact view shows:
+      Analysis lock
+      Not used for this request
+  - completion can succeed without fabricated lock metadata
+
+
+AUTOMATED VALIDATION FOR LATEST FIX
+-----------------------------------
+Targeted core/component validation:
+
+  src/lib/blinding/unblinding.test.ts
+    7 tests passed
+
+  src/components/blinding/UnblindingWorkspace.test.tsx
+    8 tests passed
+
+New component coverage includes:
+  supports persistent authorized unblinding when the plan did not require an
+  analysis lock
+
+The no-lock test verifies:
+  - local lockBytes input is null
+  - completion registration omits:
+      lockId
+      analysisLockReceiptSha256
+      analysisArtifactFilename
+      analysisArtifactSha256
+      analysisArtifactByteLength
+
+Full suite:
+
+  Test Files 20 passed (20)
+  Tests      117 passed (117)
+
+Lint:
+
+  npm run lint
+  clean
+
+Build:
+
+  npm run build
+  clean
+
+Observed build result:
+  - compiled successfully
+  - TypeScript finished successfully
+  - page data collection succeeded
+  - static generation succeeded
+  - page optimization succeeded
+
+A temporary TypeScript nullability issue in the component test was fixed by
+explicitly narrowing the lock-required test path before decoding lockBytes.
+
+Known Vitest behavior remains:
+  occasional worker-start timeout under local resource contention.
+
+During this fix, one targeted run timed out before starting the component worker.
+The immediate rerun passed all 8 tests.
+Do not change Vitest configuration solely because of this isolated transient.
+
+
+SUPABASE DEPLOYMENT / VALIDATION
+--------------------------------
+Migration deployed:
+
+  20261002223000_allow_unblinding_completion_without_lock.sql
+
+Deployment command:
+  npx supabase db push
+
+Result:
+  migration applied successfully
+
+Migration list afterward showed local and remote aligned through:
+
+  20261002223000 | 20261002223000
+
+Database lint:
+
+  npx supabase db lint --linked --level warning
+
+Result:
+
+  No schema errors found
+
+This migration is now deployed immutable history.
+Future changes must use NEW migrations.
+
+
+MANUAL ACCEPTANCE: NO-LOCK PATH
+-------------------------------
+Manual browser acceptance completed successfully using a disposable Study:
+
+  Study:
+    Big Fix Test
+
+Plan configuration:
+  Analysis lock:
+    Not required
+
+  Authorization:
+    Self-authorization permitted
+
+Observed workflow:
+
+1. Plan activated.
+2. Blinded package created and registered.
+3. Analysis lock intentionally NOT created.
+4. Unblinding view showed:
+     Analysis lock for unblinding
+     No analysis lock
+     An analysis lock is optional under this plan.
+5. Request unblinding succeeded.
+6. UI showed:
+     Authorization required
+     This plan permits self-authorization.
+7. Self-authorization succeeded.
+8. Authorized-artifact view showed:
+     Analysis lock
+     Not used for this request
+9. User supplied the saved local unblinding secret.
+10. Browser-local verification/decryption succeeded.
+11. Final unblinding receipt generated with:
+      lockId = null
+      analysisLockReceiptSha256 = null
+      analysisArtifact = null
+12. Completion registration succeeded.
+13. Workflow state became:
+      Unblinded
+14. Unblinding view showed:
+      Complete
+      Authorized unblinding is complete.
+15. Audit history showed:
+      Request
+        Analysis lock: No analysis lock selected
+      Authorization
+        Policy: Self-authorization permitted
+      Completion
+        completed by user
+        unblinding ID
+        receipt SHA-256
+        secret SHA-256
+16. Audit history retained the expected custody statement:
+      The secret, plaintext mapping, and final receipt text were not uploaded.
+
+This is meaningful end-to-end acceptance of the exact path that was previously
+broken.
+
+
+CURRENT UI ARCHITECTURE
+-----------------------
+The structural redesign remains the accepted baseline.
+
+Primary product rule:
+
+  Show current state.
+  Show current action.
+  Show critical warnings.
+  Move completed, explanatory, and technical detail out of the live task.
+
+Setup navigation:
+  Blinding plan
+  Analysis roles        [conditional: Independent only]
+  Blinded package
+
+Post-setup navigation:
+  Blinding plan
+  Analysis roles        [when relevant]
+  Blinded package
+  Analysis lock
+  Unblinding
+  Audit history
+
+Stable view query parameters:
+  ?view=plan
+  ?view=roles
+  ?view=blinding
+  ?view=analysis
+  ?view=unblinding
+  ?view=history
+
+Do NOT regress to one long vertically stacked protocol-like page.
+
+
+DOCUMENTATION STATUS
+--------------------
+The documentation-refresh phase is now complete in the working tree.
+
+Already committed/pushed before this checkpoint:
+
+1. README.md
+   Commit:
+     ba794c8 Refresh README for current blindstats workflow
+
+2. docs/study-workflow-v0.md
+   Initial refresh:
+     4943bc6 Refresh Study workflow documentation
+
+   Updated again in:
+     6cd8e7a Support unblinding completion without analysis lock
+
+Current documentation refresh prepared and reviewed by the user:
+
+  docs/blinding-workspace-v0.md
+  docs/analysis-lock-v0.md
+  docs/unblinding-v0.md
+  docs/vision.md
+
+The refreshed technical documents now consistently distinguish:
+
+  browser-local substantive/artifact operations
+  from
+  persistent server-backed governance
+
+They also reflect:
+
+  - authenticated Studies and capabilities;
+  - immutable Blinding plan v1;
+  - exact public-receipt registration;
+  - durable AnalysisLock registration;
+  - request / authorization / exposure separation;
+  - optional AnalysisLock behavior when the Plan explicitly permits it;
+  - persistent safe completion metadata;
+  - database registration timestamps;
+  - current custody boundaries; and
+  - the Study-as-container / RMS direction.
+
+docs/literature-and-prior-art.md was intentionally left unchanged. It is primarily
+methodological/background documentation and did not require the same architecture
+rewrite.
+
+PROJECT_HANDOFF.txt is now intended to be committed with this documentation
+checkpoint and maintained at the repository root for future session continuity.
+
+
+CURRENT RELEASE PHASE
+---------------------
+Core blinding product:
+  substantially feature-complete for first researcher-feedback release
+
+Documentation-refresh phase:
+  complete once the current four Markdown changes + PROJECT_HANDOFF.txt are
+  committed/pushed
+
+Research-preview release:
+  close
+
+Remaining work before deployment:
+  - deployment hardening
+  - production deployment
+  - focused production smoke test
+  - lightweight researcher-facing walkthrough/education
+  - field feedback collection
+
+Do NOT broaden the feature set before field feedback unless a concrete release
+blocker appears.
+
+
+RECOMMENDED NEXT MAJOR TASK
+---------------------------
+Next major phase:
+
+  deployment hardening for the researcher-feedback / research-preview release
+
+Do not begin another broad feature or architecture expansion first.
+
+
+DEPLOYMENT HARDENING CHECKLIST
+------------------------------
+After remaining docs, review:
+
+  - production environment variable handling
+  - Supabase auth redirect / confirmation URLs
+  - deployment target configuration
+  - server/client Supabase configuration
+  - migration state
+  - RLS / RPC assumptions
+  - public error behavior
+  - accidental logging/exposure of secrets
+  - security headers / framework defaults where relevant
+  - localhost/test/demo language visible to users
+  - concise privacy/security boundary language
+  - production build
+  - post-deploy smoke test
+
+The release should be described as:
+  researcher-feedback / research-preview
+
+NOT:
+  production-hardened infrastructure for sensitive, regulated, confidential, or
+  client research data.
+
+
+RESEARCHER-FEEDBACK RELEASE PURPOSE
+-----------------------------------
+Primary goal:
+  learn whether researchers can understand and use the workflow.
+
+Questions to learn:
+  - Is the workflow intuitive?
+  - Does role separation match actual practice?
+  - Does the optional AnalysisLock policy make sense?
+  - Which warnings are useful versus distracting?
+  - What blocks adoption?
+  - Is external transfer of the blinded dataset awkward?
+  - Is external transfer of the unblinding secret awkward?
+  - Would temporary in-app handoff improve usability?
+  - What other research workflows should exist in a Study?
+  - What would make blindstats useful as a broader RMS?
+
+
+EPHEMERAL IN-APP HANDOFF IDEA: DEFER
+------------------------------------
+Potential post-feedback feature:
+
+  ephemeral in-app handoff layer
+
+Possible objects:
+  - blinded dataset
+  - post-authorization unblinding secret
+
+Potential behavior:
+  - intended authenticated recipient only
+  - short expiration
+  - delete after successful claim/download
+  - expiration cleanup backstop
+  - retain safe audit metadata only
+
+Likely infrastructure if later pursued:
+  existing Supabase private Storage rather than adding MongoDB solely for this
+
+Stronger future variant:
+  browser encrypts for recipient
+  temporary storage holds ciphertext only
+
+Do NOT build before the first feedback release unless researcher evidence strongly
+supports it.
+
+
+DEFERRED / DO NOT BUILD YET
+---------------------------
+Do not divert into:
+
+  - Teams / Organizations hierarchy
+  - multiple blinded variables
+  - multiple protection targets
+  - simultaneous multiple active blinding workflows per Study
+  - broad enterprise/general role editor
+  - billing
+  - general server-side research-file storage
+  - automatic long-term server custody of research data
+  - server storage of plaintext mapping
+  - in-app plaintext secret storage
+  - encrypted in-app secret transport
+  - secure project-folder / file-transfer module
+  - generic exposure ledger
+  - plan amendment/version UI beyond v1
+  - randomization/allocation module
+  - preregistration module
+  - generic RMS infrastructure without user evidence
+
+These may be useful later but should be driven by researcher feedback or a specific
+architecture need.
+
+
+TESTING PHILOSOPHY
+------------------
+Use:
+  - deterministic unit/component tests
+  - npm test
+  - npm run lint
+  - npm run build
+  - Supabase migration list / DB lint for database work
+  - targeted browser checks
+
+Reserve full two-account E2E workflow for:
+  - meaningful governance changes
+  - deployment/release milestones
+
+Do not rerun it for wording-only or tiny isolated changes.
+
+Known Vitest behavior:
+  occasional worker-start timeout.
+  Immediate reruns have passed.
+  Do not reconfigure solely because of an isolated timeout.
+
+
+WORKING STYLE / DELIVERY PREFERENCES
+------------------------------------
+Windows PowerShell.
+
+Preferred code delivery:
+  downloadable ZIP bundles
+  exact PowerShell commands
+  path-preserving extraction with:
+    Expand-Archive -DestinationPath . -Force
+
+Prefer:
+  incremental visible slices
+  one checkpoint at a time
+  browser acceptance before commit
+  clean Git history
+  minimal dependencies
+  scientifically explicit rationale
+  short targeted manual tests
+
+Avoid:
+  asking user to open VS Code unless genuinely necessary
+  broad speculative infrastructure
+  mock-heavy tests merely to increase test count
+  full E2E manual reruns for tiny changes
+  long-page UI patterns mixing live tasks, audit history, and education
+
+
+RECOMMENDED NEXT SESSION START
+------------------------------
+Run:
+
+  cd "C:\Users\Mackson Ncube\Documents\blindstats"
+  git status
+  git log --oneline --decorate -8
+
+At the moment this handoff was prepared, the latest previously pushed commit was:
+
+  6cd8e7a Support unblinding completion without analysis lock
+
+The working tree was expected to contain:
+
+  modified:
+    docs/blinding-workspace-v0.md
+    docs/analysis-lock-v0.md
+    docs/unblinding-v0.md
+    docs/vision.md
+
+  new:
+    PROJECT_HANDOFF.txt
+
+Those files should be committed together as the documentation/handoff checkpoint.
+After that commit, actual git log/status are authoritative.
+
+Latest deployed migration:
+  20261002223000_allow_unblinding_completion_without_lock.sql
+
+Latest source export used for the refresh:
+  mightymetrika-blindstats-8a5edab282632443(20261005-225815).txt
+
+Then begin:
+  deployment hardening
+
+
+END OF HANDOFF
+--------------
+Latest previously pushed checkpoint before the current documentation commit:
+
+  6cd8e7a Support unblinding completion without analysis lock
+
+Current working milestone:
+  remaining technical documentation refreshed and reviewed
+  PROJECT_HANDOFF.txt moved into the repository as the tracked continuity file
+
+Current validated product baseline:
+  migration deployed and DB lint clean
+  full automated suite 117/117
+  lint clean
+  production build clean
+  optional AnalysisLock path works end-to-end
+  persistent completion works with or without AnalysisLock according to Plan v1
+  manual no-lock acceptance completed successfully
+
+Immediate next task after committing this documentation/handoff checkpoint:
+  deployment hardening
+
+Then:
+  deploy research-preview -> production smoke test -> researcher walkthrough ->
+  field feedback.

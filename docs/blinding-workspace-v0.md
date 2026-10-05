@@ -1,29 +1,58 @@
 # Blinding Workspace v0
 
-**Status:** Implemented browser-local prototype
-**Project:** blindstats
-**Artifact schema:** `0.3`
-**Updated:** 2026-09-08
+- **Project:** blindstats
+- **Status:** implemented browser-local artifact operation with persistent registration; pre-release
+- **Artifact schema:** `0.3`
+- **Updated:** 2026-10-05
 
 ## 1. Purpose
 
-Blinding Workspace v0 implements the first stage of the blindstats workflow:
+Blinding Workspace v0 implements the transformation stage of the current
+server-backed blinding workflow.
 
-> **Analyst blinding → locked analysis → documented unblinding**
+Its browser-local job remains intentionally narrow:
 
-Its job is intentionally narrow:
+> **Original CSV → blinded CSV + public blinding receipt + unblinding secret**
 
-> **Original CSV → blinded CSV + public receipt + unblinding secret**
+That local artifact operation now runs inside a persistent Study and Blinding
+workflow with an active immutable Blinding plan, Study-scoped capabilities,
+server-backed workflow state, and durable transformation registration.
 
-The workspace demonstrates the transformation and artifact model before
-server-enforced roles, accounts, persistent study records, or research-file
-storage are introduced.
+The current architecture deliberately separates:
 
-## 2. Current scope
+- **substantive file processing**, which remains in the browser; from
+- **governance and artifact identity**, which are persisted by blindstats.
 
-The workspace can:
+See also:
 
-1. read a CSV locally in the browser;
+- [`study-workflow-v0.md`](study-workflow-v0.md)
+- [`analysis-lock-v0.md`](analysis-lock-v0.md)
+- [`unblinding-v0.md`](unblinding-v0.md)
+
+## 2. Current governed workflow
+
+The current persistent path is:
+
+1. an authenticated user creates or opens a Study;
+2. the Blinding workflow is configured;
+3. Blinding plan v1 is activated and becomes immutable;
+4. a Study member with `blinding.create` selects a local CSV;
+5. one categorical column is selected for transformation;
+6. the browser creates the blinded CSV, public receipt, and unblinding secret;
+7. the user saves the generated artifacts locally and confirms custody of the
+   unblinding secret;
+8. blindstats registers the exact public receipt and safe transformation metadata;
+   and
+9. successful registration moves the workflow from `setup` to `blinded`.
+
+The source dataset, generated blinded dataset, plaintext mapping, and plaintext
+unblinding secret are not uploaded as part of this process.
+
+## 3. Current scope
+
+The browser-local transformation can:
+
+1. read a CSV locally;
 2. allow one categorical column to be selected;
 3. generate a randomized one-to-one mapping from observed categories to neutral
    labels;
@@ -32,18 +61,19 @@ The workspace can:
 6. encrypt the mapping;
 7. create a public blinding receipt containing the sealed mapping;
 8. create a separate unblinding secret containing the decryption key; and
-9. download the three generated artifacts locally.
+9. offer the generated artifacts for local download.
 
-Current v0 scope is limited to UTF-8, comma-delimited CSV files and one selected
-categorical variable per blinding operation.
+Current schema-`0.3` scope is limited to UTF-8, comma-delimited CSV files and one
+selected categorical variable per blinding transformation.
 
-## 3. Security boundary
+Multiple transformed variables and alternative blinding mechanisms remain
+deferred.
 
-### 3.1 Browser-local processing
+## 4. Security and custody boundary
 
-The current workflow processes the source CSV and generated cryptographic
-material in the browser. It does not implement server-side research-file upload
-or persistence.
+### 4.1 Browser-local substantive processing
+
+The source CSV and generated cryptographic material are processed in the browser.
 
 Conceptually:
 
@@ -59,43 +89,58 @@ User's browser
     |-- encrypts mapping
     |-- creates public receipt
     |-- creates unblinding secret
-    `-- downloads artifacts
+    `-- downloads local artifacts
 ```
 
-### 3.2 No role enforcement
+blindstats does not persist the source CSV or blinded CSV contents.
 
-Browser-local processing is not a multi-user authorization boundary.
+### 4.2 Persistent governance is separate from file custody
 
-The person creating the blinded package has access to the original data and to
-the generated unblinding secret. The intended file-mediated role pattern is:
+The current application does provide server-backed authorization and workflow
+state.
 
-```text
-Study owner
-    |
-    |-- retains unblinding secret
-    |
-    `-- gives analyst:
-          blinded CSV
-          public blinding receipt
-```
+Blinded-package registration requires:
 
-The current software supports that separation but does not enforce it.
+- authentication;
+- `blinding.create`;
+- workflow state `setup`;
+- an active immutable Blinding plan version; and
+- a valid supported schema-`0.3` public receipt.
 
-### 3.3 Current privacy limitation
+The database registration function validates the submitted receipt, computes the
+SHA-256 of the exact UTF-8 receipt text on the server, binds the transformation to
+the active plan, and atomically moves the workflow to `blinded`.
 
-The current prototype should not be treated as a storage, transfer, or
-authorization system for sensitive, regulated, confidential, or client research
-data.
+### 4.3 Custodian / analyst separation
 
-Open-source code improves inspectability; it does not by itself establish the
-privacy, governance, retention, authorization, monitoring, or operational
-controls required for those uses.
+The person creating the blinded package necessarily has access to the source data,
+the plaintext category identities, and the generated unblinding secret.
 
-## 4. Input contract
+In the separated two-party workflow, that person acts as the blinding custodian
+or project lead.
 
-### 4.1 Supported file
+The blinded analyst receives the blinded dataset outside blindstats.
 
-v0 accepts one `.csv` file encoded as UTF-8 and parsed as comma-delimited data.
+The public blinding receipt itself does not need to be separately transferred to
+the analyst in the persistent workflow because blindstats stores the exact
+registered receipt and can supply it to later governed steps.
+
+The plaintext unblinding secret remains outside blindstats custody.
+
+### 4.4 Release status
+
+The current application is being prepared for a researcher-feedback /
+research-preview release.
+
+It should not yet be represented as production-hardened infrastructure for
+sensitive, confidential, regulated, or client research data.
+
+## 5. Input contract
+
+### 5.1 Supported file
+
+Schema `0.3` accepts one `.csv` file encoded as UTF-8 and parsed as
+comma-delimited data.
 
 The source CSV must contain:
 
@@ -103,15 +148,17 @@ The source CSV must contain:
 - at least one data row; and
 - at least one column.
 
-### 4.2 Selected variable
+### 5.2 Selected variable
 
 The user selects exactly one column.
 
 The selected column must contain at least two distinct nonmissing serialized
-values. v0 treats those observed values as categories; it does not attempt broader
-statistical type inference.
+values.
 
-### 4.3 Missing values
+The current implementation treats those observed values as categories; it does
+not attempt broader statistical type inference.
+
+### 5.3 Missing values
 
 For the selected column:
 
@@ -123,11 +170,11 @@ For the selected column:
 Strings such as `NA`, `N/A`, `.`, or `missing` are not automatically reinterpreted
 as missing merely because of their text.
 
-## 5. Blinding transformation
+## 6. Blinding transformation
 
 Each distinct nonmissing category receives exactly one neutral label.
 
-The initial neutral-label scheme is:
+The current neutral-label scheme is:
 
 ```text
 Group_A
@@ -139,10 +186,11 @@ Group_C
 The mapping is bijective over the observed nonmissing categories.
 
 Random assignment uses cryptographically secure browser randomness. The
-implementation must not silently fall back to `Math.random()`.
+implementation does not silently fall back to `Math.random()`.
 
-Blinding changes only the selected column's nonmissing category values. It
-preserves:
+Blinding changes only the selected column's nonmissing category values.
+
+It preserves:
 
 - row count;
 - column count;
@@ -151,12 +199,12 @@ preserves:
 - the selected column name; and
 - all unselected cell values.
 
-Because the selected column name is preserved, v0 blinds category values rather
-than all potentially meaningful semantics in a dataset.
+Because the selected column name is preserved, schema `0.3` blinds category
+values rather than all potentially meaningful semantics in a dataset.
 
-## 6. Output artifacts
+## 7. Output artifacts
 
-### 6.1 Blinded CSV
+### 7.1 Blinded CSV
 
 Suggested filename:
 
@@ -164,10 +212,10 @@ Suggested filename:
 <source-base-name>_blinded.csv
 ```
 
-The SHA-256 stored for this artifact is computed from the exact serialized bytes
-offered for download.
+The SHA-256 recorded for the blinded artifact is computed from the exact
+serialized bytes offered for download.
 
-### 6.2 Public blinding receipt
+### 7.2 Public blinding receipt
 
 Suggested filename:
 
@@ -175,9 +223,7 @@ Suggested filename:
 blinding-receipt.json
 ```
 
-The public receipt is designed to accompany the blinded-analysis materials.
-
-Its schema-`0.3` structure is conceptually:
+The schema-`0.3` structure is conceptually:
 
 ```json
 {
@@ -211,14 +257,16 @@ Its schema-`0.3` structure is conceptually:
 }
 ```
 
-The receipt contains the encrypted mapping, not the readable mapping.
+The public receipt contains the encrypted mapping, not the readable mapping or
+unblinding key.
 
-It does expose workflow metadata such as the selected column name, category count,
-dataset dimensions, artifact hashes, and encrypted-payload length. Researchers
-should decide whether those metadata are appropriate for the intended blinding
-design.
+It does expose metadata including the selected column name, category count,
+dataset dimensions, artifact hashes, and encrypted payload.
 
-### 6.3 Unblinding secret
+Researchers should consider whether those metadata are appropriate for the
+intended blinding design.
+
+### 7.3 Unblinding secret
 
 Suggested filename:
 
@@ -240,16 +288,19 @@ Conceptually:
 }
 ```
 
-The secret contains the cryptographic key used for later authenticated decryption.
+The secret contains the cryptographic key required for later authenticated
+decryption.
 
-It should be retained separately from the blinded analyst until unblinding is
-authorized.
+It should remain separate from the blinded analyst until the governed unblinding
+process permits release.
 
-## 7. Sealed-mapping cryptography
+blindstats does not persist the plaintext secret.
+
+## 8. Sealed-mapping cryptography
 
 The mapping is encrypted with AES-GCM using Web Crypto.
 
-For each blinding operation, blindstats generates:
+For each blinding transformation, blindstats generates:
 
 - a fresh random 256-bit AES key; and
 - a fresh random 96-bit IV.
@@ -257,7 +308,8 @@ For each blinding operation, blindstats generates:
 AES-GCM uses a 128-bit authentication tag.
 
 The encrypted plaintext contains the complete original-to-neutral mapping.
-Additional authenticated data binds the sealed mapping to important workflow
+
+Additional authenticated data binds the sealed mapping to important transformation
 metadata, including:
 
 - schema version;
@@ -270,38 +322,84 @@ metadata, including:
 - neutral-label scheme; and
 - mapping-assignment method.
 
-Changing the secret, ciphertext, IV, or bound metadata should cause authenticated
+Changing the secret, ciphertext, IV, or bound metadata causes authenticated
 decryption to fail.
 
 The cryptographic design protects the mapping while the secret remains separate.
-It does not enforce when a person releases or uses that secret.
+It does not by itself control whether a person copies or releases the secret
+outside blindstats.
 
-## 8. Artifact identity
+## 9. Artifact identity and persistent registration
 
-### 8.1 Source hash
+### 9.1 Source hash
 
-The source SHA-256 is computed from the exact uploaded file bytes, not from a
+The source SHA-256 is computed from the exact local file bytes, not from a
 parsed-and-reserialized approximation.
 
-### 8.2 Blinded hash
+### 9.2 Blinded hash
 
-The blinded SHA-256 is computed from the exact bytes offered for download.
+The blinded SHA-256 is computed from the exact generated bytes offered for
+download.
 
-### 8.3 Transformation identifier
+### 9.3 Transformation identifier
 
-Each blinding operation receives a fresh UUID. The same transformation ID appears
-in the public receipt and unblinding secret.
+Each blinding operation receives a fresh UUID.
 
-## 9. Timestamp interpretation
+The same transformation ID appears in the public receipt and unblinding secret.
 
-`createdAt` is a browser-generated canonical ISO-8601 timestamp.
+### 9.4 Exact public-receipt identity
 
-It documents the local workflow event but is not an independently trusted
-timestamp and should not be described as cryptographic proof of chronology.
+The persistent registration stores the exact public receipt text.
 
-## 10. Validation and failure behavior
+The database computes the SHA-256 of that exact UTF-8 text rather than trusting a
+caller-supplied digest.
 
-The operation should fail explicitly for unsupported or malformed inputs,
+This preserves the exact artifact identity used by later AnalysisLock and
+unblinding steps.
+
+Reformatting otherwise equivalent JSON may therefore create a different
+exact-byte receipt identity.
+
+### 9.5 Persisted transformation metadata
+
+The persistent transformation record includes safe values such as:
+
+- Study and workflow identity;
+- active plan version;
+- transformation ID;
+- schema version;
+- browser receipt timestamp;
+- selected column;
+- category, row, and column counts;
+- source and blinded SHA-256 values;
+- exact public-receipt SHA-256;
+- exact public receipt text;
+- registering user; and
+- database registration time.
+
+The source/blinded file contents, plaintext mapping, and plaintext secret are not
+stored.
+
+## 10. Timestamp interpretation
+
+The receipt's `createdAt` is browser-generated.
+
+It documents the local artifact creation event but is not independently trusted
+chronology.
+
+Persistent registration additionally receives a database-generated
+`registered_at` timestamp.
+
+The server timestamp supports a narrower claim:
+
+> blindstats registered this exact public receipt at this server-recorded time.
+
+It does not prove when the source data were originally created or when the user
+first generated equivalent artifacts outside blindstats.
+
+## 11. Validation and failure behavior
+
+The local operation fails explicitly for unsupported or malformed inputs,
 including:
 
 - invalid or empty CSV;
@@ -314,33 +412,47 @@ including:
 - encryption failure; or
 - artifact serialization failure.
 
-Integrity-critical operations must fail closed rather than silently degrade to a
-weaker method.
+Persistent registration independently validates the supported public-receipt
+structure and governed workflow conditions.
 
-## 11. Testing expectations
+Integrity-critical operations fail rather than silently degrading to a weaker
+relationship.
 
-Core automated tests cover:
+## 12. What this stage establishes
 
-- CSV parsing and serialization;
-- neutral-label generation;
-- randomized bijective mappings;
-- transformation preservation rules;
-- SHA-256 hashing;
-- sealed-mapping encryption/decryption;
-- authenticated-decryption failures;
-- public-receipt structure;
-- unblinding-secret structure; and
-- package generation.
+When completed through the persistent workflow, blindstats establishes that:
 
-React component tests focus on stable workflow invariants rather than visual
-snapshots or exact explanatory wording.
+- a supported public receipt was registered under the active immutable Plan;
+- the registered receipt identifies exact source and blinded artifacts by SHA-256;
+- the exact public receipt representation is preserved;
+- the authenticated actor held `blinding.create`; and
+- the workflow was transitioned from `setup` to `blinded`.
 
-## 12. Current completion state
+It does not prove:
 
-As of 2026-09-08, the Blinding Workspace is connected to the complete
-browser-local blind-lock-unblind workflow and has passed automated tests, lint,
-production TypeScript/build validation, and manual browser acceptance.
+- that the blinded dataset was transferred securely outside blindstats;
+- that the analyst only used that dataset;
+- that protected information was never learned through another route;
+- that the selected column conceals every result-relevant feature; or
+- that the custodian retained the secret securely.
 
-The next architectural step is not another local blinding feature. It is to place
-this proven artifact protocol inside a stronger study, role, authorization,
-storage, and audit architecture when those requirements are ready to be designed.
+The goal is an auditable artifact and governance chain, not certification of
+researcher behavior.
+
+## 13. Current completion state
+
+As of 2026-10-05, the browser-local Blinding Workspace is integrated into the
+persistent Study workflow.
+
+The current implementation has been exercised through the complete governed
+workflow and the repository validation baseline is:
+
+```text
+Test files: 20 passed
+Tests:      117 passed
+Lint:       clean
+Build:      clean
+```
+
+The next release work is documentation and deployment hardening rather than
+another broad blinding-transformation feature.

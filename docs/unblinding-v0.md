@@ -1,103 +1,175 @@
 # Documented Unblinding v0
 
-**Status:** Implemented browser-local prototype
-**Project:** blindstats
-**Artifact schema:** `0.3`
-**Updated:** 2026-09-08
+- **Project:** blindstats
+- **Status:** implemented browser-local release with persistent authorization and completion registration; pre-release
+- **Artifact schema:** `0.3`
+- **Updated:** 2026-10-05
 
 ## 1. Purpose
 
-Documented Unblinding v0 completes the browser-local scientific workflow:
+Documented Unblinding v0 performs the local release stage of the blindstats
+artifact protocol.
 
-> **Blind → analyze while blinded → lock an exact analysis artifact → unblind → document**
+In the current persistent workflow, unblinding is governed by a deliberate
+separation:
 
-The unblinding stage verifies the linked public receipt and analysis-lock receipt,
-uses the released cryptographic secret to authenticate and decrypt the sealed
-mapping, and creates the first workflow receipt that records the readable mapping.
+> **Request ≠ authorization ≠ exposure**
 
-## 2. Required inputs
+A request records intent to unblind.
 
-The unblinding operation requires exactly three JSON artifacts:
+Authorization records that the governed release is permitted.
+
+Only after authorization does the user locally supply the unblinding secret and
+release the protected mapping.
+
+The browser creates the final unblinding receipt.
+
+blindstats then persists safe completion metadata and moves the workflow to
+`unblinded`.
+
+## 2. Two operating modes
+
+### 2.1 Persistent governed mode
+
+In the current Study workflow, the unblinding operation receives from persistent
+state:
+
+- the exact registered public blinding receipt;
+- the authorized request;
+- the exact request-selected AnalysisLock receipt when a lock was used; and
+- the active governed artifact relationships.
+
+The user supplies locally:
+
+- the unblinding secret.
+
+The plaintext secret and released mapping stay in the browser.
+
+### 2.2 Standalone file-mediated mode
+
+Standalone Documented Unblinding preserves the original schema-`0.3` file
+protocol.
+
+It requires exactly three JSON artifacts:
 
 1. the exact public blinding receipt;
 2. the unblinding secret; and
 3. the analysis-lock receipt.
 
-No source dataset, blinded dataset, or analysis artifact is required by the
-unblinding operation itself.
+The standalone mode does not infer a governed Plan or authorization record from
+persistent application state.
 
-Those substantive artifacts were identified earlier in the workflow and their
-identities are carried forward through hashes and receipts.
+## 3. Authorization before local release
 
-## 3. Artifact-chain validation
+In the persistent workflow, mapping release is available only after a durable
+unblinding authorization exists and the workflow is
+`unblinding_authorized`.
 
-Before releasing the mapping, blindstats verifies the following relationships.
+Authorization is governed by the active immutable Blinding plan.
 
-### 3.1 Public receipt
+Current policies are:
 
-The public receipt must be a valid supported schema-`0.3` blinding receipt,
-including valid transformation metadata, source/blinded hashes, sealed-mapping
-parameters, and blinding-algorithm metadata.
+- `independent`; or
+- `self_authorization`.
 
-### 3.2 Unblinding secret
+Under independent authorization, the requester and authorizer must be different
+authenticated Study members with the relevant capabilities.
+
+Under self-authorization, the same actor may request and authorize only when the
+Plan permits it and the user has the necessary capabilities.
+
+A successful authorization does not decrypt or expose the mapping.
+
+The unblinding secret remains outside server custody and is transferred to the
+recipient outside blindstats in the current first-release workflow.
+
+## 4. Artifact-chain validation
+
+Before releasing the mapping, the browser validates the relevant schema-`0.3`
+artifact relationships.
+
+### 4.1 Public receipt
+
+The public receipt must contain valid supported transformation metadata,
+source/blinded hashes, sealed-mapping parameters, and algorithm metadata.
+
+In persistent mode, blindstats supplies the exact public receipt already
+registered for the governed transformation.
+
+### 4.2 Unblinding secret
 
 The unblinding secret must:
 
 - use schema `0.3`;
 - identify itself as `unblinding_secret`;
 - use AES-GCM with a 256-bit key;
-- contain a valid hexadecimal key; and
+- contain valid key material; and
 - carry the same transformation ID as the public receipt.
 
-### 3.3 Analysis lock
+The secret is supplied locally by the user.
 
-The analysis-lock receipt must:
+### 4.3 AnalysisLock when present
+
+When the authorized request is bound to an AnalysisLock, the exact registered
+lock receipt must:
 
 - refer to the same transformation ID as the public receipt;
-- carry the same blinded-artifact SHA-256 as the public receipt; and
-- contain the SHA-256 of the exact public-receipt bytes supplied at lock time.
+- carry the same blinded-artifact SHA-256;
+- contain the SHA-256 of the exact public-receipt bytes used at lock time; and
+- identify the analysis artifact that was locked.
 
-At unblinding, blindstats hashes the exact public-receipt bytes again and requires
-that hash to equal the value recorded in the analysis-lock receipt.
+The browser hashes the exact public receipt again and verifies the relationship.
 
-### 3.4 Authenticated mapping decryption
+### 4.4 No-lock governed path
+
+When the active immutable Plan explicitly permits
+`require_analysis_lock = false`, a request may intentionally be authorized with no
+AnalysisLock.
+
+In that governed path:
+
+- no lock receipt is supplied to the local unblinding operation;
+- no lock relationship is invented;
+- the final receipt records `lockId: null`;
+- `analysisLockReceiptSha256` is `null`; and
+- `analysisArtifact` is `null`.
+
+The public receipt, local secret, transformation, authorization, and other
+governed identities are still verified.
+
+### 4.5 Authenticated mapping decryption
 
 blindstats decrypts the public receipt's sealed mapping using AES-GCM and the
-released unblinding secret.
+local unblinding secret.
 
-Authenticated decryption also uses the transformation metadata bound as
+Authenticated decryption uses the transformation metadata that were bound as
 additional authenticated data during initial blinding.
 
 The operation fails if the key, ciphertext, IV, authentication tag, or bound
 metadata is inconsistent.
 
-After decryption, blindstats validates that the payload:
+After decryption, blindstats validates the mapping payload, including its internal
+structure, uniqueness relationships, label scheme, and category count.
 
-- has the expected internal domain marker;
-- contains a mapping array;
-- contains at least two entries;
-- has unique original categories;
-- has unique neutral labels;
-- uses the expected `Group_<letters>` label set; and
-- has the category count recorded in the public receipt.
+## 5. Why substantive artifacts are not supplied again
 
-## 4. Why the analysis artifact is not supplied again
+The source dataset and blinded dataset were already identified by SHA-256 in the
+public receipt.
 
-The analysis-lock receipt already records the exact pre-unblinding analysis
-artifact by SHA-256, filename, and byte length.
+When an AnalysisLock was used, the analysis artifact was already identified by
+filename, SHA-256, and byte length in the AnalysisLock receipt.
 
-The unblinding question is whether a valid lock record exists for the same public
-blinding receipt, not whether the analyst still possesses another local copy of
-the locked file.
+The unblinding operation therefore does not need to re-upload or rehash the source
+dataset, blinded dataset, or locked analysis artifact.
 
-A future utility may verify a candidate analysis artifact against a lock receipt,
-but that check is separate from mapping release.
+A future utility could verify a candidate local file against one of those recorded
+identities, but that is separate from mapping release.
 
-## 5. Output
+## 6. Output: unblinding receipt
 
-The unblinding stage produces one downloadable unblinding receipt.
+The browser creates one downloadable post-unblinding receipt.
 
-Conceptually:
+A lock-bound example is conceptually:
 
 ```json
 {
@@ -133,92 +205,185 @@ Conceptually:
 }
 ```
 
-The unblinding receipt is a **post-unblinding artifact**. It contains protected
-information and should be handled accordingly.
+When no AnalysisLock was used under a Plan that permits that path:
 
-## 6. Exact-byte relationships
+```json
+{
+  "lockId": null,
+  "artifacts": {
+    "analysisLockReceiptSha256": null,
+    "analysisArtifact": null
+  }
+}
+```
 
-The final receipt records SHA-256 values for:
+The full receipt still contains the other governed artifact identities and the
+released mapping.
+
+The unblinding receipt is protected post-unblinding material and should be handled
+accordingly.
+
+blindstats does not persist the readable receipt text.
+
+## 7. Exact-byte relationships
+
+The final receipt records SHA-256 identities for:
 
 - the source artifact originally identified by the public receipt;
-- the exact public-receipt bytes supplied at unblinding;
+- the exact public receipt used for unblinding;
 - the blinded artifact originally identified by the public receipt;
-- the exact unblinding-secret bytes supplied at unblinding;
-- the exact analysis-lock-receipt bytes supplied at unblinding; and
-- the previously locked analysis artifact identified by the lock receipt.
+- the exact local unblinding-secret bytes; and
+- when a lock is used, the exact AnalysisLock receipt and the previously locked
+  analysis artifact identity.
 
-The analysis artifact itself is not rehashed at unblinding.
+The source/blinded/analysis substantive files are not re-uploaded at unblinding.
 
-## 7. Secret-release interpretation
+## 8. Persistent completion registration
 
-In the intended file-mediated role model:
+After successful local release, the user can save the final receipt and confirm
+custody before registering completion.
 
-1. the owner retains the unblinding secret;
-2. the analyst locks the pre-unblinding analysis;
-3. the owner releases the secret; and
-4. the analyst completes unblinding.
+The server stores safe completion metadata rather than the secret, mapping, or
+readable final receipt.
 
-The current software does not enforce that chronology.
+Persistent completion is linked to:
 
-Possession of both the public receipt and unblinding secret is cryptographically
-sufficient to decrypt the sealed mapping with compatible software, even without
-using blindstats or providing an analysis-lock receipt.
+- Study;
+- workflow;
+- active immutable Plan;
+- request;
+- authorization;
+- transformation;
+- AnalysisLock when one was used;
+- source/blinded artifact identities;
+- secret SHA-256; and
+- final receipt SHA-256.
 
-Therefore, v0 depends on human/file separation for the timing of secret release.
-A later platform should enforce release through authenticated roles, study state,
-authorization, and server-controlled key management.
+When the request used no AnalysisLock, the lock-specific completion metadata
+remain NULL as a consistent group.
 
-## 8. Timestamp interpretation
+The server verifies the nonsecret relationships it can independently verify and
+atomically moves:
 
-Each successful unblinding receives a fresh UUID and browser-generated canonical
-ISO-8601 timestamp.
+```text
+unblinding_authorized -> unblinded
+```
 
-The timestamp is not independently trusted and should not be described as
-cryptographic proof of when real-world unblinding occurred.
+The server does **not** independently repeat the private browser decryption because
+it does not possess the plaintext secret.
 
-## 9. Research-integrity interpretation
+The appropriate claim is therefore that blindstats recorded completion of the
+authorized local workflow and linked it to the governed artifact chain.
 
-The unblinding receipt documents an internally consistent artifact chain processed
-through blindstats and the mapping released in that operation.
+It should not claim that the server independently proved private decryption.
 
-blindstats does not certify that:
+## 9. Secret-release interpretation
 
-- nobody accessed the mapping before the documented operation;
-- the owner withheld the secret until the analysis was locked;
-- the locked artifact was the only analysis conducted;
+The current server-backed workflow enforces request and authorization as durable
+application events.
+
+It does **not** take custody of the plaintext unblinding secret.
+
+In the usual separated workflow:
+
+1. the custodian retains the secret;
+2. the blinded analyst performs the analysis;
+3. an unblinding request is made;
+4. the request is authorized according to the active Plan;
+5. the custodian transfers the saved secret outside blindstats; and
+6. the authorized recipient selects the secret locally and releases the mapping.
+
+Possession of both the public receipt and secret is cryptographically sufficient
+to decrypt the mapping with compatible software.
+
+Therefore blindstats cannot prove that nobody copied or used the secret outside
+the governed application workflow.
+
+The persistent governance records improve auditability without changing that
+fundamental external-custody fact.
+
+## 10. Timestamp interpretation
+
+The final receipt's `createdAt` is browser-generated and is not independently
+trusted chronology.
+
+Persistent workflow records provide database-generated timestamps for:
+
+- request;
+- authorization; and
+- completion registration.
+
+These support narrower server-recorded chronology claims.
+
+They do not prove that protected information was never exposed through another
+route before those events.
+
+## 11. Research-integrity interpretation
+
+The persistent unblinding workflow documents:
+
+- a governed request;
+- a governed authorization;
+- local artifact-chain verification/decryption;
+- a final receipt identity;
+- a durable completion record; and
+- the transition to `unblinded`.
+
+It does not certify that:
+
+- nobody accessed the mapping before documented completion;
+- the custodian always stored or transferred the secret securely;
+- the locked artifact, when one exists, was the only analysis conducted;
 - the analyst used only the documented blinded data; or
-- the researcher followed every intended procedural rule outside the software.
+- every relevant procedural rule outside blindstats was followed.
 
-The value of v0 is that the intended blind-lock-unblind sequence is easy to
-conduct, inspect, and document.
+The value is a clear, inspectable, durable chain of artifact identities and
+governance events.
 
-Later technical controls can raise assurance without pretending that software can
-eliminate the human component of research integrity.
+## 12. Security and privacy
 
-## 10. Security and privacy
+The actual secret and plaintext mapping are processed locally.
 
-The v0 unblinding operation is browser-local.
+The final unblinding receipt contains the released mapping and is not uploaded by
+the persistent workflow.
 
-The unblinding receipt contains the released mapping and should be treated as
-unblinded material.
+The server stores hashes and safe metadata sufficient to connect completion to the
+governed workflow.
 
-The current prototype does not provide server-enforced roles, controlled key
-release, research-file storage, retention policy, or the other operational
-controls required for sensitive or regulated research infrastructure.
+The current research-preview application does not provide:
 
-## 11. Current completion state
+- in-app transfer of the plaintext secret;
+- general protected-file storage;
+- comprehensive retention/deletion policy;
+- formal incident-response operations; or
+- a claim of suitability for sensitive or regulated production research.
 
-As of 2026-09-08, Documented Unblinding v0 is implemented in both the core
-TypeScript workflow and browser UI.
+## 13. Current completion state
 
-Manual acceptance has confirmed:
+As of 2026-10-05, Documented Unblinding v0 is integrated with persistent
+request/authorization/completion governance.
 
-- successful end-to-end encrypted mapping release;
-- consistent transformation and lock identifiers across the workflow;
-- no plaintext mapping in the public receipt;
-- no plaintext mapping in the unblinding-secret artifact;
-- plaintext mapping in the final unblinding receipt; and
-- authenticated-decryption failure when the unblinding secret is altered.
+Manual acceptance has confirmed both:
 
-The automated suite, lint, TypeScript validation, and production build are also
-clean.
+- the normal lock-bound governed workflow; and
+- the Plan-permitted no-AnalysisLock path through request, authorization, local
+  release, completion registration, `unblinded`, and Audit history.
+
+The latest no-lock acceptance confirmed that Audit history records:
+
+- no AnalysisLock selected for the request;
+- the authorization policy and actor;
+- completion actor/time;
+- unblinding receipt SHA-256; and
+- secret SHA-256
+
+without inventing lock metadata that did not exist.
+
+Repository validation at this checkpoint is:
+
+```text
+Test files: 20 passed
+Tests:      117 passed
+Lint:       clean
+Build:      clean
+```
