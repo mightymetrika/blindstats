@@ -4,7 +4,7 @@
 - **Status:** implemented first server-backed workflow; pre-release
 - **Scope:** current Study + analyst-blinding governance architecture
 - **Browser-local artifact schema:** `0.3`
-- **Updated:** 2026-10-01
+- **Updated:** 2026-10-02
 
 ## 1. Purpose
 
@@ -27,7 +27,7 @@ The implementation combines two layers:
 1. **browser-local artifact operations**
    - create the blinded package;
    - hash the source, blinded, and analysis artifacts;
-   - create the analysis-lock receipt;
+   - create an analysis-lock receipt when that step is used;
    - authenticate/decrypt the mapping after authorization; and
    - create the final unblinding receipt;
 
@@ -289,20 +289,19 @@ An analysis lock identifies an exact declared artifact. It does not establish th
 the artifact is scientifically complete, that it was the only analysis performed,
 or that later work did not occur.
 
-#### Current completion limitation
+#### No-lock completion path
 
-The request and authorization functions honor the plan's `require_analysis_lock`
-setting: a request may omit a lock when the active plan does not require one.
+The request, authorization, browser-local unblinding, and persistent completion
+paths all honor the active plan's `require_analysis_lock` setting.
 
-However, the current persistent unblinding-completion registration still requires
-the authorized request to be bound to a registered AnalysisLock.
+When an analysis lock is required, the governed request and final completion remain
+bound to the selected registered AnalysisLock.
 
-Therefore, **a fully completed persistent unblinding workflow currently still
-needs an AnalysisLock even when the plan says it is not required**.
-
-This is a known implementation mismatch that should be resolved before presenting
-"analysis lock not required" as a fully supported end-to-end path in the first
-field release.
+When an analysis lock is not required and the request intentionally omits one, the
+final unblinding receipt and persistent completion record explicitly carry no
+AnalysisLock identity or analysis-artifact metadata. The rest of the governed
+chain remains bound to the active plan, registered transformation, request,
+authorization, unblinding secret identity, and final receipt identity.
 
 ### 6.4 Unblinding-authorization policy
 
@@ -838,8 +837,7 @@ to:
 - request;
 - authorization;
 - transformation;
-- AnalysisLock;
-- analysis artifact;
+- AnalysisLock and analysis artifact when the request used one;
 - source/blinded artifacts; and
 - secret hash.
 
@@ -852,7 +850,7 @@ Instead, Audit history is assembled from durable workflow records:
 
 - active immutable plan version;
 - blinding transformation registration;
-- one or more analysis locks;
+- zero or more analysis locks;
 - unblinding request;
 - authorization; and
 - unblinding completion.
@@ -1005,7 +1003,7 @@ A research team can currently:
 6. register the exact public receipt without uploading the substantive dataset;
 7. preserve the unblinding secret outside server custody;
 8. analyze using the blinded dataset outside blindstats;
-9. register one or more exact analysis locks;
+9. register an exact analysis lock when required or otherwise desired;
 10. request unblinding against the governed workflow;
 11. authorize under independent or self-authorization policy;
 12. locally authenticate/decrypt the mapping after authorization;
@@ -1020,11 +1018,10 @@ The major remaining work is not another broad workflow build.
 It is:
 
 1. refresh stale project documentation;
-2. resolve or explicitly constrain the no-analysis-lock completion mismatch;
-3. perform deployment hardening;
-4. configure and validate production authentication/redirect behavior;
-5. deploy the research-preview environment; and
-6. perform a focused production smoke test, including a meaningful two-account
+2. perform deployment hardening;
+3. configure and validate production authentication/redirect behavior;
+4. deploy the research-preview environment; and
+5. perform a focused production smoke test, including a meaningful two-account
    independent workflow.
 
 ## 22. Working architecture summary

@@ -51,9 +51,9 @@ type UnblindingRegistrationContext = {
   transformationId: string;
   publicReceiptSha256: string;
   publicReceiptBase64: string;
-  lockId: string;
-  analysisLockReceiptSha256: string;
-  analysisLockReceiptBase64: string;
+  lockId: string | null;
+  analysisLockReceiptSha256: string | null;
+  analysisLockReceiptBase64: string | null;
 };
 
 type UnblindingWorkspaceProps = {
@@ -177,7 +177,7 @@ export function UnblindingWorkspace({
   }, [registration]);
 
   const registeredLockReceiptBytes = useMemo(() => {
-    if (!registration) {
+    if (!registration?.analysisLockReceiptBase64) {
       return null;
     }
 
@@ -192,7 +192,7 @@ export function UnblindingWorkspace({
     ? Boolean(registeredReceiptBytes)
     : Boolean(receipt);
   const lockReady = registrationEnabled
-    ? Boolean(registeredLockReceiptBytes)
+    ? registration?.lockId === null || Boolean(registeredLockReceiptBytes)
     : Boolean(lockReceipt);
 
   const canGenerate =
@@ -233,7 +233,7 @@ export function UnblindingWorkspace({
   }
 
   async function handleGenerate(): Promise<void> {
-    if (!effectiveReceiptBytes || !secret || !effectiveLockReceiptBytes) {
+    if (!effectiveReceiptBytes || !secret || !lockReady) {
       return;
     }
 
@@ -258,7 +258,9 @@ export function UnblindingWorkspace({
 
         if (result.receipt.lockId !== registration.lockId) {
           throw new Error(
-            "Generated unblinding receipt does not match the authorized AnalysisLock.",
+            registration.lockId === null
+              ? "Generated unblinding receipt unexpectedly references an AnalysisLock."
+              : "Generated unblinding receipt does not match the authorized AnalysisLock.",
           );
         }
       }
@@ -311,7 +313,29 @@ export function UnblindingWorkspace({
     formData.set("unblindingId", receipt.unblindingId);
     formData.set("receiptCreatedAt", receipt.createdAt);
     formData.set("transformationId", receipt.transformationId);
-    formData.set("lockId", receipt.lockId);
+    if (
+      receipt.lockId !== null &&
+      receipt.artifacts.analysisLockReceiptSha256 !== null &&
+      receipt.artifacts.analysisArtifact !== null
+    ) {
+      formData.set("lockId", receipt.lockId);
+      formData.set(
+        "analysisLockReceiptSha256",
+        receipt.artifacts.analysisLockReceiptSha256,
+      );
+      formData.set(
+        "analysisArtifactFilename",
+        receipt.artifacts.analysisArtifact.filename,
+      );
+      formData.set(
+        "analysisArtifactSha256",
+        receipt.artifacts.analysisArtifact.sha256,
+      );
+      formData.set(
+        "analysisArtifactByteLength",
+        String(receipt.artifacts.analysisArtifact.byteLength),
+      );
+    }
     formData.set("selectedColumn", receipt.selectedColumn);
     formData.set(
       "sourceArtifactSha256",
@@ -328,22 +352,6 @@ export function UnblindingWorkspace({
     formData.set(
       "unblindingSecretSha256",
       receipt.artifacts.unblindingSecretSha256,
-    );
-    formData.set(
-      "analysisLockReceiptSha256",
-      receipt.artifacts.analysisLockReceiptSha256,
-    );
-    formData.set(
-      "analysisArtifactFilename",
-      receipt.artifacts.analysisArtifact.filename,
-    );
-    formData.set(
-      "analysisArtifactSha256",
-      receipt.artifacts.analysisArtifact.sha256,
-    );
-    formData.set(
-      "analysisArtifactByteLength",
-      String(receipt.artifacts.analysisArtifact.byteLength),
     );
     formData.set("unblindingReceiptSha256", generation.receiptSha256);
     formData.set("acknowledgeCustody", "on");
@@ -442,10 +450,10 @@ export function UnblindingWorkspace({
               </div>
               <div>
                 <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                  Authorized lock ID
+                  Analysis lock
                 </dt>
                 <dd className="mt-1 break-all font-mono text-xs text-slate-700">
-                  {registration.lockId}
+                  {registration.lockId ?? "Not used for this request"}
                 </dd>
               </div>
               <div>
@@ -456,16 +464,18 @@ export function UnblindingWorkspace({
                   <HashValue value={registration.publicReceiptSha256} />
                 </dd>
               </div>
-              <div>
-                <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                  AnalysisLock receipt SHA-256
-                </dt>
-                <dd>
-                  <HashValue
-                    value={registration.analysisLockReceiptSha256}
-                  />
-                </dd>
-              </div>
+              {registration.analysisLockReceiptSha256 ? (
+                <div>
+                  <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Analysis lock receipt SHA-256
+                  </dt>
+                  <dd>
+                    <HashValue
+                      value={registration.analysisLockReceiptSha256}
+                    />
+                  </dd>
+                </div>
+              ) : null}
             </dl>
           </details>
         ) : null}
@@ -713,14 +723,16 @@ export function UnblindingWorkspace({
                           {generatedReceipt.transformationId}
                         </dd>
                       </div>
-                      <div>
-                        <dt className="text-xs font-medium uppercase tracking-wide text-emerald-800">
-                          Lock ID
-                        </dt>
-                        <dd className="mt-1 break-all font-mono text-xs text-emerald-950">
-                          {generatedReceipt.lockId}
-                        </dd>
-                      </div>
+                      {generatedReceipt.lockId ? (
+                        <div>
+                          <dt className="text-xs font-medium uppercase tracking-wide text-emerald-800">
+                            Lock ID
+                          </dt>
+                          <dd className="mt-1 break-all font-mono text-xs text-emerald-950">
+                            {generatedReceipt.lockId}
+                          </dd>
+                        </div>
+                      ) : null}
                       <div>
                         <dt className="text-xs font-medium uppercase tracking-wide text-emerald-800">
                           Final receipt SHA-256

@@ -137,6 +137,32 @@ function persistentRegistration() {
   };
 }
 
+function createMockPackageWithoutLock(): UnblindingPackage {
+  const mockPackage = createMockPackage();
+
+  return {
+    ...mockPackage,
+    receipt: {
+      ...mockPackage.receipt,
+      lockId: null,
+      artifacts: {
+        ...mockPackage.receipt.artifacts,
+        analysisLockReceiptSha256: null,
+        analysisArtifact: null,
+      },
+    },
+  };
+}
+
+function persistentRegistrationWithoutLock() {
+  return {
+    ...persistentRegistration(),
+    lockId: null,
+    analysisLockReceiptSha256: null,
+    analysisLockReceiptBase64: null,
+  };
+}
+
 async function uploadRequiredFiles(
   user: ReturnType<typeof userEvent.setup>,
 ): Promise<void> {
@@ -202,6 +228,11 @@ describe("UnblindingWorkspace workflow", () => {
 
     expect(new TextDecoder().decode(receiptBytes)).toBe(RECEIPT_TEXT);
     expect(new TextDecoder().decode(secretBytes)).toBe(SECRET_TEXT);
+
+    if (lockBytes === null) {
+      throw new Error("Expected an AnalysisLock receipt in the lock-required path.");
+    }
+
     expect(new TextDecoder().decode(lockBytes)).toBe(LOCK_TEXT);
 
     expect(
@@ -278,10 +309,75 @@ describe("UnblindingWorkspace workflow", () => {
 
     expect(new TextDecoder().decode(receiptBytes)).toBe(RECEIPT_TEXT);
     expect(new TextDecoder().decode(secretBytes)).toBe(SECRET_TEXT);
+
+    if (lockBytes === null) {
+      throw new Error("Expected an AnalysisLock receipt in the lock-required path.");
+    }
+
     expect(new TextDecoder().decode(lockBytes)).toBe(LOCK_TEXT);
     expect(mockedSha256Hex).toHaveBeenCalledWith(
       createMockPackage().receiptArtifact.bytes,
     );
+  });
+
+  it("supports persistent authorized unblinding when the plan did not require an analysis lock", async () => {
+    const user = userEvent.setup();
+    const registerAction = vi.fn().mockResolvedValue({
+      ok: true,
+      completionRecordId: "completion-record-id",
+    });
+
+    mockedCreateUnblindingPackage.mockResolvedValueOnce(
+      createMockPackageWithoutLock(),
+    );
+
+    render(
+      <UnblindingWorkspace
+        registration={persistentRegistrationWithoutLock()}
+        registerAction={registerAction}
+      />,
+    );
+
+    expect(
+      screen.getByText("Not used for this request"),
+    ).toBeInTheDocument();
+
+    await user.upload(
+      screen.getByLabelText("Unblinding secret"),
+      createFile("unblinding-secret.json", SECRET_TEXT),
+    );
+
+    expect(verifyButton()).toBeEnabled();
+    await user.click(verifyButton());
+
+    const [, , lockBytes] =
+      mockedCreateUnblindingPackage.mock.calls[0];
+    expect(lockBytes).toBeNull();
+
+    await screen.findByText("Artifact chain verified. Mapping released.");
+
+    await user.click(
+      screen.getByRole("checkbox", {
+        name: /I saved the unblinding receipt/i,
+      }),
+    );
+    await user.click(
+      screen.getByRole("button", {
+        name: "Register unblinding completion",
+      }),
+    );
+
+    await waitFor(() => {
+      expect(registerAction).toHaveBeenCalledTimes(1);
+    });
+
+    const [formData] = registerAction.mock.calls[0] as [FormData];
+
+    expect(formData.get("lockId")).toBeNull();
+    expect(formData.get("analysisLockReceiptSha256")).toBeNull();
+    expect(formData.get("analysisArtifactFilename")).toBeNull();
+    expect(formData.get("analysisArtifactSha256")).toBeNull();
+    expect(formData.get("analysisArtifactByteLength")).toBeNull();
   });
 
   it("registers only safe completion metadata and redirects to the current workflow", async () => {

@@ -102,6 +102,38 @@ describe("createUnblindingPackage", () => {
     expect(receiptText).toContain("Control");
   });
 
+  it("supports authorized unblinding without an analysis lock", async () => {
+    const {
+      blindedPackage,
+    } = await fixture();
+
+    const result =
+      await createUnblindingPackage(
+        blindedPackage.receiptArtifact.bytes,
+        blindedPackage.secretArtifact.bytes,
+        null,
+        UNBLINDING_TIME,
+      );
+
+    expect(result.receipt.lockId).toBeNull();
+    expect(
+      result.receipt.artifacts.analysisLockReceiptSha256,
+    ).toBeNull();
+    expect(
+      result.receipt.artifacts.analysisArtifact,
+    ).toBeNull();
+    expect(result.receipt.releasedMapping).toHaveLength(
+      2,
+    );
+    expect(
+      result.receipt.artifacts.blindingReceiptSha256,
+    ).toBe(
+      await sha256Hex(
+        blindedPackage.receiptArtifact.bytes,
+      ),
+    );
+  });
+
   it("records hashes of the exact three supplied JSON artifacts", async () => {
     const {
       blindedPackage,

@@ -1629,7 +1629,14 @@ export default async function BlindingWorkflowPage({
               unblindingAuthorization &&
               !unblindingCompletion &&
               canReceiveUnblinded ? (
-                authorizedAnalysisLock ? (
+                unblindingRequest.analysis_lock_id &&
+                !authorizedAnalysisLock ? (
+                  <div className="mt-6 rounded-2xl border border-black/10 p-6 dark:border-white/15">
+                    <p className="text-sm font-medium">
+                      The analysis lock selected by this request could not be loaded.
+                    </p>
+                  </div>
+                ) : (
                   <UnblindingWorkspace
                     registration={{
                       studyId: study.id,
@@ -1641,22 +1648,19 @@ export default async function BlindingWorkflowPage({
                         transformation.public_receipt_text,
                         "utf8",
                       ).toString("base64"),
-                      lockId: authorizedAnalysisLock.lock_id,
+                      lockId: authorizedAnalysisLock?.lock_id ?? null,
                       analysisLockReceiptSha256:
-                        authorizedAnalysisLock.analysis_lock_receipt_sha256,
-                      analysisLockReceiptBase64: Buffer.from(
-                        authorizedAnalysisLock.analysis_lock_receipt_text,
-                        "utf8",
-                      ).toString("base64"),
+                        authorizedAnalysisLock?.analysis_lock_receipt_sha256 ??
+                        null,
+                      analysisLockReceiptBase64: authorizedAnalysisLock
+                        ? Buffer.from(
+                            authorizedAnalysisLock.analysis_lock_receipt_text,
+                            "utf8",
+                          ).toString("base64")
+                        : null,
                     }}
                     registerAction={registerUnblindingCompletion}
                   />
-                ) : (
-                  <div className="mt-6 rounded-2xl border border-black/10 p-6 dark:border-white/15">
-                    <p className="text-sm font-medium">
-                      A registered analysis lock is required for the current documented completion path.
-                    </p>
-                  </div>
                 )
               ) : null}
             </section>

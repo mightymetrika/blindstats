@@ -104,8 +104,8 @@ export type UnblindingArtifactReferences = {
   blindingReceiptSha256: string;
   blindedArtifactSha256: string;
   unblindingSecretSha256: string;
-  analysisLockReceiptSha256: string;
-  analysisArtifact: AnalysisArtifactReference;
+  analysisLockReceiptSha256: string | null;
+  analysisArtifact: AnalysisArtifactReference | null;
 };
 
 export type UnblindingReceipt = {
@@ -114,7 +114,7 @@ export type UnblindingReceipt = {
   unblindingId: string;
   createdAt: string;
   transformationId: string;
-  lockId: string;
+  lockId: string | null;
   selectedColumn: string;
   artifacts: UnblindingArtifactReferences;
   releasedMapping: BlindingMappingEntry[];

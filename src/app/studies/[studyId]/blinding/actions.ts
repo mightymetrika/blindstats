@@ -41,8 +41,56 @@ function getRequiredSha256(formData: FormData, name: string) {
   return value;
 }
 
-function getRequiredPositiveInteger(formData: FormData, name: string) {
-  const value = getRequiredString(formData, name);
+function getOptionalString(formData: FormData, name: string) {
+  const value = formData.get(name);
+
+  if (value === null) {
+    return null;
+  }
+
+  if (typeof value !== "string") {
+    throw new Error(`${name} must be a string when provided.`);
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function getOptionalExactString(formData: FormData, name: string) {
+  const value = formData.get(name);
+
+  if (value === null) {
+    return null;
+  }
+
+  if (typeof value !== "string") {
+    throw new Error(`${name} must be a string when provided.`);
+  }
+
+  return value.trim().length > 0 ? value : null;
+}
+
+function getOptionalSha256(formData: FormData, name: string) {
+  const value = getOptionalString(formData, name);
+
+  if (value === null) {
+    return null;
+  }
+
+  if (!SHA256_HEX_PATTERN.test(value)) {
+    throw new Error(`${name} must be a lowercase 64-character SHA-256 digest.`);
+  }
+
+  return value;
+}
+
+function getOptionalPositiveInteger(formData: FormData, name: string) {
+  const value = getOptionalString(formData, name);
+
+  if (value === null) {
+    return null;
+  }
+
   const parsed = Number(value);
 
   if (!Number.isSafeInteger(parsed) || parsed < 1) {
@@ -718,16 +766,16 @@ export async function registerUnblindingCompletion(
   let receiptCreatedAt: string;
   let unblindingId: string;
   let transformationId: string;
-  let lockId: string;
+  let lockId: string | null;
   let selectedColumn: string;
   let sourceArtifactSha256: string;
   let blindingReceiptSha256: string;
   let blindedArtifactSha256: string;
   let unblindingSecretSha256: string;
-  let analysisLockReceiptSha256: string;
-  let analysisArtifactFilename: string;
-  let analysisArtifactSha256: string;
-  let analysisArtifactByteLength: number;
+  let analysisLockReceiptSha256: string | null;
+  let analysisArtifactFilename: string | null;
+  let analysisArtifactSha256: string | null;
+  let analysisArtifactByteLength: number | null;
   let unblindingReceiptSha256: string;
 
   try {
@@ -737,7 +785,7 @@ export async function registerUnblindingCompletion(
     );
     unblindingId = getRequiredString(formData, "unblindingId");
     transformationId = getRequiredString(formData, "transformationId");
-    lockId = getRequiredString(formData, "lockId");
+    lockId = getOptionalString(formData, "lockId");
     selectedColumn = getRequiredExactString(formData, "selectedColumn");
     sourceArtifactSha256 = getRequiredSha256(
       formData,
@@ -755,22 +803,38 @@ export async function registerUnblindingCompletion(
       formData,
       "unblindingSecretSha256",
     );
-    analysisLockReceiptSha256 = getRequiredSha256(
+    analysisLockReceiptSha256 = getOptionalSha256(
       formData,
       "analysisLockReceiptSha256",
     );
-    analysisArtifactFilename = getRequiredExactString(
+    analysisArtifactFilename = getOptionalExactString(
       formData,
       "analysisArtifactFilename",
     );
-    analysisArtifactSha256 = getRequiredSha256(
+    analysisArtifactSha256 = getOptionalSha256(
       formData,
       "analysisArtifactSha256",
     );
-    analysisArtifactByteLength = getRequiredPositiveInteger(
+    analysisArtifactByteLength = getOptionalPositiveInteger(
       formData,
       "analysisArtifactByteLength",
     );
+
+    const lockMetadata = [
+      lockId,
+      analysisLockReceiptSha256,
+      analysisArtifactFilename,
+      analysisArtifactSha256,
+      analysisArtifactByteLength,
+    ];
+    const hasAnyLockMetadata = lockMetadata.some((value) => value !== null);
+    const hasAllLockMetadata = lockMetadata.every((value) => value !== null);
+
+    if (hasAnyLockMetadata && !hasAllLockMetadata) {
+      throw new Error(
+        "Analysis-lock completion metadata must be supplied together or omitted together.",
+      );
+    }
     unblindingReceiptSha256 = getRequiredSha256(
       formData,
       "unblindingReceiptSha256",

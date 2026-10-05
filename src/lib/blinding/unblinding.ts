@@ -45,7 +45,7 @@ function requireEqual(
 export async function createUnblindingPackage(
   blindingReceiptBytes: Uint8Array,
   unblindingSecretBytes: Uint8Array,
-  analysisLockReceiptBytes: Uint8Array,
+  analysisLockReceiptBytes: Uint8Array | null,
   createdAt: Date = new Date(),
 ): Promise<UnblindingPackage> {
   const blindingReceipt =
@@ -57,9 +57,11 @@ export async function createUnblindingPackage(
       unblindingSecretBytes,
     );
   const analysisLockReceipt =
-    parseAnalysisLockReceiptBytes(
-      analysisLockReceiptBytes,
-    );
+    analysisLockReceiptBytes === null
+      ? null
+      : parseAnalysisLockReceiptBytes(
+          analysisLockReceiptBytes,
+        );
 
   requireEqual(
     unblindingSecret.transformationId,
@@ -67,36 +69,42 @@ export async function createUnblindingPackage(
     "Unblinding secret transformation identifier does not match the public blinding receipt.",
   );
 
-  requireEqual(
-    analysisLockReceipt.blinding
-      .transformationId,
-    blindingReceipt.transformationId,
-    "Analysis-lock receipt transformation identifier does not match the public blinding receipt.",
-  );
+  if (analysisLockReceipt) {
+    requireEqual(
+      analysisLockReceipt.blinding
+        .transformationId,
+      blindingReceipt.transformationId,
+      "Analysis-lock receipt transformation identifier does not match the public blinding receipt.",
+    );
 
-  requireEqual(
-    analysisLockReceipt.blinding
-      .blindedArtifactSha256,
-    blindingReceipt.blindedArtifact.sha256,
-    "Analysis-lock receipt blinded artifact hash does not match the public blinding receipt.",
-  );
+    requireEqual(
+      analysisLockReceipt.blinding
+        .blindedArtifactSha256,
+      blindingReceipt.blindedArtifact.sha256,
+      "Analysis-lock receipt blinded artifact hash does not match the public blinding receipt.",
+    );
+  }
 
   const [
     blindingReceiptSha256,
     unblindingSecretSha256,
-    analysisLockReceiptSha256,
   ] = await Promise.all([
     sha256Hex(blindingReceiptBytes),
     sha256Hex(unblindingSecretBytes),
-    sha256Hex(analysisLockReceiptBytes),
   ]);
+  const analysisLockReceiptSha256 =
+    analysisLockReceiptBytes === null
+      ? null
+      : await sha256Hex(analysisLockReceiptBytes);
 
-  requireEqual(
-    blindingReceiptSha256,
-    analysisLockReceipt.blinding
-      .blindingReceiptSha256,
-    "Public blinding receipt hash does not match the analysis-lock receipt.",
-  );
+  if (analysisLockReceipt) {
+    requireEqual(
+      blindingReceiptSha256,
+      analysisLockReceipt.blinding
+        .blindingReceiptSha256,
+      "Public blinding receipt hash does not match the analysis-lock receipt.",
+    );
+  }
 
   const releasedMapping =
     await openBlindingMapping(
@@ -114,7 +122,7 @@ export async function createUnblindingPackage(
     createdAt: identity.createdAt,
     transformationId:
       blindingReceipt.transformationId,
-    lockId: analysisLockReceipt.lockId,
+    lockId: analysisLockReceipt?.lockId ?? null,
     selectedColumn:
       blindingReceipt.selectedColumn,
     artifacts: {
@@ -125,9 +133,11 @@ export async function createUnblindingPackage(
         blindingReceipt.blindedArtifact.sha256,
       unblindingSecretSha256,
       analysisLockReceiptSha256,
-      analysisArtifact: {
-        ...analysisLockReceipt.analysisArtifact,
-      },
+      analysisArtifact: analysisLockReceipt
+        ? {
+            ...analysisLockReceipt.analysisArtifact,
+          }
+        : null,
     },
     releasedMapping: releasedMapping.map(
       (entry) => ({ ...entry }),
