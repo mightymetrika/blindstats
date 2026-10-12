@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
+import { summarizeStudiesReadFailure } from "@/lib/supabase/studies-read-diagnostics";
 
 import { createStudy } from "./actions";
 
@@ -36,8 +37,8 @@ export default async function StudiesPage({
   }
 
   const [
-    { data: profile, error: profileError },
-    { data: studies, error: studiesError },
+    { data: profile, error: profileError, status: profileStatus },
+    { data: studies, error: studiesError, status: studiesStatus },
   ] = await Promise.all([
     supabase
       .from("profiles")
@@ -51,11 +52,19 @@ export default async function StudiesPage({
   ]);
 
   if (profileError) {
-    throw new Error(`Unable to load profile: ${profileError.message}`);
+    console.error(
+      "[blindstats] Studies read failure",
+      summarizeStudiesReadFailure("profile", profileError, profileStatus),
+    );
+    throw new Error("Unable to load Study information.");
   }
 
   if (studiesError) {
-    throw new Error(`Unable to load Studies: ${studiesError.message}`);
+    console.error(
+      "[blindstats] Studies read failure",
+      summarizeStudiesReadFailure("studies", studiesError, studiesStatus),
+    );
+    throw new Error("Unable to load Study information.");
   }
 
   const email = typeof claims.email === "string" ? claims.email : null;
