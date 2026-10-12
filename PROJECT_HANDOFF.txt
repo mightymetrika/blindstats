@@ -1,8 +1,8 @@
 blindstats PROJECT HANDOFF
 ============================
-Updated: 2026-10-05
-Handoff version: v27
-Purpose: checkpoint after completing the technical documentation refresh; next phase is deployment hardening
+Updated: 2026-10-12
+Handoff version: v28
+Purpose: current research-preview hardening checkpoint; identify the next bounded authentication diagnostic task
 
 PROJECT
 -------
@@ -57,45 +57,82 @@ a provider-specific build-context ignore), decide that during deployment
 hardening rather than adding one speculatively now.
 
 Latest source export supplied at this checkpoint:
-  mightymetrika-blindstats-8a5edab282632443(20261005-225815).txt
+  mightymetrika-blindstats-8a5edab282632443(20261012-230125).txt
 
 The latest source export confirms:
-  - current README
-  - refreshed docs/study-workflow-v0.md
-  - current workflow UI
+  - current README and refreshed docs
+  - original browser-local artifact and persistent governance paths
   - no-lock unblinding completion support
+  - deployment-hardening Supabase config and security response headers
+  - Studies error boundary and its two targeted tests
   - migrations through:
       20261002223000_allow_unblinding_completion_without_lock.sql
 
 
 CURRENT GIT CHECKPOINT
 ----------------------
-Latest committed and pushed milestone:
-
-  6cd8e7a  Support unblinding completion without analysis lock
-
-Push succeeded:
-  4943bc6..6cd8e7a  main -> main
-
-Final status shown by user:
-
+Observed user status on 2026-10-12:
   On branch main
   Your branch is up to date with 'origin/main'.
   nothing to commit, working tree clean
 
-Recent milestone history:
+Known committed/pushed milestones:
+  19fb90f Refresh technical docs and add project handoff
+  a2cf2ef Harden Supabase configuration and response headers
 
-  6cd8e7a Support unblinding completion without analysis lock
-  4943bc6 Refresh Study workflow documentation
-  ba794c8 Refresh README for current blindstats workflow
-  8a02c22 Polish workflow and study navigation UI
-  62854c3 Add post-setup workflow navigation
-  4c22be7 Add conditional blinding setup navigation
-  b4b5c46 Make authorization policy guidance responsive
-  05de142 Enforce independent authorization at plan activation
+Subsequent Studies error-boundary patch was validated and the user later
+reported a clean branch synchronized with origin/main. Its exact Git commit
+hash has not been supplied; obtain it from git log rather than guessing.
 
-This is a clean checkpoint and a good place to resume.
+The 2026-10-12 export includes both hardening slices and the expected new
+files, so it appears consistent with the reported current working tree.
 
+HARDENING PROGRESS AND OUTSTANDING JWT ERROR
+--------------------------------------------
+Slice 1, committed as a2cf2ef:
+  - src/lib/supabase/config.ts and config.test.ts added
+  - browser, server, and proxy Supabase clients use config validation
+  - next.config.ts supplies baseline HTTP response security headers
+  - user validation: 21 test files, 130 tests passed; lint and build clean
+  - local browser sign-in, Study access, and sign-out succeeded
+
+Slice 2, subsequent commit hash to confirm:
+  - src/app/studies/error.tsx and error.test.tsx added
+  - Studies-area errors show a safe recovery screen with a Try again action
+  - user validation: 2 targeted tests passed; lint and build clean
+  - first targeted run timed out starting a Vitest worker, then passed
+  - this is user-facing error recovery, NOT an authentication repair
+
+Unresolved observation during a local Next.js dev session (2026-10-09):
+  GET /studies returned 500; src/app/studies/page.tsx threw:
+    Unable to load Studies: JWT issued at future
+  A later GET /studies returned 200 and the session worked normally.
+  Claims validation and database reads are distinct operations in the page.
+  The failure was reported by a database query after getClaims completed.
+
+2026-10-12 code review:
+  - Supabase SSR proxy calls auth.getClaims() and propagates refreshed
+    cookies to the request and response, consistent with the documented
+    Next.js SSR pattern
+  - no project-specific root cause of the intermittent JWT error is proven
+  - public reports describe similar PostgREST rejections; possible service
+    clock skew is a hypothesis, not a verified diagnosis of this project
+  - do NOT disable claims verification or loosen Study RLS as a workaround
+  - do NOT automatically add broad retries or expose raw errors to users
+
+Next bounded JWT investigation:
+  1. If the error recurs, record exact UTC timestamp, error message/code,
+     HTTP status, and request ID if accessible; do not share full JWTs,
+     cookies, API keys, unblinding secrets, or research data.
+  2. Check whether an identical read later succeeds without reauthenticating.
+  3. If reproducible, review Supabase project logs and raise a focused
+     support report with sanitized timestamps and codes.
+  4. Only then decide whether a narrowly scoped read retry is warranted.
+
+Background references (not evidence about this specific project):
+  https://supabase.com/docs/guides/auth/server-side/creating-a-client
+  https://github.com/orgs/supabase/discussions/48123
+  https://github.com/supabase/supabase/issues/49655
 
 CURRENT PRODUCT / SCIENTIFIC MODEL
 ----------------------------------
@@ -217,7 +254,7 @@ This is accepted for the first feedback release while a Study effectively has on
 blinding workflow.
 
 
-LATEST FIX: OPTIONAL ANALYSIS LOCK NOW WORKS END TO END
+PRIOR WORKFLOW FIX: OPTIONAL ANALYSIS LOCK WORKS END TO END
 ------------------------------------------------------
 Problem discovered during documentation refresh:
 
@@ -367,7 +404,7 @@ If require_analysis_lock = false:
   - completion can succeed without fabricated lock metadata
 
 
-AUTOMATED VALIDATION FOR LATEST FIX
+AUTOMATED VALIDATION FOR OPTIONAL ANALYSIS LOCK FIX
 -----------------------------------
 Targeted core/component validation:
 
@@ -548,112 +585,59 @@ Do NOT regress to one long vertically stacked protocol-like page.
 
 DOCUMENTATION STATUS
 --------------------
-The documentation-refresh phase is now complete in the working tree.
+Documentation refresh is complete and committed/pushed:
+  ba794c8 Refresh README for current blindstats workflow
+  4943bc6 Refresh Study workflow documentation
+  6cd8e7a Support unblinding completion without analysis lock
+  19fb90f Refresh technical docs and add project handoff
 
-Already committed/pushed before this checkpoint:
-
-1. README.md
-   Commit:
-     ba794c8 Refresh README for current blindstats workflow
-
-2. docs/study-workflow-v0.md
-   Initial refresh:
-     4943bc6 Refresh Study workflow documentation
-
-   Updated again in:
-     6cd8e7a Support unblinding completion without analysis lock
-
-Current documentation refresh prepared and reviewed by the user:
-
-  docs/blinding-workspace-v0.md
-  docs/analysis-lock-v0.md
-  docs/unblinding-v0.md
-  docs/vision.md
-
-The refreshed technical documents now consistently distinguish:
-
-  browser-local substantive/artifact operations
-  from
-  persistent server-backed governance
-
-They also reflect:
-
-  - authenticated Studies and capabilities;
-  - immutable Blinding plan v1;
-  - exact public-receipt registration;
-  - durable AnalysisLock registration;
-  - request / authorization / exposure separation;
-  - optional AnalysisLock behavior when the Plan explicitly permits it;
-  - persistent safe completion metadata;
-  - database registration timestamps;
-  - current custody boundaries; and
-  - the Study-as-container / RMS direction.
-
-docs/literature-and-prior-art.md was intentionally left unchanged. It is primarily
-methodological/background documentation and did not require the same architecture
-rewrite.
-
-PROJECT_HANDOFF.txt is now intended to be committed with this documentation
-checkpoint and maintained at the repository root for future session continuity.
-
+The root PROJECT_HANDOFF.txt is tracked; update the SAME file at meaningful
+checkpoints. Older v0 documents describe the artifact protocol plus the
+implemented persistent governance layer. No broad documentation rewrite is
+pending before research-preview deployment.
 
 CURRENT RELEASE PHASE
 ---------------------
-Core blinding product:
-  substantially feature-complete for first researcher-feedback release
+Core blinding workflow: substantially complete for researcher feedback.
+Documentation refresh: committed and pushed.
+Provider-neutral config/header hardening: committed and pushed.
+Studies error recovery boundary: code present; targeted tests/lint/build pass.
 
-Documentation-refresh phase:
-  complete once the current four Markdown changes + PROJECT_HANDOFF.txt are
-  committed/pushed
+Still needed before research-preview field release:
+  - investigate the intermittent JWT issued-at-future error
+  - establish hosting target and production application URL
+  - align Supabase Auth Site URL, allowed redirects, confirmation email flow
+  - review RLS/RPC, public error behavior, exposed secrets, release wording
+  - deploy and perform a focused production two-account smoke test
+  - prepare brief researcher walkthrough and collect field feedback
 
-Research-preview release:
-  close
-
-Remaining work before deployment:
-  - deployment hardening
-  - production deployment
-  - focused production smoke test
-  - lightweight researcher-facing walkthrough/education
-  - field feedback collection
-
-Do NOT broaden the feature set before field feedback unless a concrete release
-blocker appears.
-
+Do NOT broaden the feature set without a concrete release blocker or feedback.
 
 RECOMMENDED NEXT MAJOR TASK
 ---------------------------
-Next major phase:
-
-  deployment hardening for the researcher-feedback / research-preview release
-
-Do not begin another broad feature or architecture expansion first.
-
+First: bounded JWT/Data API issue diagnosis; no speculative auth changes.
+Then: production authentication and deployment-target configuration, after
+choosing an actual deployment URL.
 
 DEPLOYMENT HARDENING CHECKLIST
 ------------------------------
-After remaining docs, review:
+Complete:
+  - explicit Supabase environment variable validation
+  - browser/server/proxy client configuration consistency
+  - baseline response headers (nosniff, DENY frame, referrer, permissions)
+  - safe Studies-area UI recovery for unexpected server errors
+  - local lint, tests, production build for the delivered slices
 
-  - production environment variable handling
-  - Supabase auth redirect / confirmation URLs
-  - deployment target configuration
-  - server/client Supabase configuration
-  - migration state
-  - RLS / RPC assumptions
-  - public error behavior
-  - accidental logging/exposure of secrets
-  - security headers / framework defaults where relevant
-  - localhost/test/demo language visible to users
-  - concise privacy/security boundary language
-  - production build
-  - post-deploy smoke test
+Open:
+  - investigate intermittent JWT issued-at-future rejection
+  - production hosting target and URL
+  - Supabase Auth redirect / confirmation URLs and signup configuration
+  - review deployed migration alignment, RLS, RPCs, public error behavior
+  - accidental logging/exposure of secrets and production release wording
+  - production smoke test, walkthrough, and researcher feedback
 
-The release should be described as:
-  researcher-feedback / research-preview
-
-NOT:
-  production-hardened infrastructure for sensitive, regulated, confidential, or
-  client research data.
-
+Release wording: researcher-feedback / research-preview. NOT infrastructure
+certified for sensitive, regulated, confidential, or client research data.
 
 RESEARCHER-FEEDBACK RELEASE PURPOSE
 -----------------------------------
@@ -779,61 +763,37 @@ Avoid:
 RECOMMENDED NEXT SESSION START
 ------------------------------
 Run:
-
   cd "C:\Users\Mackson Ncube\Documents\blindstats"
   git status
   git log --oneline --decorate -8
 
-At the moment this handoff was prepared, the latest previously pushed commit was:
+Expected based on latest observed status: branch main synchronized with
+origin/main, working tree clean. Confirm the Studies error-boundary commit hash
+from actual git log. The current source export is dated 2026-10-12.
 
-  6cd8e7a Support unblinding completion without analysis lock
+First target: investigate and capture evidence for JWT issued-at-future when
+it recurs. Do not alter authentication checks without evidence.
 
-The working tree was expected to contain:
-
-  modified:
-    docs/blinding-workspace-v0.md
-    docs/analysis-lock-v0.md
-    docs/unblinding-v0.md
-    docs/vision.md
-
-  new:
-    PROJECT_HANDOFF.txt
-
-Those files should be committed together as the documentation/handoff checkpoint.
-After that commit, actual git log/status are authoritative.
-
-Latest deployed migration:
+Latest known deployed migration:
   20261002223000_allow_unblinding_completion_without_lock.sql
-
-Latest source export used for the refresh:
-  mightymetrika-blindstats-8a5edab282632443(20261005-225815).txt
-
-Then begin:
-  deployment hardening
-
 
 END OF HANDOFF
 --------------
-Latest previously pushed checkpoint before the current documentation commit:
+Research-preview hardening is under way. Two bounded patches are present:
+  (1) Supabase configuration and response headers (a2cf2ef)
+  (2) Studies error recovery (commit SHA to confirm via git log)
 
-  6cd8e7a Support unblinding completion without analysis lock
+Validation reported by user:
+  - first slice: 130 tests passing across 21 files; lint and build clean
+  - second slice: 2 targeted tests passing; lint and build clean
+  - latest Git status: clean, main synchronized with origin/main
+  - current source export includes both patches
 
-Current working milestone:
-  remaining technical documentation refreshed and reviewed
-  PROJECT_HANDOFF.txt moved into the repository as the tracked continuity file
+Remaining active risk: intermittent 'JWT issued at future' from a Study query.
+The cause has not been established; the Studies error boundary provides
+recoverability, not a fix for JWT rejection.
 
-Current validated product baseline:
-  migration deployed and DB lint clean
-  full automated suite 117/117
-  lint clean
-  production build clean
-  optional AnalysisLock path works end-to-end
-  persistent completion works with or without AnalysisLock according to Plan v1
-  manual no-lock acceptance completed successfully
-
-Immediate next task after committing this documentation/handoff checkpoint:
-  deployment hardening
-
-Then:
-  deploy research-preview -> production smoke test -> researcher walkthrough ->
+Near-term path:
+  JWT diagnostics -> production authentication configuration -> research-preview
+  deployment -> focused two-account smoke test -> researcher walkthrough ->
   field feedback.
