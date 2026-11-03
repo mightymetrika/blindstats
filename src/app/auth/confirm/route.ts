@@ -4,22 +4,43 @@ import { type NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
+  const { searchParams } = request.nextUrl;
   const tokenHash = searchParams.get("token_hash");
-  const type = searchParams.get("type") as EmailOtpType | null;
+  const rawType = searchParams.get("type");
+  // Preserve the existing supported Supabase email OTP types.
+  const acceptedTypes = new Set([
+    "signup",
+    "invite",
+    "magiclink",
+    "recovery",
+    "email_change",
+    "email",
+  ]);
+  const type = rawType && acceptedTypes.has(rawType)
+    ? (rawType as EmailOtpType)
+    : null;
 
   const redirectTo = request.nextUrl.clone();
-  redirectTo.searchParams.delete("token_hash");
-  redirectTo.searchParams.delete("type");
+  // Never carry one-time credentials (or other query values) into a redirect.
+  redirectTo.search = "";
 
   if (tokenHash && type) {
     const supabase = await createClient();
-    const { error } = await supabase.auth.verifyOtp({ type, token_hash: tokenHash });
+    const { error } = await supabase.auth.verifyOtp({
+      type,
+      token_hash: tokenHash,
+    });
 
     if (!error) {
-      redirectTo.pathname = "/studies";
+      redirectTo.pathname = type === "recovery" ? "/reset-password" : "/studies";
       return NextResponse.redirect(redirectTo);
     }
+  }
+
+  if (type === "recovery") {
+    redirectTo.pathname = "/forgot-password";
+    redirectTo.searchParams.set("status", "expired");
+    return NextResponse.redirect(redirectTo);
   }
 
   redirectTo.pathname = "/error";

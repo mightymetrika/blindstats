@@ -1,6 +1,13 @@
+import Link from "next/link";
+
 import { login, signup } from "./actions";
 
-export default function LoginPage() {
+type LoginPageProps = {
+  searchParams: Promise<{ reset?: string }>;
+};
+
+export default async function LoginPage({ searchParams }: LoginPageProps) {
+  const { reset } = await searchParams;
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-md items-center px-6 py-12">
       <section className="w-full rounded-2xl border border-black/10 p-6 shadow-sm dark:border-white/15">
@@ -9,6 +16,12 @@ export default function LoginPage() {
         <p className="mt-2 text-sm text-black/60 dark:text-white/60">
           Sign in to work with persistent Studies.
         </p>
+
+        {reset === "success" ? (
+          <p className="mt-5 rounded-lg border border-black/15 p-3 text-sm dark:border-white/20" role="status">
+            Your password has been updated. Sign in with your new password.
+          </p>
+        ) : null}
 
         <form className="mt-6 space-y-4">
           <div>
@@ -25,6 +38,12 @@ export default function LoginPage() {
           <div>
             <label className="text-sm font-medium" htmlFor="password">Password</label>
             <input className="mt-1 w-full rounded-lg border border-black/15 bg-transparent px-3 py-2 outline-none focus:border-black/40 dark:border-white/20 dark:focus:border-white/50" id="password" name="password" type="password" autoComplete="current-password" minLength={6} required />
+          </div>
+
+          <div className="text-right">
+            <Link className="text-sm font-medium underline underline-offset-4" href="/forgot-password">
+              Forgot password?
+            </Link>
           </div>
 
           <div className="flex gap-3 pt-2">
