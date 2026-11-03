@@ -1,8 +1,10 @@
 blindstats PROJECT HANDOFF
 ============================
-Updated: 2026-10-12
-Handoff version: v28
-Purpose: current research-preview hardening checkpoint; identify the next bounded authentication diagnostic task
+Updated: 2026-11-03
+Handoff version: v29
+Purpose: durable Nov 2026 deployment/authentication checkpoint; document the
+         two deployed environments, validated recovery work, exact remaining
+         Preview error, and safest next steps before researcher testing
 
 PROJECT
 -------
@@ -25,8 +27,11 @@ Stack:
   Node 24.x
   no ORM
 
-Supabase project ref:
-  kfrfemqoalzxwzecyjjf
+Supabase projects (two separate projects; DO NOT confuse):
+  Development / Vercel Preview: blindstats
+    kfrfemqoalzxwzecyjjf
+  Production / Vercel Production: blindstats-prod
+    nafujgfnylnvmmhpbpot
 
 Local environment:
   .env.local exists and is ignored
@@ -56,10 +61,16 @@ If a deployment provider later needs a source-upload ignore file (for example,
 a provider-specific build-context ignore), decide that during deployment
 hardening rather than adding one speculatively now.
 
-Latest source export supplied at this checkpoint:
+Historical source export (2026-10-12, NOT the current snapshot):
   mightymetrika-blindstats-8a5edab282632443(20261012-230125).txt
 
-The latest source export confirms:
+A newer tracked repository archive supplied for recovery development was:
+  blindstats_password_recovery_source.zip (HEAD bdc257b, 2026-10-18)
+The new recovery code was subsequently committed/pushed on development
+as df3a7ff (2026-11-02). Use git log/status to establish the live current
+HEAD, rather than treating the source archive as up to date.
+
+The historical 2026-10-12 export confirms:
   - current README and refreshed docs
   - original browser-local artifact and persistent governance paths
   - no-lock unblinding completion support
@@ -69,70 +80,170 @@ The latest source export confirms:
       20261002223000_allow_unblinding_completion_without_lock.sql
 
 
-CURRENT GIT CHECKPOINT
-----------------------
-Observed user status on 2026-10-12:
-  On branch main
-  Your branch is up to date with 'origin/main'.
-  nothing to commit, working tree clean
+ACTIVE GIT / REPOSITORY CHECKPOINT (2026-11-03)
+------------------------------------------------
+Repository: https://github.com/mightymetrika/blindstats.git
+Local: C:\Users\Mackson Ncube\Documents\blindstats
+Branches:
+  development = ongoing implementation and Vercel Preview
+  main = approved release / eventual Production
+  Do not merge development to main merely because the first Vercel
+  deployment was assigned Production by Vercel.
 
-Known committed/pushed milestones:
-  19fb90f Refresh technical docs and add project handoff
-  a2cf2ef Harden Supabase configuration and response headers
+Last user-reported git status: clean development, tracking origin/development.
+Last user-reported pushed commit: df3a7ff Add secure password recovery workflow.
+Prior deployment wiring/ignore commit: bdc257b Ignore Vercel metadata and
+  environment files (tracked .gitignore; .vercel/ and .env* ignored).
+Earlier known: 6286b6f added sanitized JWT/Studies read diagnostics;
+  25318f4 v28 handoff; 0eab088 Studies error boundary; a2cf2ef config and
+  response headers. Verify abbreviated commit IDs with git log if needed.
 
-Subsequent Studies error-boundary patch was validated and the user later
-reported a clean branch synchronized with origin/main. Its exact Git commit
-hash has not been supplied; obtain it from git log rather than guessing.
+IMPORTANT: Vercel is NOT connected to mightymetrika/blindstats by native Git
+integration. Team account GitHub integration only exposed randomplayables,
+so the Vercel project was created/linked from this local repo via CLI.
+No automatic Git push -> Vercel deployment is established. CLI deployment
+must be invoked explicitly; future GitHub Actions is an option, not set up.
+The Vercel account retains the existing randomplayables login; DO NOT
+break the unrelated RandomPlayables project or disconnect that integration.
 
-The 2026-10-12 export includes both hardening slices and the expected new
-files, so it appears consistent with the reported current working tree.
+LATEST DEPLOYMENTS / ACCESS PROTECTION
+--------------------------------------
+Hosting: Vercel Pro team blindstats, project blindstats
+Project: https://vercel.com/blindstats/blindstats
+Vercel CLI linked local .vercel/project.json (ignored by Git).
+Vercel env vars per environment (both required):
+  NEXT_PUBLIC_SUPABASE_URL
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+Vercel dashboard showed two distinct configured URL values:
+  Preview -> https://kfrfemqoalzxwzecyjjf.supabase.co (development)
+  Production -> https://nafujgfnylnvmmhpbpot.supabase.co (production)
+Publishable keys were not exposed in chat. Verify each matches its own
+project if diagnosing environment errors. NEVER put private/service-role
+keys, password, Resend SMTP password, Vercel tokens, or cookies in handoff.
 
-HARDENING PROGRESS AND OUTSTANDING JWT ERROR
---------------------------------------------
-Slice 1, committed as a2cf2ef:
-  - src/lib/supabase/config.ts and config.test.ts added
-  - browser, server, and proxy Supabase clients use config validation
-  - next.config.ts supplies baseline HTTP response security headers
-  - user validation: 21 test files, 130 tests passed; lint and build clean
-  - local browser sign-in, Study access, and sign-out succeeded
+Critical first-deployment exception:
+  On 2026-11-03 UTC, the FIRST 'npx vercel@latest deploy --scope blindstats
+  --logs' was assigned PRODUCTION by Vercel, despite omitting --prod.
+  This first deploy is at https://blindstats.com and Vercel reported
+  'Deployed to production'; do not treat it as a Preview deploy.
+  It used the Production configuration. No end-user/data smoke test has
+  been intentionally performed against that Production project.
+  Vercel Authentication was enabled for ALL deployments; verified using
+  incognito: blindstats.com redirected to Vercel login, not the app.
 
-Slice 2, subsequent commit hash to confirm:
-  - src/app/studies/error.tsx and error.test.tsx added
-  - Studies-area errors show a safe recovery screen with a Try again action
-  - user validation: 2 targeted tests passed; lint and build clean
-  - first targeted run timed out starting a Vitest worker, then passed
-  - this is user-facing error recovery, NOT an authentication repair
+Second deployment was explicitly Preview:
+  npx vercel@latest deploy --target=preview --scope blindstats --logs
+  Preview: https://blindstats-lny8ir800-blindstats.vercel.app
+  Inspect: https://vercel.com/blindstats/blindstats/AqM2ZYFwx8JTrReJMivsjxvKJooC
+  Compile/TypeScript/build successful, protection enabled, app login renders.
+  --target is now DEPRECATED; for future Preview deploys use:
+    npx vercel@latest deploy --environment preview --scope blindstats --logs
+  Do NOT run --prod during Preview/testing phase.
 
-Unresolved observation during a local Next.js dev session (2026-10-09):
-  GET /studies returned 500; src/app/studies/page.tsx threw:
-    Unable to load Studies: JWT issued at future
-  A later GET /studies returned 200 and the session worked normally.
-  Claims validation and database reads are distinct operations in the page.
-  The failure was reported by a database query after getClaims completed.
+Domain: blindstats.com purchased at CLOUDFLARE Registrar, not Porkbun.
+  DNS managed at Cloudflare; root CNAME DNS-only to Vercel assigned target.
+  Vercel reported active CDN and managed SSL certificate. Do not move DNS
+  to Vercel nameservers or Cloudflare Workers just to deploy Next.js.
+  Vercel maps blindstats.com to Production (protected). Keep Production
+  locked down until release audit and authorized testing are complete.
 
-2026-10-12 code review:
-  - Supabase SSR proxy calls auth.getClaims() and propagates refreshed
-    cookies to the request and response, consistent with the documented
-    Next.js SSR pattern
-  - no project-specific root cause of the intermittent JWT error is proven
-  - public reports describe similar PostgREST rejections; possible service
-    clock skew is a hypothesis, not a verified diagnosis of this project
-  - do NOT disable claims verification or loosen Study RLS as a workaround
-  - do NOT automatically add broad retries or expose raw errors to users
+SUPABASE SCHEMA / AUTH CONFIGURATION
+------------------------------------
+Two separate Supabase projects inside mightymetrika organization:
+  DEV blindstats (kfrfemqoalzxwzecyjjf): all existing test Studies
+  PROD blindstats-prod (nafujgfnylnvmmhpbpot): new, intended clean data.
+  All 14 local migrations through 20261002223000 were applied to PROD
+  and migration list matched, db lint warning level found no schema errors.
+  CLI subsequently re-linked to DEV (safe default). Always confirm:
+    npx supabase projects list
+  before DB changes. NEVER run db push against the wrong project.
+  A Cloudflare/Resend email setup does not require a migration.
 
-Next bounded JWT investigation:
-  1. If the error recurs, record exact UTC timestamp, error message/code,
-     HTTP status, and request ID if accessible; do not share full JWTs,
-     cookies, API keys, unblinding secrets, or research data.
-  2. Check whether an identical read later succeeds without reauthenticating.
-  3. If reproducible, review Supabase project logs and raise a focused
-     support report with sanitized timestamps and codes.
-  4. Only then decide whether a narrowly scoped read retry is warranted.
+Production Supabase Authentication / URL Configuration:
+  Site URL: https://blindstats.com
+  Confirmation signup template (saved):
+    {{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&amp;type=email
+  Reset password template (saved on 2026-11-03):
+    {{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&amp;type=recovery
+  The HTML '&amp;' inside href is intentional.
+  Site URL and email templates point to the protected Production host;
+  they do not by themselves establish Preview email support.
 
-Background references (not evidence about this specific project):
-  https://supabase.com/docs/guides/auth/server-side/creating-a-client
-  https://github.com/orgs/supabase/discussions/48123
-  https://github.com/supabase/supabase/issues/49655
+Development Supabase Authentication / URL Configuration:
+  Site URL remains http://localhost:3000 to protect local workflow.
+  Added allowed redirect (Supabase confirmed success):
+    https://blindstats-lny8ir800-blindstats.vercel.app/**
+  No other redirect was evidenced. An allowed redirect ALONE does not
+  change default email template links or signup redirectTo behavior.
+  Because Preview hostnames rotate, a deliberate stable Preview alias or
+  carefully constrained redirect design is preferred before testing
+  signup/recovery emails; do not use broad unsafe wildcards casually.
+  Check actual DEV confirmation/recovery templates and application actions
+  before sending any email links from the Preview host.
+
+Resend SMTP for PRODUCTION:
+  Registered and verified auth.blindstats.com on Resend (Cloudflare DNS).
+  DKIM and both sending CNAMEs verified in dashboard; sending enabled.
+  Resend API key named blindstats-production-supabase has Sending access
+  limited to auth.blindstats.com. SMTP host smtp.resend.com, port 465,
+  username resend, sender no-reply@auth.blindstats.com, name blindstats.
+  Password is secret and must NEVER be printed, committed, or recorded here.
+  Custom SMTP was enabled in production Supabase dashboard.
+  Development SMTP was not configured as part of the documented steps.
+
+PASSWORD RECOVERY IMPLEMENTATION (2026-11-02)
+----------------------------------------------
+Committed/pushed to development as df3a7ff (9 files, 482 insertions,
+7 deletions). Includes:
+  - src/app/forgot-password/page.tsx and actions.ts
+  - src/app/reset-password/page.tsx and actions.ts
+  - src/app/login/page.tsx: Forgot password? link
+  - src/app/auth/confirm/route.ts: recovery OTP -> /reset-password;
+    existing signup and invite confirmation flows preserved
+  - 3 new test files covering confirmation, forgot and reset actions.
+Safety intent: account-neutral reset-request response; eight-character
+minimum new password; session-authenticated password update; no raw token
+in post-confirmation redirect. Verify in browser prior to field release.
+Validated locally by user on Windows: npm test passed 148/148 (26 files),
+npm run lint passed; npm run build passed with all new routes. Vercel
+Production and Preview builds both completed successfully.
+No database migration or new package dependency was required.
+
+CURRENT BUG / THE FIRST TASK NEXT SESSION
+-----------------------------------------
+2026-11-03 Preview browser smoke test:
+  1. Protected Preview URL opened and /login rendered.
+  2. Existing DEV test account was used to sign in.
+  3. The first /studies page displayed the safe Studies error boundary:
+     'Unable to load Study information'. This is an actual runtime failure.
+  4. Later /studies loaded successfully; signed in as test1;
+     nine existing DEV Studies displayed.
+  Thus Supabase Preview connectivity/auth and database read DO WORK,
+  but an intermittent failing read remains. Root cause is NOT established.
+
+Related older LOCAL incident: Supabase REST /profiles produced HTTP 401
+PGRST303 'JWT issued at future', while /studies succeeded. Earlier logs
+were correlated with a Supabase Edge request on 2026-10-12. The new Preview
+failure may OR MAY NOT be the same issue. Do not claim a confirmed link.
+The safe UI error boundary is recovery, not a fix for the underlying issue.
+
+IMMEDIATE DIAGNOSTIC NEXT ACTION:
+  In Vercel project Logs, choose Preview, time near the sign-in that
+  produced the error. Inspect /studies server logs; capture sanitized
+  event timestamp (UTC), HTTP status, Supabase error code, and nonsecret
+  request ID. Where useful, correlate with Supabase DEV API/Auth logs.
+  Do not share tokens, cookies, passwords, research data or unblinding
+  material. Try normal page reload separately and note recurrence rate.
+  Check app diagnostic logging already present in
+  src/lib/supabase/studies-read-diagnostics.ts before adding logging.
+  No speculative JWT retries, no bypass of getClaims(), no loosening RLS.
+
+After the error is characterized, proceed to focused PREVIEW testing:
+  (1) login and sign-out stability with existing DEV account,
+  (2) DEV signup email route and reset email route alignment,
+  (3) browser confirmation/recovery for test users, and
+  (4) later a two-account governance smoke test and researcher feedback.
+Do not claim field-release readiness on the basis of a successful build.
 
 CURRENT PRODUCT / SCIENTIFIC MODEL
 ----------------------------------
@@ -596,48 +707,31 @@ checkpoints. Older v0 documents describe the artifact protocol plus the
 implemented persistent governance layer. No broad documentation rewrite is
 pending before research-preview deployment.
 
-CURRENT RELEASE PHASE
----------------------
-Core blinding workflow: substantially complete for researcher feedback.
-Documentation refresh: committed and pushed.
-Provider-neutral config/header hardening: committed and pushed.
-Studies error recovery boundary: code present; targeted tests/lint/build pass.
+CURRENT RELEASE PHASE / DEPLOYMENT HARDENING
+---------------------------------------------
+Researcher-feedback Preview is deployed, protected, and initially smoke-tested.
+Hosting, domain, two Supabase projects, production SMTP and recovery templates
+are configured. The Preview login renders and DEV authentication/Studies read
+succeeded on retry. The initial /studies runtime error remains unexplained.
 
-Still needed before research-preview field release:
-  - investigate the intermittent JWT issued-at-future error
-  - establish hosting target and production application URL
-  - align Supabase Auth Site URL, allowed redirects, confirmation email flow
-  - review RLS/RPC, public error behavior, exposed secrets, release wording
-  - deploy and perform a focused production two-account smoke test
-  - prepare brief researcher walkthrough and collect field feedback
+Still open BEFORE external researchers are invited:
+  - characterize/fix intermittent Preview Studies read failure;
+  - align DEV confirmation/recovery email destinations with Preview and
+    perform safe end-to-end signup/reset tests;
+  - review production/preview access controls and authentication behavior;
+  - audit RLS/RPC, data exposure, security logs, secrets and release wording;
+  - perform focused two-account governance smoke test in DEV only;
+  - prepare researcher walkthrough and limits-of-use notice.
 
-Do NOT broaden the feature set without a concrete release blocker or feedback.
+Deployment access model: Vercel Authentication -> All Deployments.
+This protects deployment URLs for team users, but is NOT the same as
+blindstats/Supabase user authentication. External researchers cannot use a
+Vercel-protected URL normally unless an access approach is deliberately
+selected. Do not remove protection before deciding researcher onboarding.
 
-RECOMMENDED NEXT MAJOR TASK
----------------------------
-First: bounded JWT/Data API issue diagnosis; no speculative auth changes.
-Then: production authentication and deployment-target configuration, after
-choosing an actual deployment URL.
-
-DEPLOYMENT HARDENING CHECKLIST
-------------------------------
-Complete:
-  - explicit Supabase environment variable validation
-  - browser/server/proxy client configuration consistency
-  - baseline response headers (nosniff, DENY frame, referrer, permissions)
-  - safe Studies-area UI recovery for unexpected server errors
-  - local lint, tests, production build for the delivered slices
-
-Open:
-  - investigate intermittent JWT issued-at-future rejection
-  - production hosting target and URL
-  - Supabase Auth redirect / confirmation URLs and signup configuration
-  - review deployed migration alignment, RLS, RPCs, public error behavior
-  - accidental logging/exposure of secrets and production release wording
-  - production smoke test, walkthrough, and researcher feedback
-
-Release wording: researcher-feedback / research-preview. NOT infrastructure
-certified for sensitive, regulated, confidential, or client research data.
+Do not broaden core feature set without a release blocker or field evidence.
+Research-preview is NOT certified for confidential, regulated, client, or
+sensitive research data, notwithstanding the Production build.
 
 RESEARCHER-FEEDBACK RELEASE PURPOSE
 -----------------------------------
@@ -760,40 +854,33 @@ Avoid:
   long-page UI patterns mixing live tasks, audit history, and education
 
 
-RECOMMENDED NEXT SESSION START
-------------------------------
-Run:
-  cd "C:\Users\Mackson Ncube\Documents\blindstats"
+RECOMMENDED NEXT SESSION START (2026-11-03)
+-------------------------------------------
+MOST IMPORTANT: This updated v29 handoff itself must be committed and pushed
+on the development branch IMMEDIATELY, BEFORE any further diagnosis.
+Confirm it exists at repo root and GitHub shows the commit. Do not only
+save a local copy or rely on this chat retaining context.
+
+Windows PowerShell from C:\Users\Mackson Ncube\Documents\blindstats:
+  git branch --show-current
   git status
-  git log --oneline --decorate -8
+  git add PROJECT_HANDOFF.txt
+  git diff --cached --stat
+  git commit -m "Update blindstats deployment and auth handoff"
+  git push origin development
+  git status
 
-Expected based on latest observed status: branch main synchronized with
-origin/main, working tree clean. Confirm the Studies error-boundary commit hash
-from actual git log. The current source export is dated 2026-10-12.
+Once pushed, begin with the Vercel Preview runtime logs for the intermittent
+/studies loading error. Browser success on retry is NOT diagnosis.
 
-First target: investigate and capture evidence for JWT issued-at-future when
-it recurs. Do not alter authentication checks without evidence.
+Do NOT merge to main or make more Production deployments yet.
+Do NOT put any secrets or protected research artifacts in git.
 
-Latest known deployed migration:
+Latest known schema migration:
   20261002223000_allow_unblinding_completion_without_lock.sql
 
 END OF HANDOFF
 --------------
-Research-preview hardening is under way. Two bounded patches are present:
-  (1) Supabase configuration and response headers (a2cf2ef)
-  (2) Studies error recovery (commit SHA to confirm via git log)
-
-Validation reported by user:
-  - first slice: 130 tests passing across 21 files; lint and build clean
-  - second slice: 2 targeted tests passing; lint and build clean
-  - latest Git status: clean, main synchronized with origin/main
-  - current source export includes both patches
-
-Remaining active risk: intermittent 'JWT issued at future' from a Study query.
-The cause has not been established; the Studies error boundary provides
-recoverability, not a fix for JWT rejection.
-
-Near-term path:
-  JWT diagnostics -> production authentication configuration -> research-preview
-  deployment -> focused two-account smoke test -> researcher walkthrough ->
-  field feedback.
+Current durable goal: confirm handoff push, investigate Preview runtime
+error, validate DEV auth email and recovery, perform 2-account smoke test,
+then prepare safe researcher feedback release with explicit limitations.
