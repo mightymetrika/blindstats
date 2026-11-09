@@ -1,10 +1,10 @@
 blindstats PROJECT HANDOFF
 ============================
-Updated: 2026-11-03
-Handoff version: v29
-Purpose: durable Nov 2026 deployment/authentication checkpoint; document the
-         two deployed environments, validated recovery work, exact remaining
-         Preview error, and safest next steps before researcher testing
+Updated: 2026-11-09
+Handoff version: v30
+Purpose: research-preview release checkpoint after successful REAL two-account
+         development integration test; prioritize bounded production release
+         checks, not repeated manual UI workflows or speculative upgrades
 
 PROJECT
 -------
@@ -209,41 +209,75 @@ npm run lint passed; npm run build passed with all new routes. Vercel
 Production and Preview builds both completed successfully.
 No database migration or new package dependency was required.
 
-CURRENT BUG / THE FIRST TASK NEXT SESSION
------------------------------------------
-2026-11-03 Preview browser smoke test:
-  1. Protected Preview URL opened and /login rendered.
-  2. Existing DEV test account was used to sign in.
-  3. The first /studies page displayed the safe Studies error boundary:
-     'Unable to load Study information'. This is an actual runtime failure.
-  4. Later /studies loaded successfully; signed in as test1;
-     nine existing DEV Studies displayed.
-  Thus Supabase Preview connectivity/auth and database read DO WORK,
-  but an intermittent failing read remains. Root cause is NOT established.
+VERIFIED TWO-ACCOUNT AUTHORIZATION INTEGRATION (2026-11-09)
+-----------------------------------------------------------
+Status: PASS, verified against DEVELOPMENT Supabase, not Production.
+Command used from local repository root:
+  powershell.exe -NoProfile -ExecutionPolicy Bypass `
+    -File .\scripts\run-development-authz-test.ps1
+User-reported Vitest result:
+  tests/integration/independent-authorization.integration.test.ts
+  Test Files 1 passed (1); Tests 1 passed (1); duration 4.69s.
 
-Related older LOCAL incident: Supabase REST /profiles produced HTTP 401
-PGRST303 'JWT issued at future', while /studies succeeded. Earlier logs
-were correlated with a Supabase Edge request on 2026-10-12. The new Preview
-failure may OR MAY NOT be the same issue. Do not claim a confirmed link.
-The safe UI error boundary is recovery, not a fix for the underlying issue.
+The opt-in test uses two existing DEV authenticated accounts and a synthetic
+Study/CSV with real DB functions and RLS. It checks that an unrelated user
+cannot read the Study, unauthorized operations are refused, requester
+self-authorization is rejected under an immutable Independent policy, a
+separate authorized Study member can authorize, and persisted request,
+authorization, and workflow state agree. The test uses the permitted NO-LOCK
+path because analysis-lock mechanics are already unit/component tested.
+The test archives its disposable Study (there is no ordinary-user DELETE
+permission). The test does NOT prove browser-level rendering, email delivery,
+plaintext-secret transport, or a complete production end-to-end workflow.
 
-IMMEDIATE DIAGNOSTIC NEXT ACTION:
-  In Vercel project Logs, choose Preview, time near the sign-in that
-  produced the error. Inspect /studies server logs; capture sanitized
-  event timestamp (UTC), HTTP status, Supabase error code, and nonsecret
-  request ID. Where useful, correlate with Supabase DEV API/Auth logs.
-  Do not share tokens, cookies, passwords, research data or unblinding
-  material. Try normal page reload separately and note recurrence rate.
-  Check app diagnostic logging already present in
-  src/lib/supabase/studies-read-diagnostics.ts before adding logging.
-  No speculative JWT retries, no bypass of getClaims(), no loosening RLS.
+Repository changes included in the passing patch:
+  package.json: explicit test:integration:authz script
+  vitest.integration.config.mts: opt-in runner, excluded from npm test
+  tests/integration/independent-authorization.integration.test.ts
+  scripts/run-development-authz-test.ps1
+  docs/independent-authorization-integration-test.md
+The first attempt failed creating a synthetic Study because the test requested
+returning the row before owner-membership AFTER INSERT effects could satisfy
+Study SELECT RLS. The corrected test mirrored application creation behavior;
+second attempt passed. No RLS/database migration was changed.
+The PowerShell launcher reads ignored .env.local, explicitly allows only the
+expected development Supabase URL, prompts privately for two passwords, and
+clears temporary environment variables. NEVER commit or expose credentials.
 
-After the error is characterized, proceed to focused PREVIEW testing:
-  (1) login and sign-out stability with existing DEV account,
-  (2) DEV signup email route and reset email route alignment,
-  (3) browser confirmation/recovery for test users, and
-  (4) later a two-account governance smoke test and researcher feedback.
-Do not claim field-release readiness on the basis of a successful build.
+Next action: run npm test, npm run lint, npm run build; commit and push the
+5 test-support files plus THIS handoff to development. Do not merge main or
+make a new Production deploy until the bounded release checks are complete.
+
+KNOWN INTERMITTENT PREVIEW STUDIES ERROR (DEFERRED FOR INITIAL FEEDBACK)
+--------------------------------------------------------------------
+2026-11-03 Vercel Preview logs confirmed:
+  UTC 2026-11-03 00:50:36.874; operation studies; HTTP 401;
+  PGRST303; errorCategory jwt_issued_at_future.
+This matches the earlier intermittent local observation. Preview login and
+Study retrieval succeeded on retry (nine existing DEV Studies displayed).
+DEV PostgREST was 14.17 when inspected. PostgREST 14.18 release notes list
+a fix for sporadic PGRST303 JWT-issued-at-future errors; the installed
+version is a plausible cause but the project-specific root cause is not
+proven. No infrastructure upgrade was performed. Development project backup
+was NOT created; Docker and pg_dump were unavailable. Do NOT initiate an
+unbacked-up database upgrade as a side quest. Retain safe Studies error
+boundary; never weaken claims validation, permissions, or RLS. Revisit if
+frequency/severity makes the feedback release unusable.
+
+RELEASE FINISH LINE (NEXT WORK)
+-------------------------------
+1. Complete local validation and push this v30 checkpoint on development.
+2. Focused Production release checks: confirm production auth redirect,
+   verification/recovery links and SMTP work; verify Vercel deployment
+   protection strategy (external researchers cannot use protected Vercel
+   URLs without appropriate access). Check publishable-only client env,
+   proper PROD Supabase project and minimum authorization exposure.
+3. Promote validated source intentionally to main and deploy Production
+   deliberately (Vercel CLI is manual, not auto-connected to Git).
+4. Minimal post-deploy login and permissions smoke check with synthetic
+   data, release limitations/walkthrough; invite researcher feedback.
+No comprehensive repeat of the two-account browser workflow by default.
+No new major features before first researcher-feedback release.
 
 CURRENT PRODUCT / SCIENTIFIC MODEL
 ----------------------------------
@@ -709,18 +743,20 @@ pending before research-preview deployment.
 
 CURRENT RELEASE PHASE / DEPLOYMENT HARDENING
 ---------------------------------------------
-Researcher-feedback Preview is deployed, protected, and initially smoke-tested.
-Hosting, domain, two Supabase projects, production SMTP and recovery templates
-are configured. The Preview login renders and DEV authentication/Studies read
-succeeded on retry. The initial /studies runtime error remains unexplained.
+Researcher-feedback Preview is deployed and protected. Hosting, domain, two
+Supabase projects, production SMTP and recovery templates are configured.
+DEV authentication and Study retrieval succeeded on retry. Intermittent
+PGRST303 error is known, logged, and deferred absent significant recurrence.
+One live two-account independent-authorization test PASSED on 2026-11-09.
 
 Still open BEFORE external researchers are invited:
-  - characterize/fix intermittent Preview Studies read failure;
-  - align DEV confirmation/recovery email destinations with Preview and
-    perform safe end-to-end signup/reset tests;
-  - review production/preview access controls and authentication behavior;
-  - audit RLS/RPC, data exposure, security logs, secrets and release wording;
-  - perform focused two-account governance smoke test in DEV only;
+  - commit/push the passing integration test and updated v30 handoff;
+  - verify production confirmation/recovery emails and auth redirects;
+  - verify Production/Preview access protection and researcher access policy;
+  - conduct a narrow release security/configuration review for secrets,
+    environment targeting, exposed RPC/RLS behavior and release wording;
+  - intentionally promote source to main and deploy Production;
+  - run a minimal post-deploy authentication/synthetic-data check;
   - prepare researcher walkthrough and limits-of-use notice.
 
 Deployment access model: Vercel Authentication -> All Deployments.
@@ -854,33 +890,34 @@ Avoid:
   long-page UI patterns mixing live tasks, audit history, and education
 
 
-RECOMMENDED NEXT SESSION START (2026-11-03)
+RECOMMENDED NEXT SESSION START (2026-11-09)
 -------------------------------------------
-MOST IMPORTANT: This updated v29 handoff itself must be committed and pushed
-on the development branch IMMEDIATELY, BEFORE any further diagnosis.
-Confirm it exists at repo root and GitHub shows the commit. Do not only
-save a local copy or rely on this chat retaining context.
+Current source code: development branch. User last reported clean working tree
+before applying the opt-in integration test patch. The passing patched files
+and this v30 handoff remain to be validated/committed/pushed. Verify current
+branch/status; don't assume changes already committed.
 
-Windows PowerShell from C:\Users\Mackson Ncube\Documents\blindstats:
-  git branch --show-current
-  git status
-  git add PROJECT_HANDOFF.txt
-  git diff --cached --stat
-  git commit -m "Update blindstats deployment and auth handoff"
-  git push origin development
-  git status
+From C:\Users\Mackson Ncube\Documents\blindstats:
+  npm test
+  npm run lint
+  npm run build
+  git status --short
 
-Once pushed, begin with the Vercel Preview runtime logs for the intermittent
-/studies loading error. Browser success on retry is NOT diagnosis.
+Then stage the exact 5 test-support files plus PROJECT_HANDOFF.txt; commit and
+push origin development. Do not add .env.local, secrets, test credentials,
+or protected artifacts. Keep branch main and PROD unchanged until approved
+release-check milestone.
 
-Do NOT merge to main or make more Production deployments yet.
-Do NOT put any secrets or protected research artifacts in git.
+Then prioritize the narrow Production release checks listed above, avoiding
+further manual browser workflow reruns. The Supabase/PostgREST upgrade is NOT
+a prerequisite absent a consequential recurrence. There is NO verified backup
+and NO confirmed PostgREST version upgrade.
 
-Latest known schema migration:
+Most recent known deployed migration:
   20261002223000_allow_unblinding_completion_without_lock.sql
 
 END OF HANDOFF
 --------------
-Current durable goal: confirm handoff push, investigate Preview runtime
-error, validate DEV auth email and recovery, perform 2-account smoke test,
-then prepare safe researcher feedback release with explicit limitations.
+2026-11-09: Real two-account RLS/authorization test PASSED in DEV.
+Next: validate/push files plus v30 handoff, then finish Production release
+checks and researcher-feedback release with explicit limitations.

@@ -11,6 +11,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
+    "test:integration:authz": "vitest run --config vitest.integration.config.mts",
     "test:watch": "vitest"
   },
   "dependencies": {
