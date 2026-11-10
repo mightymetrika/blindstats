@@ -1,10 +1,10 @@
 blindstats PROJECT HANDOFF
 ============================
-Updated: 2026-11-09
-Handoff version: v30
-Purpose: research-preview release checkpoint after successful REAL two-account
-         development integration test; prioritize bounded production release
-         checks, not repeated manual UI workflows or speculative upgrades
+Updated: 2026-11-09 (US Pacific; deployments 2026-11-10 UTC)
+Handoff version: v31
+Purpose: preserve validated release code, completed Preview/Production deployments,
+         and successful Production signup/email-confirmation acceptance; finish
+         remaining narrow release tasks without manual workflow retesting
 
 PROJECT
 -------
@@ -80,23 +80,27 @@ The historical 2026-10-12 export confirms:
       20261002223000_allow_unblinding_completion_without_lock.sql
 
 
-ACTIVE GIT / REPOSITORY CHECKPOINT (2026-11-03)
+ACTIVE GIT / REPOSITORY CHECKPOINT (2026-11-09)
 ------------------------------------------------
 Repository: https://github.com/mightymetrika/blindstats.git
 Local: C:\Users\Mackson Ncube\Documents\blindstats
 Branches:
-  development = ongoing implementation and Vercel Preview
-  main = approved release / eventual Production
-  Do not merge development to main merely because the first Vercel
-  deployment was assigned Production by Vercel.
+  development = implementation / Preview and validated release source
+  main = intended approved release branch; NOT YET reported aligned to development
+  Production was deployed explicitly from clean development HEAD before main
+  was updated. Align main intentionally at the remaining release checkpoint.
 
-Last user-reported git status: clean development, tracking origin/development.
-Last user-reported pushed commit: df3a7ff Add secure password recovery workflow.
-Prior deployment wiring/ignore commit: bdc257b Ignore Vercel metadata and
-  environment files (tracked .gitignore; .vercel/ and .env* ignored).
-Earlier known: 6286b6f added sanitized JWT/Studies read diagnostics;
-  25318f4 v28 handoff; 0eab088 Studies error boundary; a2cf2ef config and
-  response headers. Verify abbreviated commit IDs with git log if needed.
+Last user-reported status: clean development, up to date with origin/development.
+Latest user-confirmed pushed code/handoff commit:
+  5f7be56 Validate two-account authorization and update release handoff
+  (includes opt-in integration test files and PROJECT_HANDOFF v30).
+User validated before commit: npm test 148/148 (26 files), lint clean,
+  Next.js production build clean. Real DEV two-account integration test passed.
+Prior milestones: df3a7ff password recovery; bdc257b ignored Vercel/.env;
+  fa28c0d handoff v29; 6286b6f sanitized JWT read diagnostics;
+  0eab088 Studies error boundary; a2cf2ef config and security headers.
+Version v31 is documentation-only; its Git commit is separate from 5f7be56.
+Confirm the handoff commit SHA in git log after pushing.
 
 IMPORTANT: Vercel is NOT connected to mightymetrika/blindstats by native Git
 integration. Team account GitHub integration only exposed randomplayables,
@@ -126,10 +130,9 @@ Critical first-deployment exception:
   --logs' was assigned PRODUCTION by Vercel, despite omitting --prod.
   This first deploy is at https://blindstats.com and Vercel reported
   'Deployed to production'; do not treat it as a Preview deploy.
-  It used the Production configuration. No end-user/data smoke test has
-  been intentionally performed against that Production project.
-  Vercel Authentication was enabled for ALL deployments; verified using
-  incognito: blindstats.com redirected to Vercel login, not the app.
+  It used the Production configuration. This was the initial deployment;
+  the subsequent 2026-11-09 release deployment and live signup validation
+  are recorded below. Vercel Authentication remained on throughout.
 
 Second deployment was explicitly Preview:
   npx vercel@latest deploy --target=preview --scope blindstats --logs
@@ -138,14 +141,34 @@ Second deployment was explicitly Preview:
   Compile/TypeScript/build successful, protection enabled, app login renders.
   --target is now DEPRECATED; for future Preview deploys use:
     npx vercel@latest deploy --environment preview --scope blindstats --logs
-  Do NOT run --prod during Preview/testing phase.
+
+Validated release redeployments, evening 2026-11-09 US Pacific
+(2026-11-10 UTC), built from clean development commit 5f7be56:
+  PREVIEW: npx vercel@65.14.0 deploy --environment preview --scope blindstats --logs
+    https://blindstats-ltso2n8m1-blindstats.vercel.app
+    Inspect https://vercel.com/blindstats/blindstats/9wzHK6uF6z2K14u6twDe4gFYDWAA
+    Ready in 17s; compilation, TypeScript, routes passed; protection ON.
+    This is build/deployment success; no new full two-account browser run.
+  PRODUCTION: npx vercel@65.14.0 deploy --prod --scope blindstats --logs
+    https://blindstats-pukem14zl-blindstats.vercel.app
+    Inspect https://vercel.com/blindstats/blindstats/FeupDPbHS2okTXuy3ZnppFXkuJXZ
+    Aliased https://blindstats.com; Ready in 18s; build/TypeScript passed.
+    Protection remains ON; no Supabase schema or DB upgrade performed.
+  These deployments were MANUAL Vercel CLI actions, not Git-triggered.
+
+Protection check (2026-11-09): external unauthenticated request to
+  https://blindstats.com/login returned HTTP 302 with Vercel sso-api Location.
+  `vercel curl` test created a persistent Protection Bypass for Automation
+  secret on the project; it DID NOT open public access. REVOKE that unused
+  bypass credential at release cleanup. The attempted `vercel curl` -sS/-w
+  invocation did not yield usable HTTP-status verification; do not claim it did.
 
 Domain: blindstats.com purchased at CLOUDFLARE Registrar, not Porkbun.
   DNS managed at Cloudflare; root CNAME DNS-only to Vercel assigned target.
   Vercel reported active CDN and managed SSL certificate. Do not move DNS
   to Vercel nameservers or Cloudflare Workers just to deploy Next.js.
-  Vercel maps blindstats.com to Production (protected). Keep Production
-  locked down until release audit and authorized testing are complete.
+  Vercel maps blindstats.com to the new Production deployment (protected).
+  Keep Production locked down until external researcher access is approved.
 
 SUPABASE SCHEMA / AUTH CONFIGURATION
 ------------------------------------
@@ -158,6 +181,14 @@ Two separate Supabase projects inside mightymetrika organization:
     npx supabase projects list
   before DB changes. NEVER run db push against the wrong project.
   A Cloudflare/Resend email setup does not require a migration.
+
+User separation verified in Supabase Authentication > Users screenshots:
+  Development: exactly 2 existing test accounts visible (as checked).
+  Production: 0 users BEFORE the first live Production signup test.
+  The two DEV test accounts do not transfer to Production.
+  A disposable Production account was then successfully registered and
+  used to verify email confirmation and authenticated Studies access.
+  Its inbox is public/test-only; do NOT use it for real studies or secrets.
 
 Production Supabase Authentication / URL Configuration:
   Site URL: https://blindstats.com
@@ -189,6 +220,10 @@ Resend SMTP for PRODUCTION:
   username resend, sender no-reply@auth.blindstats.com, name blindstats.
   Password is secret and must NEVER be printed, committed, or recorded here.
   Custom SMTP was enabled in production Supabase dashboard.
+  Production signup email arrived from no-reply@auth.blindstats.com on
+  2026-11-09; confirmation link led to authenticated /studies page and
+  showed a fresh workspace with zero Studies. The Production signup flow
+  is therefore accepted. LIVE PASSWORD RECOVERY NOT YET TESTED.
   Development SMTP was not configured as part of the documented steps.
 
 PASSWORD RECOVERY IMPLEMENTATION (2026-11-02)
@@ -244,9 +279,10 @@ The PowerShell launcher reads ignored .env.local, explicitly allows only the
 expected development Supabase URL, prompts privately for two passwords, and
 clears temporary environment variables. NEVER commit or expose credentials.
 
-Next action: run npm test, npm run lint, npm run build; commit and push the
-5 test-support files plus THIS handoff to development. Do not merge main or
-make a new Production deploy until the bounded release checks are complete.
+Those validation steps were completed, and the five test-support files plus
+v30 handoff were committed/pushed on development as 5f7be56. The same validated
+source was then built/deployed explicitly to both Preview and Production.
+Do not rerun the comprehensive two-account workflow for cosmetic changes.
 
 KNOWN INTERMITTENT PREVIEW STUDIES ERROR (DEFERRED FOR INITIAL FEEDBACK)
 --------------------------------------------------------------------
@@ -266,18 +302,29 @@ frequency/severity makes the feedback release unusable.
 
 RELEASE FINISH LINE (NEXT WORK)
 -------------------------------
-1. Complete local validation and push this v30 checkpoint on development.
-2. Focused Production release checks: confirm production auth redirect,
-   verification/recovery links and SMTP work; verify Vercel deployment
-   protection strategy (external researchers cannot use protected Vercel
-   URLs without appropriate access). Check publishable-only client env,
-   proper PROD Supabase project and minimum authorization exposure.
-3. Promote validated source intentionally to main and deploy Production
-   deliberately (Vercel CLI is manual, not auto-connected to Git).
-4. Minimal post-deploy login and permissions smoke check with synthetic
-   data, release limitations/walkthrough; invite researcher feedback.
+DONE: Development integration, 148 unit/component tests, lint, build,
+      explicit Preview and Production deployments of commit 5f7be56.
+DONE: Production signup, Resend confirmation email, confirmation-link
+      redemption, authenticated Studies access; new Production user has
+      zero Studies. Development/Production account separation verified.
+OPEN: 1. Test LIVE Production password reset request, delivery, token link,
+         password update and login once with the disposable account.
+      2. Intentionally fast-forward/align GitHub main to validated release
+         source after confirming branch ancestry. v31 handoff is docs only.
+      3. Choose and implement researcher access policy; Vercel Authentication
+         still blocks uninvited external users, despite Supabase signup
+         working for a Vercel-authenticated tester. Do not open access
+         before the deliberate release decision.
+      4. Revoke the unused Vercel Protection Bypass for Automation secret.
+      5. Finish narrow security/config/limitations review and researcher
+         walkthrough; invite feedback with synthetic/non-sensitive data.
+      6. Consider deletion of the disposable public-inbox Production account
+         after testing; ensure no legitimate data depend on it.
+DEFER: Login UI wording 'Sign in to work with persistent Studies' is too
+       technical. Preferred replacement: 'Sign in to continue your research.'
+       Cosmetic only; not a release blocker or reason to redeploy tonight.
 No comprehensive repeat of the two-account browser workflow by default.
-No new major features before first researcher-feedback release.
+No PostgREST/Postgres upgrade or new major feature for this checkpoint.
 
 CURRENT PRODUCT / SCIENTIFIC MODEL
 ----------------------------------
@@ -743,31 +790,30 @@ pending before research-preview deployment.
 
 CURRENT RELEASE PHASE / DEPLOYMENT HARDENING
 ---------------------------------------------
-Researcher-feedback Preview is deployed and protected. Hosting, domain, two
-Supabase projects, production SMTP and recovery templates are configured.
-DEV authentication and Study retrieval succeeded on retry. Intermittent
-PGRST303 error is known, logged, and deferred absent significant recurrence.
-One live two-account independent-authorization test PASSED on 2026-11-09.
+Preview AND Production rebuilt/deployed from validated 5f7be56; both Ready.
+Production custom domain/HTTPS functioning behind Vercel Authentication.
+Production has been live-tested with a disposable signup account: confirmation
+SMTP email delivered, linked token accepted, signed-in Studies page loaded.
+The Production environment was confirmed separate from the two DEV accounts.
+148 unit/component tests, lint, build, and a live two-account DEV integration
+passed; no additional full manual workflow is planned.
 
-Still open BEFORE external researchers are invited:
-  - commit/push the passing integration test and updated v30 handoff;
-  - verify production confirmation/recovery emails and auth redirects;
-  - verify Production/Preview access protection and researcher access policy;
-  - conduct a narrow release security/configuration review for secrets,
-    environment targeting, exposed RPC/RLS behavior and release wording;
-  - intentionally promote source to main and deploy Production;
-  - run a minimal post-deploy authentication/synthetic-data check;
-  - prepare researcher walkthrough and limits-of-use notice.
+Known risk: intermittent PGRST303 jwt_issued_at_future seen earlier in DEV,
+recoverable; deferred unless repeated. No DB service upgrades performed.
 
-Deployment access model: Vercel Authentication -> All Deployments.
-This protects deployment URLs for team users, but is NOT the same as
-blindstats/Supabase user authentication. External researchers cannot use a
-Vercel-protected URL normally unless an access approach is deliberately
-selected. Do not remove protection before deciding researcher onboarding.
+Outstanding before external researcher invitation:
+  - one production forgot-password / recovery email / new-login check;
+  - align GitHub main (source already manually deployed to Production);
+  - make a deliberate researcher access decision while Vercel Authentication
+    remains enabled; it is not the same as Supabase sign-in;
+  - remove the unused Vercel automation-bypass secret and disposable test user;
+  - narrow security/configuration, permitted data and release wording review;
+  - publish short researcher walkthrough and gather feedback.
 
+Production is deployed, but NOT publicly opened for external researchers.
 Do not broaden core feature set without a release blocker or field evidence.
 Research-preview is NOT certified for confidential, regulated, client, or
-sensitive research data, notwithstanding the Production build.
+sensitive research data, notwithstanding the successful Production signup.
 
 RESEARCHER-FEEDBACK RELEASE PURPOSE
 -----------------------------------
@@ -890,34 +936,34 @@ Avoid:
   long-page UI patterns mixing live tasks, audit history, and education
 
 
-RECOMMENDED NEXT SESSION START (2026-11-09)
--------------------------------------------
-Current source code: development branch. User last reported clean working tree
-before applying the opt-in integration test patch. The passing patched files
-and this v30 handoff remain to be validated/committed/pushed. Verify current
-branch/status; don't assume changes already committed.
+RECOMMENDED NEXT SESSION START (AFTER V31 CHECKPOINT)
+----------------------------------------------------
+Current approved test source: commit 5f7be56 on development, reported clean
+and pushed. Version v31 updates documentation only; verify its commit and push
+using git log/status. Production and Preview deploys were built from 5f7be56.
 
 From C:\Users\Mackson Ncube\Documents\blindstats:
-  npm test
-  npm run lint
-  npm run build
-  git status --short
+  git status
+  git log --oneline --decorate -6
+  git branch -vv
 
-Then stage the exact 5 test-support files plus PROJECT_HANDOFF.txt; commit and
-push origin development. Do not add .env.local, secrets, test credentials,
-or protected artifacts. Keep branch main and PROD unchanged until approved
-release-check milestone.
+Confirm v31 handoff commit is pushed to origin/development. Do not rerun
+148 tests or the two-account test just for documentation changes.
 
-Then prioritize the narrow Production release checks listed above, avoiding
-further manual browser workflow reruns. The Supabase/PostgREST upgrade is NOT
-a prerequisite absent a consequential recurrence. There is NO verified backup
-and NO confirmed PostgREST version upgrade.
+NEXT: run one LIVE Production forgot-password/recovery test with existing
+DISPOSABLE Production test account. Never post passwords or tokenized URLs.
+Then align main with the approved release source, choose the external access
+policy, revoke unused Vercel bypass, and finish short researcher instructions.
+Do not conflate manual Vercel Production deployment with a Git main merge.
+Do not expand application features or redo the full browser workflow.
+The Supabase/PostgREST upgrade is not a prerequisite. There is NO verified
+backup and NO confirmed PostgREST version upgrade.
 
 Most recent known deployed migration:
   20261002223000_allow_unblinding_completion_without_lock.sql
 
 END OF HANDOFF
 --------------
-2026-11-09: Real two-account RLS/authorization test PASSED in DEV.
-Next: validate/push files plus v30 handoff, then finish Production release
-checks and researcher-feedback release with explicit limitations.
+2026-11-09 (US Pacific): v31 captures successful release deployments and
+Production signup/email confirmation. NEXT: password recovery, main branch
+alignment, researcher access, release safety/custody note. No code edits.
