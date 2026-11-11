@@ -13,7 +13,7 @@ Sign in at [blindstats.com](https://blindstats.com). Arrange a way to share the 
 3. **Analyst — Analyze the blinded CSV** using the **analysis helper** command for your OS below. Use the blinded CSV received from the custodian, saved as `synthetic_study_blinded.csv` in **Downloads**. It creates `analysis_artifact.txt` locally.
 4. **Analyst — Lock and request:** In the shared Study, register an **Analysis Lock** using `analysis_artifact.txt` (save the lock receipt), then request unblinding against that lock.
 5. **Custodian — Authorize:** Authorize the analyst's request in blindstats, then give the analyst the saved unblinding secret through your agreed external channel.
-6. **Analyst — Complete:** Supply the secret locally, complete unblinding, download the final receipt, and inspect **Audit history**. **Both people** submit feedback: **[Private feedback form — link to be added before invitations]**.
+6. **Analyst — Complete:** Supply the secret locally, complete unblinding, download the final receipt, and inspect **Audit history**. **Both people** submit feedback: [Private feedback form](https://blindstats.com/feedback).
 
 ## Analysis helper commands
 

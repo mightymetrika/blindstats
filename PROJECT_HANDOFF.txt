@@ -1,10 +1,10 @@
 blindstats PROJECT HANDOFF
 ============================
 Updated: 2026-11-11 (US Pacific)
-Handoff version: v35
-Purpose: retain validated release and cross-platform helper history;
-         split participant testing into paired-recommended and solo-alternative
-         self-contained protocols; align invitations, links, and next steps
+Handoff version: v36
+Purpose: add minimal private researcher feedback collection as a proposed patch;
+         preserve the validated paired/single protocols and deployment history;
+         protect participant responses through an insert-only RLS table
 
 PROJECT
 -------
@@ -83,12 +83,17 @@ The historical 2026-10-12 export confirms:
 LATEST CONFIRMED GIT CHECKPOINT (2026-11-11)
 --------------------------------------------
 User-confirmed development, main, origin/development, origin/main all at:
-  2c4d337 Finalize concise researcher preview protocol and invitation links
-Working tree clean; v34 handoff committed/pushed on BOTH branches.
-This v35 change is documentation-only. After applying its patch, commit/push
-on development, fast-forward main, and verify the branch pointers. The old
-TESTING_PROTOCOL.md is deliberately removed and replaced by TWO protocols.
-No app code, Supabase migration, helper script, or Vercel deployment needed.
+  03d0d5d Separate paired and single researcher testing protocols
+Working tree clean after user pushed v35 to both branches.
+The obsolete TESTING_PROTOCOL.md was removed; short paired and single
+protocols, invitation email and v35 handoff are committed on both branches.
+
+v36 feedback patch is prepared in an archive for local application but has
+NOT been reported as installed, committed, tested, migrated, or deployed.
+The current Production app still runs deployed application code 5f7be56.
+Do not claim that /feedback or public.researcher_feedback is operational.
+This new slice REQUIRES a new, separately reviewed database migration and
+Next.js deployment to Development/Preview, then Production after acceptance.
 
 ACTIVE GIT / REPOSITORY CHECKPOINT (2026-11-10)
 ------------------------------------------------
@@ -403,9 +408,9 @@ EVALUATION DESIGN / AGREED INTENT:
     and priorities for broader RMS functions such as data collection,
     recruitment, randomization, study planning, versioning, collaboration.
   - Feedback_QUESTIONS is a DRAFT INSTRUMENT, NOT an active collection endpoint.
-    No researcher_feedback table or in-app form has been implemented.
-    Decide between a private external survey and a minimal RLS-protected
-    database table, with clear contact/consent/privacy and retention terms.
+    At v35 no researcher_feedback table or in-app form had been implemented;
+    v36 proposes the minimal RLS-protected table and authenticated form;
+    verify them in DEV, then PROD, before soliciting any real feedback.
   - Invitations require stable pinned links and an ACTUAL tested Production
     invitation-only backend policy, if this remains the chosen enrollment mode.
     Do not consider an email invitation itself sufficient access control.
@@ -467,28 +472,47 @@ RESEARCHER PREVIEW: CURRENT FINISH LINE (NEXT WORK)
 DONE: Application validation and deployment; 148 unit/component tests, lint,
       build, two-account DEV integration, Production signup/confirmation,
       password recovery, public Production / protected Preview.
-DONE: Cross-platform testing kit v0.1 committed to BOTH branches as 1c426cd;
-      Windows generate/analyze tested, temporary fixture cleaned.
-DONE: v34 short protocol + email committed/pushed to BOTH branches as 2c4d337;
-      development working tree clean at the user-confirmed checkpoint.
-NEXT: 1. Apply the v0.3 split: add PAIRED_TESTING_PROTOCOL.md and
-         SINGLE_TESTING_PROTOCOL.md; update README/email; REMOVE the obsolete
-         TESTING_PROTOCOL.md. Commit/push v35 to development and fast-forward
-         main; verify both branches. No npm tests or deployment necessary.
-      2. Set up short PRIVATE feedback collection and finalize participation,
-         contact, privacy and retention wording. No public-write feedback table.
-      3. Enforce and test invitation-only Production signup; the app currently
-         has publicly accessible /login and an open signup path.
-      4. Invite 5-10 researchers using real individual accounts, synthetic data
-         only, using paired protocol first, with single protocol as a choice;
-         link the CSV, one OS helper, and the live private feedback form.
-         No CSV/script email attachments.
-      5. Learn both blinding improvement requests (especially short-lived
-         recipient-restricted file transfer) and broader RMS priority features.
-DEFER: Login-page cosmetic copy and PostgREST timing fix unless disruptive.
-       No comprehensive repeat of E2E or unnecessary infrastructure upgrades.
-Do not represent the preview kit as an approved research study protocol;
-finalize the participation/privacy terms before recruitment.
+DONE: Researcher-preview testing kit and v33 at 1c426cd on both branches.
+DONE: Paired-recommended and single-alternative protocols plus v35 handoff
+      committed and pushed to both branches as 03d0d5d; Git clean.
+PROPOSED v36 slice (NOT APPLIED/TESTED/DEPLOYED AT THIS CHECKPOINT):
+  - src/app/feedback/page.tsx + actions.ts + tests, with short form;
+  - src/lib/feedback/validation.ts + validation tests;
+  - supabase/migrations/20261111213000_create_researcher_feedback.sql;
+  - docs/researcher-preview/FEEDBACK_OPERATIONS.md (organizer-only);
+  - researcher-preview protocols and invitation link directly to
+    https://blindstats.com/feedback (MUST NOT SEND UNTIL LIVE);
+  - README/FEEDBACK_QUESTIONS updates and this handoff.
+  - No change to actual blinding workflow, helpers, SMTP, or credentials.
+
+Access model: authenticated users may INSERT feedback with validated response
+fields only. Database supplies authenticated account ID and created timestamp.
+No SELECT/UPDATE/DELETE privileges/policies for anon or authenticated;
+privileged project administrators review through Supabase SQL Editor.
+A response is linked to an account, not automatically to a specific Study;
+existing audit timestamps are milestones rather than active-use time.
+There is no in-app administrator feedback browser or generic RMS extension.
+
+NEXT:
+  1. Apply v36 patch to clean development branch; inspect staged changes.
+     Run npm test, npm run lint, npm run build. Do not push to main yet.
+  2. Verify Supabase CLI is linked to DEVELOPMENT and review/apply the new
+     migration to DEV only; db lint and RLS checks. Deploy Preview explicitly
+     and validate one synthetic feedback submission, auth gate, storage and
+     absence of participant SELECT privileges. Never print credentials.
+  3. Once accepted, commit/push application+docs on development, and plan
+     Production migration/deployment with safeguards before fast-forward main.
+     New table migration and app version must reach same target environment.
+  4. Retest one synthetic feedback submission in Production, then clean up
+     its disposable account and feedback row. Privacy/retention notice and
+     contact terms must be finalized before invitations.
+  5. Backend-enforce invitation-only Production signup and verify email
+     invitation path, including access to /feedback under an invited account.
+  6. Invite 5-10 researchers, paired protocol first (single optional), with
+     only synthetic data and links, never email attachments. Learn requested
+     blinding, secure file-transfer and broader RMS features.
+DEFER: PostgREST timing fix and cosmetic login wording unless disruptive.
+No comprehensive repeat of two-account E2E or major RMS development now.
 
 CURRENT PRODUCT / SCIENTIFIC MODEL
 ----------------------------------
@@ -1102,34 +1126,26 @@ Avoid:
   long-page UI patterns mixing live tasks, audit history, and education
 
 
-RECOMMENDED NEXT SESSION START (AFTER v35 CHECKPOINT)
+RECOMMENDED NEXT SESSION START (v36 feedback patch)
 ---------------------------------------------------
 In C:\Users\Mackson Ncube\Documents\blindstats:
   git status
-  git log --oneline --decorate -5
+  git log -1 --oneline
   git branch -vv
 
-Last user-confirmed checkpoint: v34 docs and handoff committed/pushed to both
-main and development as 2c4d337, working tree clean. v35 is a newly supplied
-patch and NOT confirmed installed or pushed yet; do not assume success.
+Last USER-CONFIRMED checkpoint: 03d0d5d on both main and development,
+working tree clean, v35 handoff committed. v36 patch has NOT been applied,
+committed, validated against a database or deployed at handoff preparation.
 
-The current proposed participant protocol is split into TWO files:
-  docs/researcher-preview/PAIRED_TESTING_PROTOCOL.md   (recommended)
-  docs/researcher-preview/SINGLE_TESTING_PROTOCOL.md   (alternative)
-The old TESTING_PROTOCOL.md should be deleted from the repository when v35
-is installed. Email refers to both new URLs. GitHub protocol links will work
-after the push; CSV and helper scripts are pinned to existing commit 1c426cd.
-The future private feedback form link is still a placeholder in BOTH protocols
-and invitation. Do not send any invitations before it is active and privacy,
-retention, invitation-only Supabase signup and real account invites are ready.
-
-Next: implement minimal private feedback collection, then backend-enforced
-invitation-only signup and verify invitation flow. No broad RMS feature yet.
-Application code deployed at 5f7be56; documentation change requires neither
-npm testing nor Vercel deployment. Avoid unbacked-up DB service upgrades.
+Read docs/researcher-preview/FEEDBACK_OPERATIONS.md for the rollout sequence.
+Start with review/testing on Development; never run a Supabase migration
+against Production without checking the linked project ID and user approval.
+User wants short participant-facing instructions, no cross-file hopping,
+and minimal admin infrastructure. Existing paired/single protocols lead
+researchers to a single short /feedback endpoint once live.
 
 END OF HANDOFF
 --------------
-2026-11-11 (US Pacific): v35 prepared, NOT committed/pushed. Paired first,
-single optional, separate self-contained protocols, consistent analysis helper
-language, organizer email updated, README updated, obsolete protocol to be removed when installed.
+2026-11-11 (US Pacific): v36 patch PREPARED only. Paired/single protocol v35
+was pushed successfully as 03d0d5d. New private form/RLS migration/tests and
+link updates await user application, validation, deployment, and later release.

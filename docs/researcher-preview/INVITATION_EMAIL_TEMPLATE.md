@@ -13,7 +13,7 @@ I'm inviting a small group of researchers to try **blindstats**, an early tool f
 - **App:** https://blindstats.com
 - **Synthetic CSV on GitHub:** https://github.com/mightymetrika/blindstats/blob/1c426cd/docs/researcher-preview/synthetic_study.csv
 - **Analysis helper for your OS:** [insert one GitHub link from below]
-- **Private feedback form:** [insert link when ready]
+- **Private feedback form:** https://blindstats.com/feedback
 
 Please use **only the synthetic dataset**, not real research data. Nothing is attached to this email. On GitHub, select **Download raw file** for the CSV and script; the protocol explains the steps. Each researcher needs their own invited account.
 
@@ -30,4 +30,4 @@ Thank you,
 - macOS: https://github.com/mightymetrika/blindstats/blob/1c426cd/scripts/researcher-preview/researcher-preview-macos.command
 - Linux: https://github.com/mightymetrika/blindstats/blob/1c426cd/scripts/researcher-preview/researcher-preview-linux.sh
 
-Before invitations: implement the *private* feedback form and replace its placeholder in this email **and both protocols**; finalize privacy/retention wording; enforce invitation-only Production signup; and test account invitations. The protocol links become live after these files are pushed to `main`. The CSV/helpers are pinned to previously tested commit `1c426cd`.
+Before invitations: deploy and validate the *private* feedback form and its RLS-protected database table in Production; finalize privacy/retention wording; enforce invitation-only Production signup; and test account invitations. The protocol links become live after these files are pushed to `main`. The CSV/helpers are pinned to previously tested commit `1c426cd`.

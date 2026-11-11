@@ -12,7 +12,7 @@ Sign in at [blindstats.com](https://blindstats.com) using your invited account.
 2. **Blind:** In **Blinded package**, select `synthetic_study.csv`, blind the `group` column, download the blinded CSV, public receipt, and unblinding secret, and register the package.
 3. **Analyze the blinded CSV** using the **analysis helper** command for your OS below. Save the blinded CSV as `synthetic_study_blinded.csv` in **Downloads**. It creates `analysis_artifact.txt` locally.
 4. **Lock and unblind:** Register an **Analysis Lock** using `analysis_artifact.txt` (save the lock receipt). Request and self-authorize unblinding against the lock, supply your locally saved unblinding secret, complete unblinding, and inspect **Audit history**.
-5. **Share feedback:** **[Private feedback form — link to be added before invitations]**.
+5. **Share feedback:** [Private feedback form](https://blindstats.com/feedback).
 
 ## Analysis helper commands
 
