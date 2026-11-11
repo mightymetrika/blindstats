@@ -1,69 +1,46 @@
-# blindstats researcher-preview evaluation protocol
+# Try blindstats — researcher exercise
 
-**Draft:** v0.1 · 11 November 2026 · Synthetic data only · Approximate exercises, not a validated research protocol
+**Use only the supplied synthetic dataset.** Do not use real, identifiable, confidential, or client data. blindstats is an early research preview.
 
-## Purpose
+**Download from GitHub** (open the link and select **Download raw file**):
 
-Assess the feasibility and usability of analyst blinding and governance in blindstats, including: clarity of roles and custody responsibilities; ease of creating and using blinded artifacts; value of analysis locks and independent authorization; and desired future features for **both the blinding workflow and a wider research management system (RMS)**.
+- [Synthetic CSV](https://github.com/mightymetrika/blindstats/blob/1c426cd/docs/researcher-preview/synthetic_study.csv) — `synthetic_study.csv`
+- Analysis helper (choose your OS): [Windows](https://github.com/mightymetrika/blindstats/blob/1c426cd/scripts/researcher-preview/researcher-preview-windows.ps1) · [macOS](https://github.com/mightymetrika/blindstats/blob/1c426cd/scripts/researcher-preview/researcher-preview-macos.command) · [Linux](https://github.com/mightymetrika/blindstats/blob/1c426cd/scripts/researcher-preview/researcher-preview-linux.sh)
 
-This is an early researcher-feedback exercise. The software is not represented as production-hardened for confidential, identifiable, regulated, or client data. No real research data should be used. Participating in a workflow does not imply that the software proves real-world researcher behavior.
+Save the CSV and helper in **Downloads**. Sign in at [blindstats.com](https://blindstats.com) with your invited account.
 
-## Who and what
+## Individual exercise
 
-- Recruit researchers/statisticians; ideally include both experienced and novice users of analyst blinding.
-- Each participant uses their own account and email inbox (not a publicly readable temporary inbox). A paired exercise uses two **different** participants/accounts.
-- Use the supplied synthetic fixture and keep files on the participant's own computer. No data from a real study should be provided.
-- Participation and feedback are distinct from authorization to use real research data. Do not send passwords, tokens, secrets, or file contents to the study organizer.
-- Collect only the minimum contact and feedback details necessary. Provide the final privacy/consent and retention notice before recruitment. Participation is voluntary and questions can be skipped.
+1. **Create a Study** named *Synthetic preview*. In **Blinding plan**, require an **Analysis Lock**, allow **self-authorization**, acknowledge the warning, and activate the plan.
+2. **Blind the data.** Select `synthetic_study.csv`, blind the `group` column, generate and save the blinded CSV, public receipt, and unblinding secret; then register the package.
+3. **Analyze the blinded CSV** using the command for your OS below. It creates `analysis_artifact.txt` locally.
+4. **Lock the analysis.** Select `analysis_artifact.txt`, download the lock receipt, and register the Analysis Lock.
+5. **Unblind.** Request and authorize unblinding against the lock, supply your saved local secret, complete unblinding, and review **Audit history**.
+6. **Share your feedback:** **[Private feedback form — link to be added before invitations]**.
 
-## Setup — 5 minutes
+## Run the analysis helper
 
-1. Follow the invitation instructions to obtain or activate your blindstats account at `https://blindstats.com`.
-2. Download your **operating-system-specific helper**, or the pre-generated synthetic CSV.
-3. Run `generate` (see README); locate `~/blindstats-preview-files/synthetic_study.csv`.
-4. Decide whether to use **Path A (individual)** or **Path B (paired)**. Path B needs coordination and a separate authorizer account.
+After blindstats downloads `synthetic_study_blinded.csv`, use the command for your computer. If your browser changed a filename or folder, adjust the command accordingly.
 
-## Path A — Individual exercise (simplest pilot)
+**Windows — PowerShell**
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$HOME\Downloads\researcher-preview-windows.ps1" -Action Analyze -InputCsv "$HOME\Downloads\synthetic_study_blinded.csv"
+```
 
-1. Sign in and **Create Study**. Name it `Synthetic blindstats preview` (or another name marked synthetic).
-2. Open its Blinding workflow and configure the Blinding plan. Select `group` as the protected column at the package stage. For this short individual exercise, explicitly choose **self-authorization permitted**; keep **Analysis Lock required** to test its value. The app may require acknowledgement of this weaker authorization policy.
-3. Activate the plan and open **Blinded package**. Select `synthetic_study.csv`, select the `group` column, and generate the package.
-4. Download and keep **three distinct files**: the blinded CSV, public blinding receipt, and unblinding secret. Acknowledge custody, then **Register blinded package**. Do not use the unblinding secret to produce the analysis.
-5. Run your OS helper's `analyze` action using the downloaded `synthetic_study_blinded.csv`. It creates `analysis_artifact.txt` with blinded-group means and sample SDs. This operation is offline and reads **only the blinded CSV**.
-6. In **Analysis lock**, select `analysis_artifact.txt`, generate a lock, download its receipt, and register the lock as instructed by the app.
-7. In **Unblinding**, request unblinding **against that analysis lock**, then authorize it under the selected self-authorization policy.
-8. Supply your locally saved unblinding secret when the app requests it; complete local unblinding. Download the final unblinding receipt and inspect **Audit history**.
-9. Submit feedback using the private feedback channel supplied by the organizer. Record what succeeded, what failed, where you hesitated, and any feature ideas.
+**macOS — Terminal**
+```sh
+sh "$HOME/Downloads/researcher-preview-macos.command" analyze "$HOME/Downloads/synthetic_study_blinded.csv"
+```
 
-This route tests the complete chain with one person. It does **not** test meaningful independence of authorization.
+**Linux — Terminal**
+```sh
+sh "$HOME/Downloads/researcher-preview-linux.sh" analyze "$HOME/Downloads/synthetic_study_blinded.csv"
+```
 
-## Path B — Paired workflow (optional, more realistic)
+The helper writes `analysis_artifact.txt` to `blindstats-preview-files` in your home folder. It analyzes only the **blinded** CSV; no R or Python installation is needed.
 
-1. Two invited researchers each register/activate **separate real accounts**.
-2. Designate a **custodian** and **blinded analyst**. The custodian creates the synthetic Study, sets **independent authorization**, assigns the other user the Blinded analyst capabilities through **Analysis roles**, and activates the plan. The app requires distinct request/authorization actors.
-3. The custodian generates and registers the blinded package, keeps the unblinding secret private, and sends **only the synthetic blinded CSV** to the analyst using an agreed external channel.
-4. The analyst uses their OS helper to produce `analysis_artifact.txt` from the blinded CSV, registers the analysis lock, and requests unblinding.
-5. The custodian independently authorizes. Only **after** that authorization, the custodian transfers the unblinding secret through a separate agreed channel. The analyst completes local unblinding and reviews Audit history.
-6. Both participants independently report any confusion about their responsibilities, external handoffs, and whether a secure temporary file-transfer feature would help.
+## Optional paired exercise
 
-**Important:** blindstats currently does **not** offer in-app transfer of blinded datasets or plaintext unblinding secrets. This is a proposed feature to evaluate, not an implemented control. Never use real secrets or sensitive data in this exercise.
+With **two separate invited accounts**, the custodian chooses **Independent authorization** and assigns the other participant the **Blinded analyst** role. Transfer only the synthetic **blinded CSV** to the analyst. The analyst registers the lock and requests unblinding; the custodian authorizes, then transfers the unblinding secret. The analyst completes unblinding. Both submit feedback.
 
-## What researchers should notice
-
-- How clearly does the app distinguish **request**, **authorization**, and **actual unblinding**?
-- How clear is file custody: which files are safe to share, and which should remain secret?
-- Does an analysis lock feel useful, understandable, and realistically usable?
-- Does the workflow feel workable for an individual statistician and for separated research roles?
-- Where is an explicit instruction missing? How much time/effort did the workflow require?
-
-## Outcomes and feedback
-
-Record self-reported task completion (each key step: completed / completed with assistance / not completed), total time in broad bands, perceived ease (1–5), confusing steps, and willingness to use the tool again. Do not require screenshots. Capture failures with non-sensitive descriptions only.
-
-Separately solicit and prioritize **blinding workflow enhancements** and **broader RMS features**; see `FEEDBACK_QUESTIONS.md`. These are exploratory needs-assessment questions, not commitments to implement any feature.
-
-## Privacy, retention, and interpretation
-
-Before sending invitations, finalize a short notice covering feedback controller/contact, intended uses, storage/access, retention/deletion, optional follow-up, and who can see responses. Study records and audit events may persist in Production. Avoid collecting unnecessary identifiable details and **never request actual datasets, unblinding secrets, passwords, tokens, or sensitive participant material** in feedback.
-
-This is formative feasibility/user-experience testing, not a security audit, effectiveness trial, or quantitative estimate representative of all researchers. Summarize descriptive results and recurrent themes; do not overinterpret a small convenience sample.
+**Please do not send passwords, research files, or unblinding secrets to the feedback organizer.** The app does not yet transfer files between users; use an agreed external channel for this synthetic exercise.

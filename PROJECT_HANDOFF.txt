@@ -1,10 +1,11 @@
 blindstats PROJECT HANDOFF
 ============================
 Updated: 2026-11-11 (US Pacific)
-Handoff version: v33
-Purpose: preserve the completed researcher-preview deployment and validation;
-         checkpoint the cross-platform synthetic-data evaluation kit v0.1 and
-         prepare bounded feedback collection and invitation-only enrollment
+Handoff version: v34
+Purpose: preserve the researcher-preview release and tested OS helpers;
+         simplify participant-facing kit v0.2 with direct GitHub file links,
+         zero email attachments, future feedback-form placeholders; prepare
+         bounded feedback collection and invitation-only enrollment
 
 PROJECT
 -------
@@ -367,7 +368,9 @@ TEST RESULTS:
   - git status after testing showed only these untracked directories:
       ?? docs/researcher-preview/
       ?? scripts/researcher-preview/
-    This is PRE-COMMIT evidence. Do NOT claim kit is committed until pushed.
+    This was PRE-COMMIT evidence; the kit was subsequently committed.
+  - The kit and v33 handoff were committed and pushed to development AND
+    main as 1c426cd on 2026-11-11; Git status was clean after push.
   - The entire protocol has NOT been performed by a new researcher yet.
 
 EVALUATION DESIGN / AGREED INTENT:
@@ -377,10 +380,11 @@ EVALUATION DESIGN / AGREED INTENT:
   - ALL research files are synthetic. Two options: shorter single-account
     governed self-authorization with required Analysis Lock, or optional
     two-person independent authorization / handoff exercise.
-  - Direct links to instructions and relevant OS-specific script in each
-    invitation email (GitHub static link or pinned release asset); no new
-    in-app documentation website is required now. Pre-generated CSV for
-    participants who do not use shell scripts.
+  - Invitation links directly to protocol, GitHub-hosted CSV, ONE relevant
+    OS helper, and eventual private feedback form (NOT LIVE). No attachments.
+    Protocol itself repeats CSV and all three helper file links, so no need
+    to navigate README or search repository. Pre-generated CSV is default;
+    local generation is optional. No in-app documentation site required.
   - Recruitment/invitations have NOT been sent. Production self-signup is
     still publicly reachable unless backend signup gating is enforced.
   - Questions must cover: friction/understanding; artifact custody; Analysis
@@ -396,33 +400,53 @@ EVALUATION DESIGN / AGREED INTENT:
     invitation-only backend policy, if this remains the chosen enrollment mode.
     Do not consider an email invitation itself sufficient access control.
 
+RESEARCHER PREVIEW PROTOCOL v0.2 (DOCUMENTATION-ONLY, 2026-11-11)
+-----------------------------------------------------------------
+  - Replaced the lengthy participant protocol with one short, self-contained
+    sequence; removed most Who/what/setup discussion and cross-link to README.
+  - Researchers download the ready-made synthetic CSV FROM GITHUB via a
+    direct file-page link in the invitation email and self-contained protocol;
+    NO CSV or script attachment in participant emails. Generation remains
+    optional, not a prerequisite.
+  - Windows/macOS/Linux analysis commands are embedded in the protocol.
+    Existing scripts remain unchanged, and were previously validated.
+  - Condensed the invitation to direct file-page links for protocol, CSV,
+    and ONE relevant OS helper. Protocol itself repeats CSV and all three OS
+    helper links, with 'Download raw file' guidance. No README navigation.
+  - Both email and protocol reserve an explicitly NOT-LIVE link for the
+    future PRIVATE feedback form. Replace both before inviting researchers.
+    Do not invent a feedback URL or claim the form/table already exists.
+  - No files are attached to the email; source files remain inspectable on
+    GitHub, and helpers are version-pinned to known commit 1c426cd.
+  - Simplified feedback questions to completion, ease, confusion, requested
+    blinding improvements (including expiring secure transfer), and RMS
+    priorities (including data collection). Removed ALL time-band requests.
+  - Existing persistent DB event timestamps measure milestones and gaps, not
+    actual participant active time. Do not conflate these or add tracking.
+  - No app, database, authentication, dependencies or deployment changed.
+
 RESEARCHER PREVIEW: CURRENT FINISH LINE (NEXT WORK)
-----------------------------------------------------
+---------------------------------------------------
 DONE: Application validation and deployment; 148 unit/component tests, lint,
-      build, two-account DEV authorization integration, Production signup and
-      confirmation, password recovery and sign-in, public Production / protected
-      Preview; cleanup of disposable user and Vercel bypass token.
-DONE: Initial v0.1 cross-platform testing kit authored; Windows generate
-      and blinded-fixture analysis checks succeeded, temp files cleaned.
-NEXT: 1. Stage ONLY docs/researcher-preview/ and scripts/researcher-preview/
-         plus this PROJECT_HANDOFF v33; verify diff; commit/push development;
-         safely fast-forward and push main; confirm both at same commit.
-      2. Create stable links to the new protocol, OS-specific scripts, and
-         synthetic CSV; replace placeholders in invitation email before use.
-      3. Choose private feedback collection approach (external survey first
-         is acceptable; a secure RLS-controlled table only if justified).
-         Finalize participation, contact, privacy and retention wording.
-      4. Enforce and test invitation-only Production signup policy if chosen;
-         publicly accessible /login currently does NOT gate account creation.
-      5. Recruit the initial small cohort with individual persistent accounts
-         and synthetic data only. Collect usability, blinding enhancements,
-         and prioritized future RMS-feature requests.
-DEFER: UI copy improvement ('Sign in to continue your research.') and
-       PostgREST JWT timing bug unless repeated enough to impair feedback.
-       No full end-to-end rerun or optional infrastructure upgrade needed.
-Do not present the kit as an approved clinical/research study protocol;
-this is a draft usability/feasibility exercise and must be revised with the
-actual recruitment/consent/retention context before use.
+      build, two-account DEV integration, Production signup/confirmation,
+      password recovery, public Production / protected Preview.
+DONE: Cross-platform testing kit v0.1 committed to BOTH branches as 1c426cd;
+      Windows generate/analyze tested, temporary fixture cleaned.
+NEXT: 1. Commit/push this participant-facing v0.2 document refresh and v34
+         handoff to development, then fast-forward main; verify both branches.
+      2. Set up short PRIVATE feedback collection and finalize participation,
+         contact, privacy and retention wording. No public-write feedback table.
+      3. Enforce and test invitation-only Production signup; the app currently
+         has publicly accessible /login and an open signup path.
+      4. Invite 5-10 researchers using real individual accounts, synthetic data
+         only, and direct GitHub protocol/CSV/one OS helper links plus the
+         actual private feedback link. No CSV/script email attachments.
+      5. Learn both blinding improvement requests (especially short-lived
+         recipient-restricted file transfer) and broader RMS priority features.
+DEFER: Login-page cosmetic copy and PostgREST timing fix unless disruptive.
+       No comprehensive repeat of E2E or unnecessary infrastructure upgrades.
+Do not represent the preview kit as an approved research study protocol;
+finalize the participation/privacy terms before recruitment.
 
 CURRENT PRODUCT / SCIENTIFIC MODEL
 ----------------------------------
@@ -1043,11 +1067,11 @@ In C:\Users\Mackson Ncube\Documents\blindstats:
   git log --oneline --decorate -5
   git branch -vv
 
-The latest *observed* Git info before kit staging was from the 2026-11-10
-v32 source snapshot; actual updated commit hash is not yet known. Confirm
-that the new scripts and docs are committed and both branches match before
-sharing any GitHub URLs. Existing Production application code deployed from
-5f7be56 does not need redeployment for docs/scripts outside app routes.
+User-confirmed: v33 kit was committed and pushed to both branches at 1c426cd;
+working tree clean. v34 is the replacement documentation-only v0.2 protocol
+patch; it has NOT been applied or pushed yet. Confirm both branches after
+push. Existing Production application code deployed from 5f7be56 does not
+need redeployment for docs/scripts outside app routes.
 
 Next: choose feedback collection channel and invitation-only Production
 registration, test actual invitation emails, and pin stable protocol/helper
@@ -1057,6 +1081,8 @@ specific direction. Do not take an unbacked-up DB service upgrade.
 
 END OF HANDOFF
 --------------
-2026-11-11 (US Pacific): v33 adds the v0.1 research-preview kit and Windows
-helper PASS evidence, plus recruitment/feedback readiness tasks. Kit and v33
-are NOT yet known committed/pushed. No application logic or database changes.
+2026-11-11 (US Pacific): v33 kit and Windows helper PASS are committed/pushed
+on both branches at 1c426cd. v34 is prepared, NOT applied/pushed. It shortens
+participant documents; links to the GitHub CSV + OS scripts (no attachments);
+marks a future private feedback link in both protocol and email; removes time
+bands. No application logic or database changes.

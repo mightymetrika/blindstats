@@ -1,55 +1,14 @@
-# blindstats researcher feedback — draft v0.1
+# blindstats — short researcher feedback questions (draft v0.2)
 
-**Status:** question bank and submission format only. No live feedback form/database integration has yet been deployed. Keep responses private. Questions are voluntary and should not solicit research files or authentication secrets.
+For a **private** feedback form; do not ask for research files, passwords, tokens, or unblinding secrets. Responses may be skipped. No form or submission table is live yet.
 
-## A. About the test
+1. **Exercise:** Individual / Paired custodian / Paired analyst.
+2. **Did you complete it?** Independently / With help / Partly / No. If partly or no, where did you stop?
+3. **How easy was blindstats to use?** 1 (very difficult) to 5 (very easy).
+4. **What was confusing or frustrating?** What would you change first?
+5. **What blinding features would you add?** Consider multi-variable blinding, alternative transformations, collaboration, analysis locks, and more flexible roles. Which is most valuable?
+6. **Would temporary secure file transfer be useful?** No / Somewhat / Very / Unsure. Which controls matter most: recipient access, expiry deadline, single download, automatic deletion, revocation, notification, or other?
+7. **What are your top three priorities for a broader research management system (RMS)?** Examples: data collection; recruitment/screening/consent; randomization; protocol/SAP versioning; secure file sharing; data quality; analysis tools; collaboration; reporting; integrations (R, Python, REDCap, OSF).
+8. **Anything else?** Optional: interested in a follow-up conversation? Yes / No.
 
-- Which test route did you attempt? Individual / Paired custodian / Paired analyst.
-- Broad role: statistician / trialist / other quantitative researcher / other (optional).
-- Experience with analyst blinding: none / some / substantial.
-- Did you create the Study, blind a CSV, produce a blinded analysis artifact, register a lock, authorize, unblind, and inspect Audit history? Mark each: completed independently / with help / not completed / not applicable.
-- Rough effort: under 15 minutes / 15–30 / 31–60 / over 60.
-- Overall ease of use (1 very difficult – 5 very easy).
-- Where did you get stuck, or what did you expect to happen instead?
-- What, if anything, made it difficult to understand the division of responsibility between custodian and analyst?
-
-## B. Improving the blinding workflow
-
-- What would you **change or add** to the current blinding workflow? (Free text.)
-- What is the **single most valuable** missing blinding feature? (Free text.)
-- How useful would **temporary secure file transfer** be for the blinded CSV or post-authorization unblinding secret? Not useful / somewhat / very / unsure.
-- For such a transfer feature, which controls would matter? Recipient-specific access; authenticated recipient; one-time download; expiry deadline; automatic deletion on successful download or expiry; audit confirmation; encryption; ability to revoke access; other.
-- Would you prefer a file to be deleted immediately after the first confirmed download, or remain accessible until a deadline? What problems could either create?
-- Other candidate enhancements: blinding multiple variables; more transformation methods; reusable templates; stronger or more flexible analysis locks; collaboration/role delegation; receipt verification; notifications; other. Which two matter most?
-- What would prevent you from using the blinding feature for your own research, even after further validation?
-
-## C. Wider research management system (RMS) priorities
-
-- Beyond blinding, what research workflows would you most want integrated in an RMS? **Choose up to three**, then rank the top one.
-  - Data collection / forms / survey instruments
-  - Participant recruitment, screening, and consent
-  - Randomization and allocation concealment
-  - Study planning / protocol and SAP versioning
-  - Preregistration / analysis plans
-  - Secure data and document transfer
-  - Permissions, teams, and collaboration
-  - Data quality monitoring / validation
-  - Analysis execution, notebooks, or reproducible pipelines
-  - File/version custody and sharing
-  - Study reporting, audit trails, and provenance
-  - Integrations (e.g. R, Python, REDCap, OSF, GitHub)
-  - Other (describe)
-- Which workflows should be in one integrated platform, and which are better left to specialized tools?
-- Which existing research systems would blindstats need to work with?
-- If one RMS feature could be built next, which one would most improve your actual research process, and why?
-- Would you be willing to take part in a follow-up walkthrough or interview? Yes / No (optional; contact separately).
-
-## D. Final comments
-
-- Is there anything we have not asked that would make this tool more useful?
-
-## Suggested minimally structured response fields (for future private data capture)
-
-`protocol_version`, `participant_id` (pseudonymous), `test_path`, `role`, `prior_blinding_experience`, `task_statuses`, `time_band`, `ease_rating`, `usability_notes`, `blinding_top_request`, `transfer_need`, `transfer_controls`, `rms_top_three`, `rms_top_priority`, `integration_needs`, `willing_followup`, `created_at`.
-
-**Do not implement this as a public-write database table without access controls.** If an authenticated in-app form is later added, use a new migration and least-privilege RLS, and establish an admin reporting/access design before collecting responses. The initial evaluation can use an appropriately private survey instead, avoiding another release blocker.
+**For the organizer:** Store protocol version, test path, completion self-report, ease rating, comments, feature preferences, and feedback timestamp. Existing Study/workflow audit timestamps can describe milestone timing, **not active working time**. Do not collect time bands. Keep responses private and provide the finalized privacy/retention notice before recruitment.
