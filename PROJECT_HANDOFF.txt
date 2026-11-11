@@ -1,11 +1,10 @@
 blindstats PROJECT HANDOFF
 ============================
 Updated: 2026-11-11 (US Pacific)
-Handoff version: v34
-Purpose: preserve the researcher-preview release and tested OS helpers;
-         simplify participant-facing kit v0.2 with direct GitHub file links,
-         zero email attachments, future feedback-form placeholders; prepare
-         bounded feedback collection and invitation-only enrollment
+Handoff version: v35
+Purpose: retain validated release and cross-platform helper history;
+         split participant testing into paired-recommended and solo-alternative
+         self-contained protocols; align invitations, links, and next steps
 
 PROJECT
 -------
@@ -80,6 +79,16 @@ The historical 2026-10-12 export confirms:
   - migrations through:
       20261002223000_allow_unblinding_completion_without_lock.sql
 
+
+LATEST CONFIRMED GIT CHECKPOINT (2026-11-11)
+--------------------------------------------
+User-confirmed development, main, origin/development, origin/main all at:
+  2c4d337 Finalize concise researcher preview protocol and invitation links
+Working tree clean; v34 handoff committed/pushed on BOTH branches.
+This v35 change is documentation-only. After applying its patch, commit/push
+on development, fast-forward main, and verify the branch pointers. The old
+TESTING_PROTOCOL.md is deliberately removed and replaced by TWO protocols.
+No app code, Supabase migration, helper script, or Vercel deployment needed.
 
 ACTIVE GIT / REPOSITORY CHECKPOINT (2026-11-10)
 ------------------------------------------------
@@ -377,9 +386,10 @@ EVALUATION DESIGN / AGREED INTENT:
   - Initial 5-10 invited researchers, real individual email accounts that
     may be retained for follow-ups; NEVER use disposable public inboxes
     such as Yopmail for participant accounts.
-  - ALL research files are synthetic. Two options: shorter single-account
-    governed self-authorization with required Analysis Lock, or optional
-    two-person independent authorization / handoff exercise.
+  - ALL research files are synthetic. PAIRED independent-authorization
+    custodian/analyst exercise is RECOMMENDED; shorter single-account
+    self-authorization with a required Analysis Lock is the ALTERNATIVE.
+    Researchers may complete both.
   - Invitation links directly to protocol, GitHub-hosted CSV, ONE relevant
     OS helper, and eventual private feedback form (NOT LIVE). No attachments.
     Protocol itself repeats CSV and all three helper file links, so no need
@@ -400,8 +410,8 @@ EVALUATION DESIGN / AGREED INTENT:
     invitation-only backend policy, if this remains the chosen enrollment mode.
     Do not consider an email invitation itself sufficient access control.
 
-RESEARCHER PREVIEW PROTOCOL v0.2 (DOCUMENTATION-ONLY, 2026-11-11)
------------------------------------------------------------------
+RESEARCHER PREVIEW PROTOCOL v0.2 (HISTORICAL, SUPERSEDED BY v0.3)
+------------------------------------------------------------------
   - Replaced the lengthy participant protocol with one short, self-contained
     sequence; removed most Who/what/setup discussion and cross-link to README.
   - Researchers download the ready-made synthetic CSV FROM GITHUB via a
@@ -425,6 +435,33 @@ RESEARCHER PREVIEW PROTOCOL v0.2 (DOCUMENTATION-ONLY, 2026-11-11)
     actual participant active time. Do not conflate these or add tracking.
   - No app, database, authentication, dependencies or deployment changed.
 
+RESEARCHER PREVIEW PROTOCOL v0.3 SPLIT (2026-11-11)
+-------------------------------------------------
+At user request, replace docs/researcher-preview/TESTING_PROTOCOL.md with:
+  docs/researcher-preview/PAIRED_TESTING_PROTOCOL.md
+  docs/researcher-preview/SINGLE_TESTING_PROTOCOL.md
+Both participant-facing protocols are short, fully self-contained, and use:
+  - the same synthetic CSV + pinned Windows/macOS/Linux analysis helper links;
+  - "Analyze the blinded CSV using the analysis helper command for your OS";
+  - a clearly marked NON-LIVE private feedback-form placeholder;
+  - no README navigation, email attachments, time-band questions or real data.
+Paired protocol is RECOMMENDED and explicit about role sequencing:
+  custodian creates Study -> saves Independent plan + required Analysis Lock ->
+  Analysis roles: assign existing distinct analyst email -> activate plan ->
+  custodian generates package and shares only synthetic blinded CSV ->
+  analyst runs helper, locks analysis, requests unblinding -> custodian authorizes
+  then transfers secret externally -> analyst completes, both give feedback.
+Single protocol retains self-authorization, required Analysis Lock, and the
+same helper; suitable when no partner is available or as an additional test.
+Email now prioritizes paired protocol, offers single or both, and asks
+participants with a colleague to reply for a second invitation. Participant
+links are to the new protocol filenames under main (live AFTER push), while
+CSV/helper links remain pinned at tested commit 1c426cd. README is updated
+for organizer orientation; participants need not read it.
+Existing src/, database migrations, OS helper files, feedback questions and
+Vercel deployments are unchanged. The two exercises and actual invitation
+flow have not been validated with invited researchers yet.
+
 RESEARCHER PREVIEW: CURRENT FINISH LINE (NEXT WORK)
 ---------------------------------------------------
 DONE: Application validation and deployment; 148 unit/component tests, lint,
@@ -432,15 +469,20 @@ DONE: Application validation and deployment; 148 unit/component tests, lint,
       password recovery, public Production / protected Preview.
 DONE: Cross-platform testing kit v0.1 committed to BOTH branches as 1c426cd;
       Windows generate/analyze tested, temporary fixture cleaned.
-NEXT: 1. Commit/push this participant-facing v0.2 document refresh and v34
-         handoff to development, then fast-forward main; verify both branches.
+DONE: v34 short protocol + email committed/pushed to BOTH branches as 2c4d337;
+      development working tree clean at the user-confirmed checkpoint.
+NEXT: 1. Apply the v0.3 split: add PAIRED_TESTING_PROTOCOL.md and
+         SINGLE_TESTING_PROTOCOL.md; update README/email; REMOVE the obsolete
+         TESTING_PROTOCOL.md. Commit/push v35 to development and fast-forward
+         main; verify both branches. No npm tests or deployment necessary.
       2. Set up short PRIVATE feedback collection and finalize participation,
          contact, privacy and retention wording. No public-write feedback table.
       3. Enforce and test invitation-only Production signup; the app currently
          has publicly accessible /login and an open signup path.
       4. Invite 5-10 researchers using real individual accounts, synthetic data
-         only, and direct GitHub protocol/CSV/one OS helper links plus the
-         actual private feedback link. No CSV/script email attachments.
+         only, using paired protocol first, with single protocol as a choice;
+         link the CSV, one OS helper, and the live private feedback form.
+         No CSV/script email attachments.
       5. Learn both blinding improvement requests (especially short-lived
          recipient-restricted file transfer) and broader RMS priority features.
 DEFER: Login-page cosmetic copy and PostgREST timing fix unless disruptive.
@@ -927,7 +969,7 @@ Known risk: intermittent PGRST303 jwt_issued_at_future seen earlier in DEV,
 recoverable; deferred unless repeated. No DB service upgrades performed.
 
 Outstanding before deliberate external researcher invitation:
-  - commit/push the v0.1 testing kit and v33 handoff to BOTH branches;
+  - push and validate the paired/single v0.3 protocols and v35 handoff;
   - finalize stable email links; choose and enforce invitation-only signup
     backend policy rather than relying on a private email alone;
   - establish a private feedback collection channel and finalize notice about
@@ -1060,29 +1102,34 @@ Avoid:
   long-page UI patterns mixing live tasks, audit history, and education
 
 
-RECOMMENDED NEXT SESSION START (AFTER V33 CHECKPOINT)
-----------------------------------------------------
+RECOMMENDED NEXT SESSION START (AFTER v35 CHECKPOINT)
+---------------------------------------------------
 In C:\Users\Mackson Ncube\Documents\blindstats:
   git status
   git log --oneline --decorate -5
   git branch -vv
 
-User-confirmed: v33 kit was committed and pushed to both branches at 1c426cd;
-working tree clean. v34 is the replacement documentation-only v0.2 protocol
-patch; it has NOT been applied or pushed yet. Confirm both branches after
-push. Existing Production application code deployed from 5f7be56 does not
-need redeployment for docs/scripts outside app routes.
+Last user-confirmed checkpoint: v34 docs and handoff committed/pushed to both
+main and development as 2c4d337, working tree clean. v35 is a newly supplied
+patch and NOT confirmed installed or pushed yet; do not assume success.
 
-Next: choose feedback collection channel and invitation-only Production
-registration, test actual invitation emails, and pin stable protocol/helper
-links. Then recruit small researcher cohort to use synthetic fixture ONLY.
-Do not add a research-management platform feature until user feedback gives
-specific direction. Do not take an unbacked-up DB service upgrade.
+The current proposed participant protocol is split into TWO files:
+  docs/researcher-preview/PAIRED_TESTING_PROTOCOL.md   (recommended)
+  docs/researcher-preview/SINGLE_TESTING_PROTOCOL.md   (alternative)
+The old TESTING_PROTOCOL.md should be deleted from the repository when v35
+is installed. Email refers to both new URLs. GitHub protocol links will work
+after the push; CSV and helper scripts are pinned to existing commit 1c426cd.
+The future private feedback form link is still a placeholder in BOTH protocols
+and invitation. Do not send any invitations before it is active and privacy,
+retention, invitation-only Supabase signup and real account invites are ready.
+
+Next: implement minimal private feedback collection, then backend-enforced
+invitation-only signup and verify invitation flow. No broad RMS feature yet.
+Application code deployed at 5f7be56; documentation change requires neither
+npm testing nor Vercel deployment. Avoid unbacked-up DB service upgrades.
 
 END OF HANDOFF
 --------------
-2026-11-11 (US Pacific): v33 kit and Windows helper PASS are committed/pushed
-on both branches at 1c426cd. v34 is prepared, NOT applied/pushed. It shortens
-participant documents; links to the GitHub CSV + OS scripts (no attachments);
-marks a future private feedback link in both protocol and email; removes time
-bands. No application logic or database changes.
+2026-11-11 (US Pacific): v35 prepared, NOT committed/pushed. Paired first,
+single optional, separate self-contained protocols, consistent analysis helper
+language, organizer email updated, README updated, obsolete protocol to be removed when installed.
