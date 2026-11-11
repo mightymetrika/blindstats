@@ -1,10 +1,10 @@
 blindstats PROJECT HANDOFF
 ============================
-Updated: 2026-11-10 (US Pacific)
-Handoff version: v32
-Purpose: document completed live Production authentication, Git branch alignment,
-         public Production / protected Preview access, and release cleanup;
-         proceed to limited researcher feedback with synthetic data only
+Updated: 2026-11-11 (US Pacific)
+Handoff version: v33
+Purpose: preserve the completed researcher-preview deployment and validation;
+         checkpoint the cross-platform synthetic-data evaluation kit v0.1 and
+         prepare bounded feedback collection and invitation-only enrollment
 
 PROJECT
 -------
@@ -100,8 +100,13 @@ Both Preview and Production were deployed manually from code 5f7be56;
 Prior milestones: df3a7ff password recovery; bdc257b ignored Vercel/.env;
   fa28c0d v29; 6286b6f JWT diagnostics; 0eab088 Studies error boundary;
   a2cf2ef config/security headers.
-Version v32 is documentation-only; commit it to development, fast-forward
-  main to the resulting commit, and verify both remotes are synchronized.
+At the latest verified v31 Git checkpoint, main and development were at
+  5d02699. A v32 handoff was prepared and the supplied 2026-11-10 source
+  export contains v32, but no post-v32 Git commit hash is present in this
+  checkpoint evidence. Verify actual branch HEAD and handoff contents with
+  git status/log instead of guessing whether v32 has already been pushed.
+Version v33 should be committed with the researcher-preview kit to development,
+  then main fast-forwarded after validation. No automatic deployment is wired.
 
 IMPORTANT: Vercel is NOT connected to mightymetrika/blindstats by native Git
 integration. Team account GitHub integration only exposed randomplayables,
@@ -323,33 +328,101 @@ unbacked-up database upgrade as a side quest. Retain safe Studies error
 boundary; never weaken claims validation, permissions, or RLS. Revisit if
 frequency/severity makes the feedback release unusable.
 
-RELEASE FINISH LINE (NEXT WORK)
--------------------------------
-DONE: Development integration, 148 unit/component tests, lint, build,
-      explicit Preview and Production deployments of code commit 5f7be56.
-DONE: Production signup/email confirmation, reset email, password change,
-      successful new-password login, and /studies access.
-DONE: GitHub main fast-forwarded to development at 5d02699; verified clean.
-DONE: Disposable Production user deleted; Production users count returned 0.
-DONE: Vercel automation bypass removed from dashboard; Standard Protection
-      configured; unauthenticated GET /login = 200 for Production and
-      GET /login = 302 to Vercel SSO for Preview.
-OPEN: 1. Commit/push this documentation-only v32 handoff to development,
-         fast-forward main and verify both branches at the same commit.
-      2. Choose initial researcher-feedback audience and access policy.
-         Production is already publicly reachable and signup may be open;
-         this is NOT an invitation-only enrollment control.
-      3. Provide a concise researcher walkthrough and limitations/custody
-         warning; invite feedback using ONLY synthetic, non-sensitive data.
-      4. Before inviting real users, confirm account-creation policy, legal/
-         privacy disclosures and that no confidential data is requested.
-      5. Observe any recurring PostgREST JWT timing errors during feedback;
-         no speculative upgrade now.
-DEFER: Login UI wording 'Sign in to work with persistent Studies' is too
-       technical. Preferred replacement: 'Sign in to continue your research.'
-       Cosmetic only; not a release blocker.
-No comprehensive repeat of the two-account browser workflow by default.
-No PostgREST/Postgres upgrade or new major feature for this checkpoint.
+RESEARCHER PREVIEW TESTING KIT v0.1 (2026-11-11)
+-------------------------------------------------
+A documentation + offline-helper patch was supplied to the user as:
+  blindstats_researcher_preview_v01_patch.zip
+It adds ONLY 8 new files (no application auth, workflow, migrations,
+Supabase configuration, or package dependencies):
+  docs/researcher-preview/README.md
+  docs/researcher-preview/TESTING_PROTOCOL.md
+  docs/researcher-preview/FEEDBACK_QUESTIONS.md
+  docs/researcher-preview/INVITATION_EMAIL_TEMPLATE.md
+  docs/researcher-preview/synthetic_study.csv
+  scripts/researcher-preview/researcher-preview-windows.ps1
+  scripts/researcher-preview/researcher-preview-macos.command
+  scripts/researcher-preview/researcher-preview-linux.sh
+
+The kit includes a 48-row fully synthetic CSV with the protected categorical
+column named 'group'. Helpers run locally, require no R/Python packages,
+and offer GENERATE (synthetic source CSV) and ANALYZE (the CSV produced by
+blindstats, using only neutral group labels). They write a simple descriptive
+analysis_artifact.txt suitable for Analysis Lock. No scripts or fixture
+should be used with private/confidential/regulated/client research data.
+
+TEST RESULTS:
+  - macOS/Linux shell helpers were checked locally by the assistant for
+    generation, blinded-data analysis, and refusal of an unblinded source.
+    These were not independently executed on users' macOS/Linux devices.
+  - Windows user ran researcher-preview-windows.ps1 -Action Generate:
+    successful synthetic_study.csv creation, 48 observations.
+  - User constructed a TEMPORARY local fixture by replacing the two source
+    group identities with Group_A and Group_B (NOT actual browser blinding).
+    Windows helper -Action Analyze against that CSV succeeded:
+      Rows 48; Group_A n=24 mean=62.13 SD=7.87;
+      Group_B n=24 mean=64.00 SD=7.62; difference=1.88.
+    Output generated as analysis_artifact.txt, printed, then deleted, along
+    with the temporary fixture. The original generated synthetic file remains
+    in $HOME/blindstats-preview-files, outside the repository.
+  - git status after testing showed only these untracked directories:
+      ?? docs/researcher-preview/
+      ?? scripts/researcher-preview/
+    This is PRE-COMMIT evidence. Do NOT claim kit is committed until pushed.
+  - The entire protocol has NOT been performed by a new researcher yet.
+
+EVALUATION DESIGN / AGREED INTENT:
+  - Initial 5-10 invited researchers, real individual email accounts that
+    may be retained for follow-ups; NEVER use disposable public inboxes
+    such as Yopmail for participant accounts.
+  - ALL research files are synthetic. Two options: shorter single-account
+    governed self-authorization with required Analysis Lock, or optional
+    two-person independent authorization / handoff exercise.
+  - Direct links to instructions and relevant OS-specific script in each
+    invitation email (GitHub static link or pinned release asset); no new
+    in-app documentation website is required now. Pre-generated CSV for
+    participants who do not use shell scripts.
+  - Recruitment/invitations have NOT been sent. Production self-signup is
+    still publicly reachable unless backend signup gating is enforced.
+  - Questions must cover: friction/understanding; artifact custody; Analysis
+    Lock and roles; requested BLINDING improvements (especially expiring,
+    recipient-restricted, optionally one-time-download encrypted file handoff);
+    and priorities for broader RMS functions such as data collection,
+    recruitment, randomization, study planning, versioning, collaboration.
+  - Feedback_QUESTIONS is a DRAFT INSTRUMENT, NOT an active collection endpoint.
+    No researcher_feedback table or in-app form has been implemented.
+    Decide between a private external survey and a minimal RLS-protected
+    database table, with clear contact/consent/privacy and retention terms.
+  - Invitations require stable pinned links and an ACTUAL tested Production
+    invitation-only backend policy, if this remains the chosen enrollment mode.
+    Do not consider an email invitation itself sufficient access control.
+
+RESEARCHER PREVIEW: CURRENT FINISH LINE (NEXT WORK)
+----------------------------------------------------
+DONE: Application validation and deployment; 148 unit/component tests, lint,
+      build, two-account DEV authorization integration, Production signup and
+      confirmation, password recovery and sign-in, public Production / protected
+      Preview; cleanup of disposable user and Vercel bypass token.
+DONE: Initial v0.1 cross-platform testing kit authored; Windows generate
+      and blinded-fixture analysis checks succeeded, temp files cleaned.
+NEXT: 1. Stage ONLY docs/researcher-preview/ and scripts/researcher-preview/
+         plus this PROJECT_HANDOFF v33; verify diff; commit/push development;
+         safely fast-forward and push main; confirm both at same commit.
+      2. Create stable links to the new protocol, OS-specific scripts, and
+         synthetic CSV; replace placeholders in invitation email before use.
+      3. Choose private feedback collection approach (external survey first
+         is acceptable; a secure RLS-controlled table only if justified).
+         Finalize participation, contact, privacy and retention wording.
+      4. Enforce and test invitation-only Production signup policy if chosen;
+         publicly accessible /login currently does NOT gate account creation.
+      5. Recruit the initial small cohort with individual persistent accounts
+         and synthetic data only. Collect usability, blinding enhancements,
+         and prioritized future RMS-feature requests.
+DEFER: UI copy improvement ('Sign in to continue your research.') and
+       PostgREST JWT timing bug unless repeated enough to impair feedback.
+       No full end-to-end rerun or optional infrastructure upgrade needed.
+Do not present the kit as an approved clinical/research study protocol;
+this is a draft usability/feasibility exercise and must be revised with the
+actual recruitment/consent/retention context before use.
 
 CURRENT PRODUCT / SCIENTIFIC MODEL
 ----------------------------------
@@ -830,11 +903,12 @@ Known risk: intermittent PGRST303 jwt_issued_at_future seen earlier in DEV,
 recoverable; deferred unless repeated. No DB service upgrades performed.
 
 Outstanding before deliberate external researcher invitation:
-  - commit/push v32 to BOTH branches;
-  - select open versus invitation-only account policy; the production signup
-    page is already publicly accessible; use backend enforcement if gated;
-  - concise researcher instructions and appropriate privacy/custody wording;
-  - collect initial usability feedback using synthetic/non-sensitive data.
+  - commit/push the v0.1 testing kit and v33 handoff to BOTH branches;
+  - finalize stable email links; choose and enforce invitation-only signup
+    backend policy rather than relying on a private email alone;
+  - establish a private feedback collection channel and finalize notice about
+    voluntary participation, access, retention, and non-sensitive feedback;
+  - use ONLY the included synthetic fixture and no private/regulated data.
 
 Production is now publicly reachable, but researcher invitations have NOT
 been reported. Do not broaden core features without field evidence.
@@ -962,36 +1036,27 @@ Avoid:
   long-page UI patterns mixing live tasks, audit history, and education
 
 
-RECOMMENDED NEXT SESSION START (AFTER V32 CHECKPOINT)
+RECOMMENDED NEXT SESSION START (AFTER V33 CHECKPOINT)
 ----------------------------------------------------
-Current approved tested application source: 5f7be56. Preview and Production
-were manually deployed from this source. Latest verified Git commit BEFORE
-this v32 documentation update: 5d02699 on main AND development.
-
-From C:\Users\Mackson Ncube\Documents\blindstats:
+In C:\Users\Mackson Ncube\Documents\blindstats:
   git status
-  git log --oneline --decorate -6
+  git log --oneline --decorate -5
   git branch -vv
 
-Confirm PROJECT_HANDOFF v32 was committed/pushed to development AND main.
-Do not rerun 148 tests, two-account integration, or deployment for a
-handoff-only change. Vercel deployment remains manual.
+The latest *observed* Git info before kit staging was from the 2026-11-10
+v32 source snapshot; actual updated commit hash is not yet known. Confirm
+that the new scripts and docs are committed and both branches match before
+sharing any GitHub URLs. Existing Production application code deployed from
+5f7be56 does not need redeployment for docs/scripts outside app routes.
 
-NEXT: decide initial researcher audience and enrollment policy (open vs
-invitation-only); production /login is already public. Prepare a brief
-researcher walkthrough and an explicit synthetic-data-only warning. Do not
-claim production certification for sensitive research or client data.
-Observe JWT timing error only if it recurs materially; no DB upgrade is
-required before limited synthetic-data feedback. There is NO verified
-backup and NO confirmed PostgREST version upgrade.
-
-Most recent known deployed migration:
-  20261002223000_allow_unblinding_completion_without_lock.sql
+Next: choose feedback collection channel and invitation-only Production
+registration, test actual invitation emails, and pin stable protocol/helper
+links. Then recruit small researcher cohort to use synthetic fixture ONLY.
+Do not add a research-management platform feature until user feedback gives
+specific direction. Do not take an unbacked-up DB service upgrade.
 
 END OF HANDOFF
 --------------
-2026-11-10 (US Pacific): v32 records full successful Production email
-recovery/login, main/development alignment at 5d02699, deletion of public-
-inbox test account, removal of Vercel bypass, and Production HTTP 200 versus
-protected Preview HTTP 302. NEXT: controlled researcher feedback rollout.
-No application-code changes or new deployment needed.
+2026-11-11 (US Pacific): v33 adds the v0.1 research-preview kit and Windows
+helper PASS evidence, plus recruitment/feedback readiness tasks. Kit and v33
+are NOT yet known committed/pushed. No application logic or database changes.
