@@ -6,7 +6,7 @@ Hello [first name],
 
 I'm inviting a small group of researchers to try **blindstats**, an early tool for auditable analyst blinding. I'd value your feedback on the experience, improvements to blinding, and ideas for a broader research management system (RMS).
 
-**Paired testing is recommended:** one researcher acts as blinding custodian and another as analyst. If you can test with a colleague, reply so we can arrange a separate account for them. You can instead try the single-person exercise—or do both.
+**Paired testing is recommended:** one researcher acts as blinding custodian and another as analyst. If you can test with a colleague, please ask them to create their own account at blindstats.com. You can instead try the single-person exercise—or do both.
 
 - **Paired testing protocol (recommended):** https://github.com/mightymetrika/blindstats/blob/main/docs/researcher-preview/PAIRED_TESTING_PROTOCOL.md
 - **Single-person protocol (alternative):** https://github.com/mightymetrika/blindstats/blob/main/docs/researcher-preview/SINGLE_TESTING_PROTOCOL.md
@@ -15,7 +15,7 @@ I'm inviting a small group of researchers to try **blindstats**, an early tool f
 - **Analysis helper for your OS:** [insert one GitHub link from below]
 - **Private feedback form:** https://blindstats.com/feedback
 
-Please use **only the synthetic dataset**, not real research data. Nothing is attached to this email. On GitHub, select **Download raw file** for the CSV and script; the protocol explains the steps. Each researcher needs their own invited account.
+Please use **only the synthetic dataset**, not real research data. Nothing is attached to this email. On GitHub, select **Download raw file** for the CSV and script; the protocol explains the steps. Each researcher creates their own account with their usual private email address.
 
 [Insert participation, privacy/retention, and contact wording before sending.]
 
@@ -30,4 +30,4 @@ Thank you,
 - macOS: https://github.com/mightymetrika/blindstats/blob/1c426cd/scripts/researcher-preview/researcher-preview-macos.command
 - Linux: https://github.com/mightymetrika/blindstats/blob/1c426cd/scripts/researcher-preview/researcher-preview-linux.sh
 
-Before invitations: deploy and validate the *private* feedback form and its RLS-protected database table in Production; finalize privacy/retention wording; enforce invitation-only Production signup; and test account invitations. The protocol links become live after these files are pushed to `main`. The CSV/helpers are pinned to previously tested commit `1c426cd`.
+Before sending: Production /feedback and its RLS table have been validated; check current links, finalize participation/privacy/retention/contact wording, and remove this organizer-only section. Public self-registration is OPEN; direct researcher outreach is targeted, but there is no invite approval gate. The CSV/helpers are pinned to tested commit `1c426cd`.

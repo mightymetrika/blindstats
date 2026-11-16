@@ -4,7 +4,7 @@ Use this option if you are testing on your own, or after completing the [recomme
 
 **Files from GitHub:** [Synthetic CSV](https://github.com/mightymetrika/blindstats/blob/1c426cd/docs/researcher-preview/synthetic_study.csv) · Analysis helper: [Windows](https://github.com/mightymetrika/blindstats/blob/1c426cd/scripts/researcher-preview/researcher-preview-windows.ps1) / [macOS](https://github.com/mightymetrika/blindstats/blob/1c426cd/scripts/researcher-preview/researcher-preview-macos.command) / [Linux](https://github.com/mightymetrika/blindstats/blob/1c426cd/scripts/researcher-preview/researcher-preview-linux.sh). On each file page choose **Download raw file**. Save the CSV or helper you need in **Downloads**. Nothing is attached to the invitation email.
 
-Sign in at [blindstats.com](https://blindstats.com) using your invited account.
+Create an account at [blindstats.com](https://blindstats.com), confirm your email, and sign in.
 
 ## Exercise
 

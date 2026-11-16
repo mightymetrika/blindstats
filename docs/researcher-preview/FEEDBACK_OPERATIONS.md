@@ -1,8 +1,8 @@
 # Researcher-preview feedback — organizer notes
 
-The participant-facing link is `https://blindstats.com/feedback` **only after**
-the migration and application are deployed and validated. This document is for
-the organizer, not part of the participant testing protocol.
+The participant-facing link `https://blindstats.com/feedback` is LIVE: both
+Development and Production migration, app submission, and permission checks
+passed on 2026-11-16. This document is for the organizer only.
 
 ## Collection and privacy
 
@@ -20,7 +20,7 @@ the organizer, not part of the participant testing protocol.
   but cannot be unambiguously matched to a response from someone with multiple
   Studies, nor be interpreted as active time-on-task.
 
-## Safe rollout
+## Rollout record (completed in Development and Production)
 
 1. Commit the application, migration, tests, and docs to `development` only.
 2. Review the SQL migration and confirm the CLI is linked to the **Development**
@@ -46,7 +46,12 @@ the organizer, not part of the participant testing protocol.
    deploy the validated app code to Production, and submit one synthetic test
    response using an authorized test account. Then remove that test account and
    verify the associated feedback row is deleted via the foreign-key cascade.
-7. Do not invite researchers until Production invitation-only signup is enforced,
-   administrative invite emails work, and the privacy/retention notice is ready.
+7. User chose OPEN self-registration with targeted outreach. Paired researchers
+   recruit their own colleagues and each creates their own account. Before
+   outreach, finalize participation/privacy/retention/contact wording and verify
+   link destinations. No email allowlist, manual nominations or admin invitations.
+8. Delete disposable Production Yopmail test account prod2, then verify its
+   synthetic feedback row was removed through ON DELETE CASCADE. Never delete
+   legitimate researcher accounts.
 
 Current protocol version stored by the database: `researcher-preview-v0.3`.

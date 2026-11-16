@@ -1,10 +1,11 @@
 blindstats PROJECT HANDOFF
 ============================
-Updated: 2026-11-11 (US Pacific)
-Handoff version: v36
-Purpose: add minimal private researcher feedback collection as a proposed patch;
-         preserve the validated paired/single protocols and deployment history;
-         protect participant responses through an insert-only RLS table
+Updated: 2026-11-16 (US Pacific)
+Handoff version: v37
+Purpose: confirm live Development and Production feedback acceptance, both
+         database migrations and privacy checks, validated application deploys,
+         and OPEN signup with targeted researcher outreach; prepare Git main
+         fast-forward and first researcher invitations
 
 PROJECT
 -------
@@ -80,22 +81,81 @@ The historical 2026-10-12 export confirms:
       20261002223000_allow_unblinding_completion_without_lock.sql
 
 
-LATEST CONFIRMED GIT CHECKPOINT (2026-11-11)
---------------------------------------------
-User-confirmed development, main, origin/development, origin/main all at:
-  03d0d5d Separate paired and single researcher testing protocols
-Working tree clean after user pushed v35 to both branches.
-The obsolete TESTING_PROTOCOL.md was removed; short paired and single
-protocols, invitation email and v35 handoff are committed on both branches.
+LATEST VERIFIED RELEASE CHECKPOINT (2026-11-16)
+-----------------------------------------------
+SOURCE / GIT:
+  - development HEAD 4916340 Simplify researcher feedback form, pushed 2026-11-16.
+    User confirmed clean local development tree at deployment time.
+  - predecessor 4b9fba9 Add private researcher feedback collection and v36
+    handoff, pushed to development on 2026-11-11.
+  - main / origin/main last confirmed at 03d0d5d (v35); NOT YET confirmed
+    synchronized to 4916340. Do NOT claim main is current until pushed.
+  - v37 changes documentation only. Commit/push v37 on development and then
+    fast-forward main using --ff-only, verify both remote refs. No Vercel
+    redeploy is required for this documentation-only update.
 
-v36 feedback patch is prepared in an archive for local application but has
-NOT been reported as installed, committed, tested, migrated, or deployed.
-The current Production app still runs deployed application code 5f7be56.
-Do not claim that /feedback or public.researcher_feedback is operational.
-This new slice REQUIRES a new, separately reviewed database migration and
-Next.js deployment to Development/Preview, then Production after acceptance.
+TESTS / DEVELOPMENT ACCEPTANCE:
+  - npm test PASS 163/163 (28 files) with feedback action and validation tests;
+    npm run lint and npm run build passed on local Windows PowerShell 5.1.
+  - Subsequent 2-file feedback-form simplification at commit 4916340 removed
+    separate temporary secure-transfer questions. Instead it is one example in
+    the broader RMS priorities placeholder. Feedback-targeted 15/15 tests,
+    lint and build all passed.
+  - Development Supabase kfrfemqoalzxwzecyjjf: migration
+    20261111213000_create_researcher_feedback.sql applied; all 15 local/remote
+    migrations matched, db lint had no schema errors.
+  - Protected Preview with simplified form deployed successfully on 2026-11-16:
+    https://blindstats-ewzpcgexy-blindstats.vercel.app
+    Inspect: https://vercel.com/blindstats/blindstats/CN4mVdjW8XeoXY2ThESHsasmkmpj
+    Authenticated test response submitted; thank-you screen displayed and
+    feedback row found in DEV public.researcher_feedback.
+    DEV SQL confirmed RLS enabled; anon SELECT=false, authenticated
+    SELECT/UPDATE/DELETE=false, response-column INSERT=true, user_id INSERT=false.
 
-ACTIVE GIT / REPOSITORY CHECKPOINT (2026-11-10)
+PRODUCTION ROLLOUT AND ACCEPTANCE (2026-11-16):
+  - Production Supabase blindstats-prod nafujgfnylnvmmhpbpot deliberately
+    linked, dry-run verified ONLY the feedback migration pending; migration
+    20261111213000 was applied. All 15 histories matched and db lint clean.
+  - Supabase CLI was relinked to Development afterward and ref checked.
+  - Code commit 4916340 manually deployed with
+      npx vercel@65.14.0 deploy --prod --scope blindstats --logs
+    Production deployment: https://blindstats-agv0se36u-blindstats.vercel.app
+    Inspect: https://vercel.com/blindstats/blindstats/3PaViqT6Aas6dpY1b6CPp6kDuQLp
+    Aliased https://blindstats.com; Vercel build/TypeScript passed, Ready in 20s.
+    No automatic Vercel deploy is connected to GitHub.
+  - New disposable public-inbox account blindst.prod2@yopmail.com created,
+    confirmation email arrived, auth succeeded, /studies loaded.
+    Production /feedback submission returned status=thanks. SQL Editor showed
+    actual row: test_role=paired_analyst; completion=partial; ease_rating=2;
+    difficulties='Testing feedback form.' (synthetic placeholder).
+  - Production SQL confirmed RLS enabled; anon SELECT=false, authenticated
+    SELECT/UPDATE/DELETE=false, feedback-column INSERT=true, user_id INSERT=false.
+    These are grant/RLS checks plus successful app submission, not a full
+    adversarial multi-account PROD permission test.
+  - Earlier account blindst.prod1@yopmail.com had been deleted intentionally
+    on 2026-11-10; attempts to reuse its old account/confirmation link are
+    expected to fail. No evidence of a new auth regression from that alone.
+  - New prod2 account and its test feedback row remain to be cleaned up.
+    FK user_id references auth.users ON DELETE CASCADE: deleting the disposable
+    auth account also deletes its feedback. VERIFY cascade and row cleanup.
+
+RECRUITMENT ACCESS DECISION:
+  - User chose OPEN self-signup with targeted invitations, not whitelist or
+    manual nomination/approval. Researchers recruit their own paired colleague,
+    who registers independently with a real private email address.
+  - Public signup and public Production domain are accepted for an early
+    open-source research preview; this is NOT a restricted/private pilot.
+    Retain Supabase email confirmation, Study RLS/capabilities, feedback RLS;
+    use only synthetic non-sensitive study data. Limit outreach, not access.
+  - Paired exercise is recommended; single-person or both are alternatives.
+    Invitation links to two short GitHub protocols, synthetic CSV, one OS helper
+    and the now-live private /feedback form. No file attachments.
+  - Before invitations: update documents that still say invitation-only or
+    feedback pending; finalize concise privacy/retention/contact wording and
+    verify participant-facing GitHub links. No extra enrollment system required.
+  - First genuine researcher invitations not yet confirmed sent.
+
+HISTORICAL GIT / REPOSITORY CHECKPOINT (2026-11-10)
 ------------------------------------------------
 Repository: https://github.com/mightymetrika/blindstats.git
 Local: C:\Users\Mackson Ncube\Documents\blindstats
@@ -467,8 +527,8 @@ Existing src/, database migrations, OS helper files, feedback questions and
 Vercel deployments are unchanged. The two exercises and actual invitation
 flow have not been validated with invited researchers yet.
 
-RESEARCHER PREVIEW: CURRENT FINISH LINE (NEXT WORK)
----------------------------------------------------
+HISTORICAL RESEARCHER PREVIEW FINISH LINE (v36 PROPOSAL)
+---------------------------------------------------------
 DONE: Application validation and deployment; 148 unit/component tests, lint,
       build, two-account DEV integration, Production signup/confirmation,
       password recovery, public Production / protected Preview.
@@ -976,8 +1036,8 @@ checkpoints. Older v0 documents describe the artifact protocol plus the
 implemented persistent governance layer. No broad documentation rewrite is
 pending before research-preview deployment.
 
-CURRENT RELEASE PHASE / DEPLOYMENT HARDENING
----------------------------------------------
+HISTORICAL RELEASE PHASE / DEPLOYMENT HARDENING (2026-11-11)
+-------------------------------------------------------------
 Preview AND Production built/deployed from validated code commit 5f7be56;
 both Ready. Public Production login / HTTPS returned HTTP 200; Preview
 returned 302 to Vercel SSO. Vercel Authentication is ON with Standard
@@ -1126,26 +1186,33 @@ Avoid:
   long-page UI patterns mixing live tasks, audit history, and education
 
 
-RECOMMENDED NEXT SESSION START (v36 feedback patch)
----------------------------------------------------
+RECOMMENDED NEXT SESSION START (v37; 2026-11-16)
+-------------------------------------------------
 In C:\Users\Mackson Ncube\Documents\blindstats:
   git status
   git log -1 --oneline
   git branch -vv
 
-Last USER-CONFIRMED checkpoint: 03d0d5d on both main and development,
-working tree clean, v35 handoff committed. v36 patch has NOT been applied,
-committed, validated against a database or deployed at handoff preparation.
+Last USER-CONFIRMED application Git checkpoint: development 4916340, clean,
+Production deployed and /feedback accepted; origin/main last confirmed v35
+03d0d5d. v37 handoff is documentation-only and must be pushed to both refs.
+Next immediate step: apply this v37 handoff and the small organizer-doc corrections,
+commit/push development, then fast-forward main and push; verify synced branches.
+No new npm tests, migrations or Vercel deploy needed for documentation.
 
-Read docs/researcher-preview/FEEDBACK_OPERATIONS.md for the rollout sequence.
-Start with review/testing on Development; never run a Supabase migration
-against Production without checking the linked project ID and user approval.
-User wants short participant-facing instructions, no cross-file hopping,
-and minimal admin infrastructure. Existing paired/single protocols lead
-researchers to a single short /feedback endpoint once live.
+After Git sync: delete disposable prod2 Yopmail user in PRODUCTION Supabase
+Authentication > Users and verify its synthetic test feedback row cascaded away.
+Do not delete or modify legitimate researcher accounts. For account deletion,
+user_id foreign key ON DELETE CASCADE applies to test feedback.
+
+Before outreach: check concise consent/privacy/retention/contact copy and
+participant GitHub links; recruit paired researcher teams with open signup and
+synthetic datasets only. Continue monitoring actual usability, but do not
+speculatively build file transfer or broader RMS modules yet.
+Known intermittently reported DEV PGRST303 JWT timing remains deferred unless
+recurrent. DO NOT confuse Production and Development Supabase project refs.
 
 END OF HANDOFF
 --------------
-2026-11-11 (US Pacific): v36 patch PREPARED only. Paired/single protocol v35
-was pushed successfully as 03d0d5d. New private form/RLS migration/tests and
-link updates await user application, validation, deployment, and later release.
+2026-11-16 (US Pacific): Production and DEV feedback live validation passed.
+Production code 4916340; docs-only v37 prepared for checkpoint push.

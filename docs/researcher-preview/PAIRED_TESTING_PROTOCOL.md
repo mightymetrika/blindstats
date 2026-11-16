@@ -1,10 +1,10 @@
 # Paired blindstats exercise (recommended)
 
-**Two people, two invited accounts:** one **blinding custodian** and one **blinded analyst**. Use **only synthetic data**—never real, confidential, client, or regulated data. blindstats is an early research preview.
+**Two people, two separately registered accounts:** one **blinding custodian** and one **blinded analyst**. Use **only synthetic data**—never real, confidential, client, or regulated data. blindstats is an early research preview.
 
 **Files from GitHub:** [Synthetic CSV](https://github.com/mightymetrika/blindstats/blob/1c426cd/docs/researcher-preview/synthetic_study.csv) · Analysis helper: [Windows](https://github.com/mightymetrika/blindstats/blob/1c426cd/scripts/researcher-preview/researcher-preview-windows.ps1) / [macOS](https://github.com/mightymetrika/blindstats/blob/1c426cd/scripts/researcher-preview/researcher-preview-macos.command) / [Linux](https://github.com/mightymetrika/blindstats/blob/1c426cd/scripts/researcher-preview/researcher-preview-linux.sh). On each file page choose **Download raw file**. Save the CSV or helper you need in **Downloads**. Nothing is attached to the invitation email.
 
-Sign in at [blindstats.com](https://blindstats.com). Arrange a way to share the *synthetic* blinded file and, later, the unblinding secret outside blindstats; the app does not yet transfer files.
+Each person creates an account at [blindstats.com](https://blindstats.com), confirms their email, and signs in. Arrange a way to share the *synthetic* blinded file and, later, the unblinding secret outside blindstats; the app does not yet transfer files.
 
 ## Exercise
 
