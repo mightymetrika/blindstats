@@ -91,25 +91,9 @@ export default async function FeedbackPage({ searchParams }: FeedbackPageProps) 
               <label className="text-sm font-medium" htmlFor="blinding_improvements">What blinding features would you add?</label>
               <textarea className={inputStyle} id="blinding_improvements" name="blinding_improvements" rows={2} maxLength={1200} placeholder="What would be most useful?" />
             </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label className="text-sm font-medium" htmlFor="transfer_usefulness">Temporary secure file transfer?</label>
-                <select className={inputStyle} id="transfer_usefulness" name="transfer_usefulness" defaultValue="">
-                  <option value="">Skip</option>
-                  <option value="no">Not useful</option>
-                  <option value="somewhat">Somewhat useful</option>
-                  <option value="very">Very useful</option>
-                  <option value="unsure">Unsure</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-sm font-medium" htmlFor="transfer_controls">Which transfer controls matter?</label>
-                <input className={inputStyle} id="transfer_controls" name="transfer_controls" maxLength={600} placeholder="E.g., expiry, one download, revocation" />
-              </div>
-            </div>
             <div>
               <label className="text-sm font-medium" htmlFor="rms_priorities">Top priorities for a broader research management system?</label>
-              <textarea className={inputStyle} id="rms_priorities" name="rms_priorities" rows={2} maxLength={1200} placeholder="E.g., data collection, randomization, recruitment, collaboration" />
+              <textarea className={inputStyle} id="rms_priorities" name="rms_priorities" rows={2} maxLength={1200} placeholder="E.g., data collection, temporary secure file transfer, randomization, recruitment, collaboration" />
             </div>
             <div>
               <label className="text-sm font-medium" htmlFor="other_feedback">Anything else? <span className="font-normal text-black/50 dark:text-white/50">(optional)</span></label>
