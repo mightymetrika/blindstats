@@ -1,5 +1,49 @@
 blindstats PROJECT HANDOFF
 ============================
+Updated: 2026-11-19 (US Pacific; PowerShell validation results received)
+Handoff version: v38 — BROWSER-LOCAL CORE (DEVELOPMENT ONLY)
+
+MULTI-VARIABLE BLINDING — CHECKPOINT 1 (BROWSER-LOCAL CORE)
+----------------------------------------------------------
+- Added a separate version 0.4 artifact protocol in src/lib/blinding/multi-*.
+- Takes two or more selected categorical columns, generates independent
+  cryptographically randomized mappings, and emits one blinded CSV, one public
+  encrypted receipt and one mapping-free unblinding secret.
+- New local v0.4 analysis-lock and unblinding artifacts preserve exact receipt
+  and blinded-file hash linkage; mapping release remains a local operation.
+- Uses distinct v0.4 AES-GCM additional authenticated data and payload domain,
+  binding selected columns, counts, timestamps, transformation ID, and hashes.
+- Retains historical 0.3 artifact generation and parsing unchanged.
+- Uses existing Group_<letters> neutral labels independently per column.
+- Added multi-blinding.test.ts covering preservation, integrity, malformed
+  input, tamper detection, v0.4 lock/release, and historical v0.3 compatibility.
+- IMPORTANT: new code is NOT wired to UI/server registration yet. DO NOT
+  submit 0.4 artifacts to current v0.3-only database functions. Existing
+  Production researcher-testing workflow stays unchanged.
+- Database migrations: none in this checkpoint. Deployment: none.
+- VERIFIED LOCAL WINDOWS RESULTS, 2026-11-19 (initial v38 candidate):
+  targeted Vitest: PASS 23/23 tests (3 files), including historical v0.3;
+  npm test: PASS 171/171 tests (29 files);
+  npm run build: PASS (Next.js compile, TypeScript, static page generation);
+  git diff --check: PASS (line-ending conversion warnings only);
+  npm run lint: exit 0, 0 errors, 1 unused-import warning for
+  MultiSealedMapping in multi-blinding.ts.
+- This checkpoint includes the single-line unused-import correction.
+  Rerun npm run lint locally to verify that the warning is eliminated
+  before the Git checkpoint; the initial reported result was 0 errors/1 warning.
+- GIT STATUS (user output before patch): development at b8230a7;
+  main, origin/main and origin/development were also at b8230a7.
+  Five intended files were modified/new after initial patch extraction.
+  No new Git commit or deployment had been confirmed at initial validation.
+- NEXT: confirm clean lint and diff checks; commit these five files on
+  development and push development. Do not release to main or deploy yet.
+  Then implement backward-compatible v0.4 database registration and UI
+  integration, with Development-only migration and Preview validation.
+
+PRIOR HANDOFF (v37) — RETAINED BELOW
+-----------------------------------
+blindstats PROJECT HANDOFF
+============================
 Updated: 2026-11-16 (US Pacific)
 Handoff version: v37
 Purpose: confirm live Development and Production feedback acceptance, both
