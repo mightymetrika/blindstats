@@ -1,5 +1,102 @@
 blindstats PROJECT HANDOFF
 ============================
+Updated: 2026-11-20 (US Pacific; v42 UX local validation user-confirmed)
+Handoff status: v0.4 PREVIEW E2E ACCEPTED; v42 UX SOURCE VALIDATED; COMMIT/PREVIEW SMOKE PENDING
+
+V42 UX CLEANUP — USER-VERIFIED LOCAL VALIDATION
+---------------------------------------------
+- Source baseline before v42: development and origin/development bcb6693,
+  clean working tree. User applied eight-file UI candidate and one-file
+  CreateStudyForm TypeScript compatibility fix.
+- Changes: additional-column checkbox labels show only variable names;
+  category/missingness preview covers each selected variable; Sign out is
+  available on Study and workflow pages; Create Study guards repeat submission
+  within the same form and displays a pending indicator. No DB migration or
+  cryptographic/server-RPC behavior changes.
+- USER-VERIFIED WINDOWS CHECKS AFTER FIX, 2026-11-20:
+    git diff --check PASS (nonfatal LF/CRLF conversion notices);
+    npm run build PASS, including Next.js compilation, TypeScript,
+      prerendering and route optimization;
+    npm test PASS 183/183 (32 test files);
+    npm run lint PASS, no reported warnings or errors.
+- Exactly EIGHT expected changed paths:
+    PROJECT_HANDOFF.txt
+    src/app/studies/[studyId]/blinding/[workflowId]/page.tsx
+    src/app/studies/[studyId]/page.tsx
+    src/app/studies/page.tsx
+    src/components/SignOutButton.tsx
+    src/components/blinding/BlindingWorkspace.test.tsx
+    src/components/blinding/BlindingWorkspace.tsx
+    src/components/studies/CreateStudyForm.tsx
+- At handoff preparation, v42 is NOT YET COMMITTED OR DEPLOYED; verify actual
+  Git and Vercel outputs. The confirmed protected Preview browser E2E remains
+  v41 at bcb6693, which successfully completed group+site blinding, lock,
+  independent authorization, unblinding, and audit history.
+- NEXT: commit/push these eight v42 files to DEVELOPMENT only. Manually
+  deploy the clean committed v42 source to authenticated PREVIEW only
+  (--environment=preview) with Development Supabase; perform a short UI smoke
+  test for the newly changed controls, not another full two-account run.
+  Confirm v42 create-submit guard, selected-variable previews and signout.
+  Keep main, Production database and Production Vercel untouched without an
+  explicit separate release decision.
+- AFTER acceptance close-out, separate next task: a small READ-ONLY
+  OpenPayables GUI pilot against a fixed versioned OpenPayables prerelease.
+  OpenPayables code/release stays in its own chat and repository.
+
+PREVIOUS HANDOFF — RETAINED BELOW
+--------------------------------
+blindstats PROJECT HANDOFF
+============================
+Updated: 2026-11-20 (US Pacific; v0.4 Preview browser acceptance evidence)
+Handoff status: v41 v0.4 END-TO-END ACCEPTED IN DEVELOPMENT/PREVIEW; UX PATCH CANDIDATE UNVALIDATED
+
+V0.4 PREVIEW ACCEPTANCE — USER SCREENSHOTS AND ARTIFACTS VERIFIED
+-------------------------------------------------------------
+- Git: user-confirmed development/origin/development bcb6693, clean tree.
+- Vercel Preview deployment explicitly --environment=preview Ready, protected
+  by Vercel Authentication: blindstats-ktmlg0lf1-blindstats.vercel.app.
+  No main merge or Production Vercel deployment was performed.
+- Real user browser flow with two Development accounts COMPLETED:
+  one protection target; independent authorization; browser-local blinding
+  of group AND site from a 48-row, 5-column synthetic CSV; persisted public
+  receipt; linked analysis lock; requester/authorizer separation; local
+  authenticated recovery of both mappings; downloaded final receipt; state
+  unblinded; durable history displaying group, site, lock, request,
+  independent authorization, and completion hashes.
+- Attached synthetic artifact verification: original and blinded CSV hashes
+  exactly match public receipt; 48 records remain; participant_id,
+  baseline_score, outcome_score preserved; both blinded columns match released
+  mappings row-for-row. Exact public-receipt/secret/lock receipt byte hashes
+  agree with the final unblinding receipt references.
+- Existing 183/183 test suite + build/lint clean; Development migrations
+  all 18 matched and lint clean; two authenticated DB integration tests PASS.
+- No *new* v0.3 browser exercise after this deployment; historical v0.3
+  unit and real-DB independent-authorization tests passed. Avoid another
+  full point-and-click run unless required by a material code change.
+
+SMALL RESEARCHER UX FEEDBACK PATCH (SOURCE CANDIDATE, NOT USER VALIDATED)
+---------------------------------------------------------------------
+- Leave multi-variable checkbox selection design unchanged pending feedback.
+- Remove redundant "Also blind" from each additional-variable checkbox.
+- Preview each selected variable's categories (bounded at 8 per variable)
+  and missingness; label primary-column stats clearly.
+- Add reusable Sign out control on Study and Blinding workflow pages.
+- Guard Create Study against rapid duplicate form submissions and show
+  "Creating Study..." while pending. This is a same-form client-side guard,
+  not a database-level idempotency guarantee against retries/across tabs.
+- UX-only patch: no artifact crypto/RPC/schema/source-handling changes. Must
+  run npm test, lint, build and diff check before commit. No need to rerun
+  full two-account browser workflow for these isolated UI improvements.
+- Once UX patch is validated and committed to development, user may decide
+  separately whether to release v0.4 to main/Production (NOT automatic).
+- NEXT separate workstream after the accepted v0.4 workflow: fixed-version,
+  READ-ONLY OpenPayables GUI pilot within the BlindStats repo, under this
+  chat. OpenPayables source/release stays in its own owning chat.
+
+PRIOR HANDOFF — RETAINED BELOW
+------------------------------
+blindstats PROJECT HANDOFF
+============================
 Updated: 2026-11-20 (US Pacific; v41 real Development database acceptance verified)
 Handoff status: v41 SOURCE + DEV DATABASE RPC ACCEPTANCE PASSED; PREVIEW GUI PENDING
 

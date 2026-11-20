@@ -166,11 +166,6 @@ export function BlindingWorkspace({
   const selectedCategories = selectedColumnInspection.categories;
   const categoryCount = selectedCategories.length;
   const missingCount = selectedColumnInspection.missingCount;
-  const categoryPreview = selectedCategories.slice(0, CATEGORY_PREVIEW_LIMIT);
-  const additionalCategoryCount = Math.max(
-    categoryCount - categoryPreview.length,
-    0,
-  );
   const eligibleAdditionalColumns = useMemo(() => {
     if (!parsed || !selectedColumn) return [];
     return parsed.columns.filter((column) =>
@@ -185,6 +180,23 @@ export function BlindingWorkspace({
         column === selectedColumn || additionalColumns.includes(column),
       )
     : [];
+  const selectedColumnPreviews = useMemo(() => {
+    if (!parsed || !selectedColumn) return [];
+
+    return parsed.columns
+      .filter((column) => column === selectedColumn || additionalColumns.includes(column))
+      .map((column) => {
+        const values = parsed.rows.map((row) => row[column]);
+        const categories = getDistinctNonmissingCategories(values);
+        return {
+          column,
+          categoryCount: categories.length,
+          missingCount: values.filter((value) => value === null).length,
+          preview: categories.slice(0, CATEGORY_PREVIEW_LIMIT),
+          hiddenCategoryCount: Math.max(categories.length - CATEGORY_PREVIEW_LIMIT, 0),
+        };
+      });
+  }, [parsed, selectedColumn, additionalColumns]);
   const canGenerate =
     Boolean(sourceFile && sourceBytes && parsed) &&
     selectedColumnIsEligible &&
@@ -495,7 +507,7 @@ export function BlindingWorkspace({
                             setWorkspaceError(null);
                           }}
                         />
-                        Also blind {column}
+                        {column}
                       </label>
                     ))}
                   </div>
@@ -509,6 +521,7 @@ export function BlindingWorkspace({
               {selectedColumn ? (
                 <div className="mt-4">
                   <div className="flex flex-wrap items-center gap-2 text-sm">
+                    <span className="text-xs font-medium text-slate-600">Primary: {selectedColumn}</span>
                     <span className="rounded-full border border-slate-200 px-3 py-1 text-slate-700">
                       {categoryCount.toLocaleString()} {categoryCount === 1 ? "category" : "categories"}
                     </span>
@@ -528,35 +541,41 @@ export function BlindingWorkspace({
 
                   <details className="mt-3 text-sm text-slate-600">
                     <summary className="cursor-pointer font-medium text-slate-700">
-                      Preview categories
+                      Preview categories for all {selectedColumnPreviews.length} selected {selectedColumnPreviews.length === 1 ? "column" : "columns"}
                     </summary>
-                    <div className="mt-3 rounded-xl bg-slate-50 p-4">
-                      {categoryPreview.length > 0 ? (
-                        <ul className="grid gap-2 sm:grid-cols-2">
-                          {categoryPreview.map((category) => (
-                            <li
-                              key={category}
-                              className="min-w-0 rounded-lg border border-slate-200 bg-white px-3 py-2"
-                            >
-                              <code className="block whitespace-pre-wrap break-all font-mono text-xs leading-5 text-slate-700">
-                                {category}
-                              </code>
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <p>No nonmissing category values were found.</p>
-                      )}
-
-                      {additionalCategoryCount > 0 ? (
-                        <p className="mt-3 text-xs text-slate-500">
-                          {additionalCategoryCount.toLocaleString()} additional{" "}
-                          {additionalCategoryCount === 1 ? "category" : "categories"}{" "}
-                          not shown.
-                        </p>
-                      ) : null}
-
-                      <p className="mt-3 text-xs leading-5 text-slate-500">
+                    <div className="mt-3 max-h-96 space-y-5 overflow-y-auto rounded-xl bg-slate-50 p-4">
+                      {selectedColumnPreviews.map((item) => (
+                        <div key={item.column}>
+                          <h3 className="font-semibold text-slate-800">
+                            {item.column}
+                          </h3>
+                          <p className="mb-2 mt-1 text-xs text-slate-500">
+                            {item.categoryCount.toLocaleString()} {item.categoryCount === 1 ? "category" : "categories"} · {item.missingCount.toLocaleString()} missing
+                          </p>
+                          {item.preview.length > 0 ? (
+                            <ul className="grid gap-2 sm:grid-cols-2">
+                              {item.preview.map((category) => (
+                                <li
+                                  key={category}
+                                  className="min-w-0 rounded-lg border border-slate-200 bg-white px-3 py-2"
+                                >
+                                  <code className="block whitespace-pre-wrap break-all font-mono text-xs leading-5 text-slate-700">
+                                    {category}
+                                  </code>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p>No nonmissing category values were found.</p>
+                          )}
+                          {item.hiddenCategoryCount > 0 ? (
+                            <p className="mt-2 text-xs text-slate-500">
+                              {item.hiddenCategoryCount.toLocaleString()} additional {item.hiddenCategoryCount === 1 ? "category" : "categories"} not shown.
+                            </p>
+                          ) : null}
+                        </div>
+                      ))}
+                      <p className="text-xs leading-5 text-slate-500">
                         Missing means an empty CSV cell. Text such as NA or N/A is treated as an observed category.
                       </p>
                     </div>

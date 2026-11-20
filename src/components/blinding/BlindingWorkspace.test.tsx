@@ -229,7 +229,14 @@ describe("BlindingWorkspace workflow", () => {
     render(<BlindingWorkspace />);
     await uploadCsv(user);
     await chooseColumn(user, "group");
-    await user.click(screen.getByRole("checkbox", { name: "Also blind alternate" }));
+    await user.click(screen.getByRole("checkbox", { name: "alternate" }));
+    await user.click(screen.getByText("Preview categories for all 2 selected columns"));
+    expect(screen.getByRole("heading", { name: "group" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "alternate" })).toBeInTheDocument();
+    expect(screen.getByText("Treatment")).toBeInTheDocument();
+    expect(screen.getByText("Control")).toBeInTheDocument();
+    expect(screen.getByText("A")).toBeInTheDocument();
+    expect(screen.getByText("B")).toBeInTheDocument();
     await user.click(generateButton());
     expect(mockedCreateMultiBlindedPackage).toHaveBeenCalledTimes(1);
     const [sourceBytes, columns] = mockedCreateMultiBlindedPackage.mock.calls[0];
@@ -237,7 +244,7 @@ describe("BlindingWorkspace workflow", () => {
     expect(columns).toEqual(["group", "alternate"]);
     expect(mockedCreateBlindedPackage).not.toHaveBeenCalled();
     await screen.findByText("Blinded package created successfully.");
-    await user.click(screen.getByRole("checkbox", { name: "Also blind alternate" }));
+    await user.click(screen.getByRole("checkbox", { name: "alternate" }));
     expect(generateButton()).toBeEnabled();
     downloadButtons().forEach((button) => expect(button).toBeDisabled());
   });

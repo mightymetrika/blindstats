@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
+import { SignOutButton } from "@/components/SignOutButton";
 import { createClient } from "@/lib/supabase/server";
 
 import { createBlindingWorkflow } from "./blinding/actions";
@@ -129,12 +130,15 @@ export default async function StudyPage({ params }: StudyPageProps) {
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-5xl px-6 py-12">
-      <Link
-        className="text-sm font-medium text-black/60 underline underline-offset-4 dark:text-white/60"
-        href="/studies"
-      >
-        Back to Studies
-      </Link>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <Link
+          className="text-sm font-medium text-black/60 underline underline-offset-4 dark:text-white/60"
+          href="/studies"
+        >
+          Back to Studies
+        </Link>
+        <SignOutButton />
+      </div>
 
       <header className="mt-6">
         <div className="flex flex-wrap items-center gap-3">

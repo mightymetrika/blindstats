@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { CreateStudyForm } from "@/components/studies/CreateStudyForm";
+import { SignOutButton } from "@/components/SignOutButton";
 import { createClient } from "@/lib/supabase/server";
 import { summarizeStudiesReadFailure } from "@/lib/supabase/studies-read-diagnostics";
 
@@ -97,14 +99,7 @@ export default async function StudiesPage({
             </Link>
           ) : null}
 
-          <form action="/auth/signout" method="post">
-            <button
-              className="rounded-lg border border-black/15 px-4 py-2 text-sm font-medium dark:border-white/20"
-              type="submit"
-            >
-              Sign out
-            </button>
-          </form>
+          <SignOutButton />
         </div>
       </header>
 
@@ -130,45 +125,7 @@ export default async function StudiesPage({
             ) : null}
           </div>
 
-          <form action={createStudy} className="mt-5 space-y-4">
-            <div>
-              <label className="text-sm font-medium" htmlFor="name">
-                Study name
-              </label>
-              <input
-                className="mt-1 w-full rounded-lg border border-black/15 bg-transparent px-3 py-2 outline-none focus:border-black/40 dark:border-white/20 dark:focus:border-white/50"
-                id="name"
-                name="name"
-                placeholder="For example: Texas Science ANCOVA"
-                type="text"
-                maxLength={200}
-                required
-              />
-            </div>
-
-            <div>
-              <label className="text-sm font-medium" htmlFor="description">
-                Description{" "}
-                <span className="font-normal text-black/45 dark:text-white/45">
-                  (optional)
-                </span>
-              </label>
-              <textarea
-                className="mt-1 min-h-20 w-full rounded-lg border border-black/15 bg-transparent px-3 py-2 outline-none focus:border-black/40 dark:border-white/20 dark:focus:border-white/50"
-                id="description"
-                name="description"
-                placeholder="Short description of the study."
-                maxLength={2000}
-              />
-            </div>
-
-            <button
-              className="rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background"
-              type="submit"
-            >
-              Create Study
-            </button>
-          </form>
+          <CreateStudyForm action={createStudy} />
         </section>
       ) : null}
 
