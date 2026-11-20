@@ -1,5 +1,57 @@
 blindstats PROJECT HANDOFF
 ============================
+Updated: 2026-11-19 (US Pacific; local v39 checks passed; database migration pending)
+Handoff version: v39 — REGISTRATION SOURCE VALIDATED; DEV MIGRATION PENDING
+
+MULTI-VARIABLE BLINDING — CHECKPOINT 2 (DATABASE REGISTRATION BOUNDARY)
+--------------------------------------------------------------------
+- Last USER-VERIFIED Git checkpoint: development/origin/development at abab0a5,
+  pushed successfully; clean working tree; main/origin/main remain b8230a7.
+- User-verified v38: all 171 unit/component tests passed; Next.js production
+  build passed. Follow-up lint cleanup passed with no errors or warnings;
+  the five v38 files, including tracked handoff, were committed as abab0a5.
+- This checkpoint adds a NEW database migration:
+    supabase/migrations/20261119194500_register_multi_column_blinding.sql
+  It adds safe selected_columns JSONB to existing transformations, preserves
+  historical 0.3 scalar fields, and creates an independent 0.4-only registration
+  RPC with exact structure/metadata checks, authenticated capability and plan
+  checks, strict state transition, and server-computed public-receipt hash.
+- Existing public.register_blinding_transformation continues to accept only
+  0.3 receipts and is NOT replaced. Existing RLS/grants are unchanged.
+- The server action now validates and dispatches v0.3 receipts to the historical
+  RPC and v0.4 receipts to the new RPC. New dispatch tests cover both versions
+  and malformed or secret-bearing receipts.
+- VERIFIED USER LOCAL TESTS, 2026-11-19: targeted 19/19 (3 files), full
+  Vitest 174/174 (30 files), eslint clean, Next.js build + TypeScript passed;
+  git diff --check passed. Expected 5 files changed, no unrelated edits.
+- DEV link verified kfrfemqoalzxwzecyjjf; project reports ACTIVE_HEALTHY.
+  Migration history and db push --dry-run were BLOCKED before SQL execution:
+    unexpected login role status 544: Failed to create login role:
+    Connection terminated due to connection timeout.
+  SQL Editor also timed out on a read-only SELECT. Auth health HTTP 200;
+  unauthenticated REST /studies returned HTTP 401, not a DB-health proof.
+  Root cause NOT diagnosed. Migration has NOT been applied to Development.
+  No migration, deploy, commit or push of v39 confirmed as of this handoff
+  update; do not falsely mark migration applied after Git commit.
+- IMPORTANT: this is still NOT an end-to-end multi-column app feature. The
+  BlindingWorkspace UI continues to emit v0.3 single-column artifacts; existing
+  analysis-lock and unblinding registration remain v0.3-only. Do not create
+  persistent v0.4 workflows until the remaining server/UI paths are complete.
+- No Production schema or deployment change. Never apply migration to
+  Production before separate release approval and Preview acceptance.
+- NEXT: commit and push these locally validated v39 source files to
+  development, with DEV database migration explicitly PENDING. No DB commands,
+  main merge, or deployment at this checkpoint. Continue implementation of
+  version-aware analysis-lock/unblinding registration and multi-column UI
+  locally; after DB connectivity is restored, dry-run and apply the migration
+  to Development only, then validate DB permissions, Preview, and full workflow.
+  Treat SQL Editor and CLI timeouts as a separate infrastructure blocker;
+  do not endlessly retry or restart an unbacked-up database.
+
+PRIOR HANDOFF (v38) — RETAINED BELOW
+-----------------------------------
+blindstats PROJECT HANDOFF
+============================
 Updated: 2026-11-19 (US Pacific; PowerShell validation results received)
 Handoff version: v38 — BROWSER-LOCAL CORE (DEVELOPMENT ONLY)
 

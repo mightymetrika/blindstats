@@ -6,7 +6,10 @@ import { revalidatePath } from "next/cache";
 import { redirect, RedirectType } from "next/navigation";
 
 import { parseAnalysisLockReceiptBytes } from "@/lib/blinding/analysis-lock-receipt";
-import { parseBlindingReceiptBytes } from "@/lib/blinding/blinding-receipt";
+import {
+  parseSupportedBlindingReceiptBytes,
+  registrationRpcForBlindingReceipt,
+} from "@/lib/blinding/public-receipt-version";
 import { createClient } from "@/lib/supabase/server";
 
 function getRequiredString(formData: FormData, name: string) {
@@ -442,8 +445,8 @@ export async function registerBlindingTransformation(
     };
   }
 
-  let publicReceiptBytes: Uint8Array;
   let publicReceiptText: string;
+  let registrationRpc: "register_blinding_transformation" | "register_multi_blinding_transformation";
 
   try {
     if (
@@ -459,8 +462,9 @@ export async function registerBlindingTransformation(
       throw new Error("Public blinding receipt transport encoding is invalid.");
     }
 
-    publicReceiptBytes = new Uint8Array(decoded);
-    parseBlindingReceiptBytes(publicReceiptBytes);
+    const publicReceiptBytes = new Uint8Array(decoded);
+    const publicReceipt = parseSupportedBlindingReceiptBytes(publicReceiptBytes);
+    registrationRpc = registrationRpcForBlindingReceipt(publicReceipt);
     publicReceiptText = new TextDecoder("utf-8", { fatal: true }).decode(
       publicReceiptBytes,
     );
@@ -475,7 +479,7 @@ export async function registerBlindingTransformation(
   }
 
   const { data, error } = await supabase.rpc(
-    "register_blinding_transformation",
+    registrationRpc,
     {
       p_workflow_id: workflowId,
       p_public_receipt_text: publicReceiptText,
