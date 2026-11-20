@@ -1,4 +1,7 @@
 import { parseBlindingReceiptBytes } from "./blinding-receipt";
+import { createMultiAnalysisLockPackage } from "./multi-unblinding";
+import { parseSupportedBlindingReceiptBytes } from "./public-receipt-version";
+import type { MultiAnalysisLockReceipt } from "./multi-types";
 import { sha256Hex } from "./hashing";
 import { createAnalysisLockIdentity } from "./identity";
 import {
@@ -19,7 +22,7 @@ export type SerializedAnalysisLockReceipt = {
 };
 
 export type AnalysisLockPackage = {
-  receipt: AnalysisLockReceipt;
+  receipt: AnalysisLockReceipt | MultiAnalysisLockReceipt;
   receiptArtifact: SerializedAnalysisLockReceipt;
 };
 
@@ -45,6 +48,12 @@ export async function createAnalysisLockPackage(
 
   if (analysisArtifact.bytes.length === 0) {
     throw new Error("Analysis artifact file cannot be empty.");
+  }
+
+  const supportedReceipt = parseSupportedBlindingReceiptBytes(blindingReceiptBytes);
+
+  if (supportedReceipt.schemaVersion === "0.4") {
+    return createMultiAnalysisLockPackage(blindingReceiptBytes, analysisArtifact, createdAt);
   }
 
   const blindingReceipt =

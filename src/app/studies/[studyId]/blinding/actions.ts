@@ -5,7 +5,10 @@ import { Buffer } from "node:buffer";
 import { revalidatePath } from "next/cache";
 import { redirect, RedirectType } from "next/navigation";
 
-import { parseAnalysisLockReceiptBytes } from "@/lib/blinding/analysis-lock-receipt";
+import {
+  parseSupportedAnalysisLockReceiptBytes,
+  registrationRpcForAnalysisLockReceipt,
+} from "@/lib/blinding/supported-analysis-lock";
 import {
   parseSupportedBlindingReceiptBytes,
   registrationRpcForBlindingReceipt,
@@ -575,6 +578,7 @@ export async function registerAnalysisLock(
   }
 
   let receiptText: string;
+  let registrationRpc: "register_analysis_lock" | "register_multi_analysis_lock";
 
   try {
     if (
@@ -591,7 +595,8 @@ export async function registerAnalysisLock(
     }
 
     const receiptBytes = new Uint8Array(decoded);
-    parseAnalysisLockReceiptBytes(receiptBytes);
+    const receipt = parseSupportedAnalysisLockReceiptBytes(receiptBytes);
+    registrationRpc = registrationRpcForAnalysisLockReceipt(receipt);
     receiptText = new TextDecoder("utf-8", { fatal: true }).decode(
       receiptBytes,
     );
@@ -605,7 +610,7 @@ export async function registerAnalysisLock(
     };
   }
 
-  const { data, error } = await supabase.rpc("register_analysis_lock", {
+  const { data, error } = await supabase.rpc(registrationRpc, {
     p_workflow_id: workflowId,
     p_analysis_lock_receipt_text: receiptText,
   });

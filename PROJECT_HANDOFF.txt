@@ -1,5 +1,58 @@
 blindstats PROJECT HANDOFF
 ============================
+Updated: 2026-11-20 (US Pacific; user-verified local v40 source validation)
+Handoff version: v40 — ANALYSIS LOCK SOURCE VALIDATED; DEV MIGRATIONS PENDING
+
+MULTI-VARIABLE BLINDING — CHECKPOINT 3 (ANALYSIS LOCK)
+--------------------------------------------------
+- Last USER-CONFIRMED Git baseline before this v40 commit: development and
+  origin/development at 7a62e56; clean tree. main/origin/main at b8230a7.
+- v40 adds version-aware browser-local analysis-lock creation and strict
+  server-side dispatch: v0.3 artifacts continue through their existing path;
+  v0.4 analysis-lock receipts use the new v0.4 registration RPC.
+- New migration (source only; not yet executed):
+    supabase/migrations/20261120190000_register_multi_analysis_lock.sql
+  The migration preserves the historical v0.3 RPC, provides a separate v0.4
+  RPC and adds an equality constraint between a lock and its linked
+  transformation artifact version.
+- The original candidate needed one TypeScript-only test compatibility fix:
+  src/lib/blinding/unblinding.test.ts now explicitly narrows its historical
+  fixture to v0.3 before assigning to the v0.3 AnalysisLockReceipt type.
+- USER-VERIFIED WINDOWS VALIDATION AFTER FIX (2026-11-20):
+  targeted regression suite PASS 15/15 (3 files);
+  full npm test PASS 178/178 (31 files);
+  npm run lint PASS without reported warnings;
+  npm run build PASS including Next.js TypeScript compilation and route build;
+  git diff --check PASS (non-fatal LF-to-CRLF conversion warnings).
+- Expected v40 source changes: exactly 7 repository-relative files (this
+  handoff, actions.ts, analysis-lock.ts, supported-analysis-lock.ts,
+  supported-analysis-lock.test.ts, unblinding.test.ts, new SQL migration).
+- Neither Development migration has been executed or database-tested:
+    20261119194500_register_multi_column_blinding.sql (v39, pending)
+    20261120190000_register_multi_analysis_lock.sql (v40, pending; after v39)
+  Previous Supabase CLI and SQL Editor connection timeouts remain unresolved.
+  Do not claim the migration, database permissions, or remote workflow pass.
+- No v40 Git commit/push has been confirmed at the moment this handoff update
+  was prepared; check the user's actual PowerShell results before marking it
+  committed. main and Production have not been changed or deployed.
+- Not an end-to-end v0.4 researcher feature yet. The multi-select blinding UI
+  and v0.4 unblinding-completion registration remain incomplete. Production
+  researcher testing continues on the unchanged v0.3 workflow.
+
+NEXT
+----
+- Stage ONLY the 7 expected v40 files, verify diff, commit and push
+  development. Do not apply the database migrations or deploy.
+- Implement v0.4 unblinding completion and the multi-variable BlindingWorkspace
+  UI, then test locally. When Development DB access is restored, inspect
+  migration history, dry-run, apply v39 then v40 and subsequent migration(s)
+  in order, and validate permissions and the full Preview workflow. Release
+  Production only after explicit acceptance.
+
+PRIOR HANDOFF (v39) — RETAINED BELOW
+------------------------------------
+blindstats PROJECT HANDOFF
+============================
 Updated: 2026-11-19 (US Pacific; local v39 checks passed; database migration pending)
 Handoff version: v39 — REGISTRATION SOURCE VALIDATED; DEV MIGRATION PENDING
 

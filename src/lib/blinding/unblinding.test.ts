@@ -232,6 +232,10 @@ describe("createUnblindingPackage", () => {
       lockPackage,
     } = await fixture();
 
+    if (lockPackage.receipt.schemaVersion !== "0.3") {
+      throw new Error("Expected a v0.3 analysis lock in the historical unblinding test.");
+    }
+
     const changedLock:
       AnalysisLockReceipt = {
         ...lockPackage.receipt,
