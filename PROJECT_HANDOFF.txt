@@ -1,5 +1,107 @@
 blindstats PROJECT HANDOFF
 ============================
+Updated: 2026-11-20 (US Pacific; v41 real Development database acceptance verified)
+Handoff status: v41 SOURCE + DEV DATABASE RPC ACCEPTANCE PASSED; PREVIEW GUI PENDING
+
+DEVELOPMENT TWO-ACCOUNT ACCEPTANCE — USER VERIFIED
+-------------------------------------------------
+- User confirmed development and origin/development are synchronized at
+  f9ebde0, clean working tree, before the integration-test patch.
+- All 18 local/remote Development migrations matched after applying the
+  three v39-v41 migrations; db lint found no schema errors.
+- Tests run on Windows, 2026-11-20, with the opt-in Development-only launcher
+  scripts/run-development-authz-test.ps1, using two distinct existing
+  Development test accounts (credentials not persisted to the handoff).
+- VERIFIED: 2/2 real authenticated Supabase integration tests PASSED:
+    tests/integration/multi-variable-workflow.integration.test.ts
+    tests/integration/independent-authorization.integration.test.ts
+- The new v0.4 test covered the complete synthetic two-column artifact chain:
+  receipt/hash and selected-column persistence; analysis-lock registration;
+  rejected unauthorized lock registration and missing required lock;
+  rejected requester self-authorization; separate actor authorization;
+  local recovery of both original mappings; rejected unauthorized completion;
+  rejected mismatched category metadata; successful safe-metadata completion;
+  final unblinded state and an idempotent exact retry.
+- The historical independent-authorizer test also passed.
+- The integration test's first attempt failed at a *test fixture* input:
+  existing blinding_plan_drafts_protection_target_count restricts the plan to
+  one substantive protection target; it is distinct from the number of CSV
+  variables selected for blinding. Fixed only the integration test fixture,
+  then reran and passed both tests. No schema or app logic changes.
+- In the same patch validation, user also verified Next.js build/TypeScript
+  passed, ordinary npm test PASSED 183/183 (32 files), and npm run lint PASSED.
+- The new test archives its disposable synthetic Study in finally; the
+  integration test cannot pass if archival reports failure.
+- Exactly THREE repository files are pending commit:
+    PROJECT_HANDOFF.txt
+    vitest.integration.config.mts
+    tests/integration/multi-variable-workflow.integration.test.ts
+- NO commit/push of this three-file acceptance-test patch is verified yet.
+  main, Production database, and Production Vercel remain unchanged.
+
+NEXT — FINISH RESEARCHER-FACING GUI ACCEPTANCE
+---------------------------------------------
+1. Commit and push only the above three locally validated test/handoff files
+   to development, verifying clean tree and origin/development match.
+2. Manually deploy that committed development source to protected Vercel
+   PREVIEW ONLY. Explicitly use --environment preview; never --prod.
+3. Using synthetic CSV and two Development accounts, visually exercise the
+   full v0.4 flow: multi-column selection, local artifacts, persistence,
+   analysis lock, request, independent authorization, all mappings recovered,
+   final state and audit history. Also run a v0.3 single-column regression.
+4. Review resulting UX/DB evidence and resolve only actual failures. Do not
+   claim end-to-end researcher acceptance until the GUI run passes.
+5. Main/Production require a separate explicit release decision. AFTER
+   multi-variable acceptance, the next separate BlindStats task is a small
+   READ-ONLY OpenPayables GUI pilot integrated against a fixed, versioned
+   OpenPayables release. OpenPayables source/release stays in its own chat.
+
+PRIOR HANDOFF — RETAINED BELOW
+------------------------------
+blindstats PROJECT HANDOFF
+============================
+Updated: 2026-11-20 (US Pacific; Development migration verified)
+Handoff status: v41 APPLICATION + DB SCHEMA APPLIED; REAL WORKFLOW ACCEPTANCE PENDING
+
+DEVELOPMENT DATABASE — USER VERIFIED
+------------------------------------
+- User confirmed Git development/origin/development at f9ebde0, clean tree.
+- Local application validation: 183/183 unit/component tests; lint and build pass.
+- Supabase CLI link is Development ONLY: kfrfemqoalzxwzecyjjf.
+- On 2026-11-20 the user successfully applied all three migrations:
+    20261119194500_register_multi_column_blinding.sql
+    20261120190000_register_multi_analysis_lock.sql
+    20261120210000_register_multi_unblinding_completion.sql
+- Follow-up migration list: 18/18 local and remote versions match.
+- Follow-up `supabase db lint --linked --level warning`: No schema errors.
+- This establishes installation, NOT full authenticated RPC or GUI acceptance.
+- Production project nafujgfnylnvmmhpbpot and main remain unchanged.
+
+DEVELOPMENT ACCEPTANCE TEST CANDIDATE — NOT YET USER VERIFIED
+-----------------------------------------------------------
+- Adds tests/integration/multi-variable-workflow.integration.test.ts to run
+  a complete v0.4 two-account workflow against Development using synthetic data.
+- Updates vitest.integration.config.mts to opt in to both this v0.4 test and
+  the existing v0.3 independent-authorization integration regression.
+- Reuse the existing scripts/run-development-authz-test.ps1 launcher; it
+  verifies Development configuration and prompts for credentials privately.
+- Ordinary `npm test` excludes these database-writing integration tests.
+- The new test checks exact public receipt and hashes, selected columns,
+  AnalysisLock registration, required-lock policy, independent authorization,
+  safe completion metadata, rejection of unauthorized/mismatched operations,
+  and idempotent completion retry. It archives its synthetic Study in `finally`.
+- Test/source patch NOT committed or applied yet; run it on clean development
+  f9ebde0, then validate npm test, lint, build, and opt-in integration tests.
+- Only after successful DB/RLS acceptance, deploy protected Vercel Preview
+  manually and perform GUI v0.4 and legacy v0.3 acceptance with synthetic CSV.
+- Do not merge main, deploy Production, or start OpenPayables pilot yet.
+- After end-to-end acceptance, next separate workstream: the small read-only
+  OpenPayables GUI pilot against fixed, versioned OpenPayables release source.
+
+PRIOR v41 HANDOFF — RETAINED BELOW
+---------------------------------
+blindstats PROJECT HANDOFF
+============================
 Updated: 2026-11-20 (US Pacific; user-verified v41 local validation)
 Handoff version: v41 — MULTI-VARIABLE WORKFLOW SOURCE VALIDATED; DEV MIGRATIONS PENDING
 
