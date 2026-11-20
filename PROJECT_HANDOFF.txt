@@ -1,5 +1,65 @@
 blindstats PROJECT HANDOFF
 ============================
+Updated: 2026-11-20 (US Pacific; user-verified v41 local validation)
+Handoff version: v41 — MULTI-VARIABLE WORKFLOW SOURCE VALIDATED; DEV MIGRATIONS PENDING
+
+MULTI-VARIABLE BLINDING — CHECKPOINT 4 (WORKFLOW SOURCE)
+-----------------------------------------------------
+- Last USER-CONFIRMED Git checkpoint before v41: development and
+  origin/development at 6b3fbc7, clean tree. main/origin/main at b8230a7.
+- v41 provides an integrated researcher-facing multi-variable selection,
+  version-aware browser-local blinding and unblinding, and version-aware
+  server completion-registration source. One selected column continues using
+  the v0.3 artifact protocol; two or more eligible selected columns use v0.4.
+  Existing v0.3 database functions remain intact.
+- Workflow/Audit can show selected-column names from safe metadata; plaintext
+  mappings, secrets, and substantive research files remain browser-local.
+- v41 adds an additive SQL migration to store safe selected-column completion
+  metadata and register authorized v0.4 unblinding separately:
+    supabase/migrations/20261120210000_register_multi_unblinding_completion.sql
+- USER-VERIFIED WINDOWS LOCAL VALIDATION (2026-11-20): initial targeted 38/38
+  tests, 183/183 full suite and lint clean, with two successive TypeScript
+  test-fixture compatibility corrections. Final complete validation after the
+  second correction: npm run build PASSED including TypeScript and Next.js
+  optimized production build; npm test PASSED 183/183 (32 files); npm run lint
+  PASSED without warnings; git diff --check PASSED (LF/CRLF notices only).
+- Expected v41 patch has exactly TEN repository-relative paths: this handoff,
+  page.tsx, actions.ts, two BlindingWorkspace files, two UnblindingWorkspace
+  files, two supported-unblinding files, and new additive SQL migration.
+- At the moment this handoff was prepared, v41 was VALIDATED LOCALLY but NOT
+  YET COMMITTED/PUSHED. Check actual user Git output before marking committed.
+- CRITICAL: THREE Development migrations are pending in source ONLY and were
+  NOT APPLIED or database-tested:
+    20261119194500_register_multi_column_blinding.sql (v39)
+    20261120190000_register_multi_analysis_lock.sql (v40)
+    20261120210000_register_multi_unblinding_completion.sql (v41)
+  Supabase administrative CLI and SQL Editor previously experienced database
+  connection timeouts. Do not assume these have cleared. Application tests
+  are NOT a substitute for migration/permission/end-to-end DB validation.
+- No Production, main, or Vercel deployment changes; Production researchers
+  still use the existing v0.3 release.
+
+NEXT — BOUNDED RELEASE ACCEPTANCE
+--------------------------------
+- Commit and push ONLY the ten locally validated v41 files to development.
+- Confirm the Development Supabase project link, inspect migration history,
+  dry-run, then apply the three pending migrations in order to Development
+  only. Stop and report if connectivity or SQL validation fails; no Production
+  commands. Do not bypass safeguards to force a migration through.
+- After migration, verify authenticated DB authorization and v0.3/v0.4
+  transformation, analysis-lock, and completion registrations with synthetic
+  data. Then deploy the source to protected Vercel Preview manually and run
+  one complete researcher workflow, including v0.3 compatibility.
+- Main/Production release requires an explicit decision after Preview passes.
+- AFTER multi-variable end-to-end acceptance, the next separate BlindStats
+  workstream is the small READ-ONLY OpenPayables GUI pilot against a fixed,
+  versioned OpenPayables alpha.2 release. OpenPayables repo/release remains
+  owned by its own chat. Do not mix repos or start this pilot early.
+
+PRIOR HANDOFF (v40) — RETAINED BELOW
+-----------------------------------
+blindstats PROJECT HANDOFF
+============================
 Updated: 2026-11-20 (US Pacific; user-verified local v40 source validation)
 Handoff version: v40 — ANALYSIS LOCK SOURCE VALIDATED; DEV MIGRATIONS PENDING
 

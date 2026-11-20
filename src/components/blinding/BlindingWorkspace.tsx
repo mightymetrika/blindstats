@@ -16,6 +16,10 @@ import {
   type ParsedCsvDataset,
 } from "@/lib/blinding/csv";
 import { getDistinctNonmissingCategories } from "@/lib/blinding/mapping";
+import {
+  createMultiBlindedPackage,
+  type MultiBlindedPackage,
+} from "@/lib/blinding/multi-blinding";
 
 const CATEGORY_PREVIEW_LIMIT = 8;
 
@@ -132,7 +136,8 @@ export function BlindingWorkspace({
   const [sourceBytes, setSourceBytes] = useState<Uint8Array | null>(null);
   const [parsed, setParsed] = useState<ParsedCsvDataset | null>(null);
   const [selectedColumn, setSelectedColumn] = useState("");
-  const [generation, setGeneration] = useState<BlindedPackage | null>(null);
+  const [additionalColumns, setAdditionalColumns] = useState<string[]>([]);
+  const [generation, setGeneration] = useState<BlindedPackage | MultiBlindedPackage | null>(null);
   const [workspaceError, setWorkspaceError] = useState<WorkspaceError | null>(
     null,
   );
@@ -166,8 +171,20 @@ export function BlindingWorkspace({
     categoryCount - categoryPreview.length,
     0,
   );
+  const eligibleAdditionalColumns = useMemo(() => {
+    if (!parsed || !selectedColumn) return [];
+    return parsed.columns.filter((column) =>
+      column !== selectedColumn &&
+      getDistinctNonmissingCategories(parsed.rows.map((row) => row[column])).length >= 2,
+    );
+  }, [parsed, selectedColumn]);
   const selectedColumnIsEligible =
     Boolean(parsed && selectedColumn) && categoryCount >= 2;
+  const selectedColumns = parsed
+    ? parsed.columns.filter((column) =>
+        column === selectedColumn || additionalColumns.includes(column),
+      )
+    : [];
   const canGenerate =
     Boolean(sourceFile && sourceBytes && parsed) &&
     selectedColumnIsEligible &&
@@ -187,6 +204,7 @@ export function BlindingWorkspace({
     setSourceBytes(null);
     setParsed(null);
     setSelectedColumn("");
+    setAdditionalColumns([]);
     resetGeneratedPackage();
     setWorkspaceError(null);
 
@@ -220,7 +238,9 @@ export function BlindingWorkspace({
   function handleColumnChange(
     event: ChangeEvent<HTMLSelectElement>,
   ): void {
-    setSelectedColumn(event.target.value);
+    const next = event.target.value;
+    setSelectedColumn(next);
+    setAdditionalColumns((previous) => previous.filter((column) => column !== next));
     resetGeneratedPackage();
     setWorkspaceError(null);
   }
@@ -235,10 +255,9 @@ export function BlindingWorkspace({
     setWorkspaceError(null);
 
     try {
-      const result = await createBlindedPackage(
-        sourceBytes,
-        selectedColumn,
-      );
+      const result = selectedColumns.length === 1
+        ? await createBlindedPackage(sourceBytes, selectedColumn)
+        : await createMultiBlindedPackage(sourceBytes, selectedColumns);
 
       setGeneration(result);
     } catch (error) {
@@ -366,7 +385,7 @@ export function BlindingWorkspace({
               Create a blinded dataset.
             </h1>
             <p className="mt-3 max-w-3xl text-base leading-7 text-slate-600">
-              Select a CSV and one categorical variable to blind.
+              Select a CSV and one or more categorical variables to blind.
             </p>
           </header>
         ) : null}
@@ -431,8 +450,8 @@ export function BlindingWorkspace({
           >
             <StageHeading
               number={2}
-              title="Select variable"
-              description="Choose one categorical column to replace with neutral group labels."
+              title="Select variables"
+              description="Choose a categorical column, then optionally select additional columns."
             />
 
             <div className="mt-5">
@@ -456,6 +475,36 @@ export function BlindingWorkspace({
                   </option>
                 ))}
               </select>
+
+              {selectedColumnIsEligible && eligibleAdditionalColumns.length > 0 ? (
+                <fieldset className="mt-5 rounded-xl border border-slate-200 p-4">
+                  <legend className="px-2 text-sm font-medium text-slate-800">
+                    Additional columns to blind (optional)
+                  </legend>
+                  <div className="mt-2 grid gap-3 sm:grid-cols-2">
+                    {eligibleAdditionalColumns.map((column) => (
+                      <label key={column} className="flex items-center gap-3 text-sm text-slate-800">
+                        <input
+                          type="checkbox"
+                          checked={additionalColumns.includes(column)}
+                          onChange={(event) => {
+                            setAdditionalColumns((current) => event.target.checked
+                              ? [...current, column]
+                              : current.filter((value) => value !== column));
+                            resetGeneratedPackage();
+                            setWorkspaceError(null);
+                          }}
+                        />
+                        Also blind {column}
+                      </label>
+                    ))}
+                  </div>
+                  <p className="mt-3 text-xs text-slate-500">
+                    {selectedColumns.length} selected. Each column receives its own randomized mapping.
+                    One selected column retains the historical v0.3 format; multiple columns use v0.4.
+                  </p>
+                </fieldset>
+              ) : null}
 
               {selectedColumn ? (
                 <div className="mt-4">

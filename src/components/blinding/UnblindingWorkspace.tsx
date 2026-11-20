@@ -10,10 +10,9 @@ import {
 } from "react";
 
 import { sha256Hex } from "@/lib/blinding/hashing";
-import {
-  createUnblindingPackage,
-  type UnblindingPackage,
-} from "@/lib/blinding/unblinding";
+import { createSupportedUnblindingPackage } from "@/lib/blinding/supported-unblinding";
+import type { UnblindingPackage } from "@/lib/blinding/unblinding";
+import type { MultiUnblindingReceipt } from "@/lib/blinding/multi-types";
 
 type InputStage = "receipt" | "secret" | "lock";
 
@@ -30,7 +29,7 @@ type LoadedArtifact = {
 type ArtifactSetter = Dispatch<SetStateAction<LoadedArtifact | null>>;
 
 type GeneratedUnblinding = {
-  package: UnblindingPackage;
+  package: { receipt: UnblindingPackage["receipt"] | MultiUnblindingReceipt; receiptArtifact: { text: string; bytes: Uint8Array } };
   receiptSha256: string;
 };
 
@@ -243,7 +242,7 @@ export function UnblindingWorkspace({
     setWorkspaceError(null);
 
     try {
-      const result = await createUnblindingPackage(
+      const result = await createSupportedUnblindingPackage(
         effectiveReceiptBytes,
         secret.bytes,
         effectiveLockReceiptBytes,
@@ -336,7 +335,12 @@ export function UnblindingWorkspace({
         String(receipt.artifacts.analysisArtifact.byteLength),
       );
     }
-    formData.set("selectedColumn", receipt.selectedColumn);
+    formData.set("schemaVersion", receipt.schemaVersion);
+    if (receipt.schemaVersion === "0.4") {
+      formData.set("selectedColumns", JSON.stringify(receipt.selectedColumns));
+    } else {
+      formData.set("selectedColumn", receipt.selectedColumn);
+    }
     formData.set(
       "sourceArtifactSha256",
       receipt.artifacts.sourceArtifactSha256,
@@ -658,9 +662,11 @@ export function UnblindingWorkspace({
                     Artifact chain verified. Mapping released.
                   </p>
                   <p className="mt-2 text-sm text-emerald-950">
-                    Unblinded variable:{" "}
+                    Unblinded {generatedReceipt.schemaVersion === "0.4" ? "variables" : "variable"}:{" "}
                     <span className="font-semibold">
-                      {generatedReceipt.selectedColumn}
+                      {generatedReceipt.schemaVersion === "0.4"
+                        ? generatedReceipt.selectedColumns.map((item) => item.column).join(", ")
+                        : generatedReceipt.selectedColumn}
                     </span>
                   </p>
 
@@ -675,6 +681,7 @@ export function UnblindingWorkspace({
                       <table className="w-full border-collapse text-left text-sm">
                         <thead>
                           <tr className="border-b border-amber-200 bg-amber-50">
+                            <th className="px-3 py-2 font-semibold text-amber-950">Column</th>
                             <th className="px-3 py-2 font-semibold text-amber-950">
                               Original value
                             </th>
@@ -684,17 +691,18 @@ export function UnblindingWorkspace({
                           </tr>
                         </thead>
                         <tbody>
-                          {generatedReceipt.releasedMapping.map((entry) => (
+                          {(generatedReceipt.schemaVersion === "0.4"
+                            ? generatedReceipt.releasedMappings.flatMap((column) =>
+                                column.mapping.map((entry) => ({ ...entry, column: column.column })))
+                            : generatedReceipt.releasedMapping.map((entry) => ({ ...entry, column: generatedReceipt.selectedColumn }))
+                          ).map((entry) => (
                             <tr
                               className="border-b border-amber-100 last:border-b-0"
-                              key={`${entry.original}\u0000${entry.blinded}`}
+                              key={`${entry.column}\u0000${entry.original}\u0000${entry.blinded}`}
                             >
-                              <td className="px-3 py-2 text-amber-950">
-                                {entry.original}
-                              </td>
-                              <td className="px-3 py-2 text-amber-950">
-                                {entry.blinded}
-                              </td>
+                              <td className="px-3 py-2 text-amber-950">{entry.column}</td>
+                              <td className="px-3 py-2 text-amber-950">{entry.original}</td>
+                              <td className="px-3 py-2 text-amber-950">{entry.blinded}</td>
                             </tr>
                           ))}
                         </tbody>

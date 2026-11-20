@@ -13,6 +13,13 @@ import {
   parseSupportedBlindingReceiptBytes,
   registrationRpcForBlindingReceipt,
 } from "@/lib/blinding/public-receipt-version";
+import {
+  requireArray,
+  requireExactKeys,
+  requireNonblankString,
+  requirePositiveInteger,
+  requireRecord,
+} from "@/lib/blinding/artifact-validation";
 import { createClient } from "@/lib/supabase/server";
 
 function getRequiredString(formData: FormData, name: string) {
@@ -746,6 +753,32 @@ export async function authorizeUnblinding(formData: FormData) {
   redirectToCurrentWorkflow(studyId, workflowId, "authorized=1");
 }
 
+function getSelectedColumnsMetadata(formData: FormData):
+  { column: string; categoryCount: number }[] {
+  const raw = getRequiredExactString(formData, "selectedColumns");
+  if (raw.length > 65536) throw new Error("Selected-column metadata is too large.");
+  let value: unknown;
+  try {
+    value = JSON.parse(raw);
+  } catch {
+    throw new Error("Selected-column metadata must be JSON.");
+  }
+  const selected = requireArray(value, "Selected columns");
+  if (selected.length < 2 || selected.length > 1024) {
+    throw new Error("Multi-variable completion requires at least two distinct selected columns.");
+  }
+  const names = new Set<string>();
+  return selected.map((item) => {
+    const column = requireRecord(item, "Selected column");
+    requireExactKeys(column, ["column", "categoryCount"], "Selected column");
+    const name = requireNonblankString(column, "column", "Selected column name");
+    const categoryCount = requirePositiveInteger(column.categoryCount, "Category count", 2);
+    if (names.has(name)) throw new Error("Selected column names must be unique.");
+    names.add(name);
+    return { column: name, categoryCount };
+  });
+}
+
 export type RegisterUnblindingCompletionResult =
   | {
       ok: true;
@@ -776,7 +809,9 @@ export async function registerUnblindingCompletion(
   let unblindingId: string;
   let transformationId: string;
   let lockId: string | null;
-  let selectedColumn: string;
+  let selectedColumn: string | null;
+  let selectedColumns: { column: string; categoryCount: number }[] | null;
+  let schemaVersion: "0.3" | "0.4";
   let sourceArtifactSha256: string;
   let blindingReceiptSha256: string;
   let blindedArtifactSha256: string;
@@ -795,7 +830,21 @@ export async function registerUnblindingCompletion(
     unblindingId = getRequiredString(formData, "unblindingId");
     transformationId = getRequiredString(formData, "transformationId");
     lockId = getOptionalString(formData, "lockId");
-    selectedColumn = getRequiredExactString(formData, "selectedColumn");
+    const version = formData.get("schemaVersion") ?? "0.3";
+    if (version !== "0.3" && version !== "0.4") {
+      throw new Error("Unsupported unblinding receipt version.");
+    }
+    schemaVersion = version;
+    selectedColumn = version === "0.3"
+      ? getRequiredExactString(formData, "selectedColumn") : null;
+    selectedColumns = version === "0.4"
+      ? getSelectedColumnsMetadata(formData) : null;
+    if (version === "0.4" && formData.has("selectedColumn")) {
+      throw new Error("v0.4 metadata must not include a single selected column.");
+    }
+    if (version === "0.3" && formData.has("selectedColumns")) {
+      throw new Error("v0.3 metadata must not include multiple selected columns.");
+    }
     sourceArtifactSha256 = getRequiredSha256(
       formData,
       "sourceArtifactSha256",
@@ -920,16 +969,13 @@ export async function registerUnblindingCompletion(
     };
   }
 
-  const { data, error } = await supabase.rpc(
-    "register_unblinding_completion",
-    {
+  const commonCompletionMetadata = {
       p_workflow_id: workflowId,
       p_request_id: requestId,
       p_unblinding_id: unblindingId,
       p_receipt_created_at: receiptCreatedAt,
       p_transformation_id: transformationId,
       p_lock_id: lockId,
-      p_selected_column: selectedColumn,
       p_source_artifact_sha256: sourceArtifactSha256,
       p_blinding_receipt_sha256: blindingReceiptSha256,
       p_blinded_artifact_sha256: blindedArtifactSha256,
@@ -939,8 +985,16 @@ export async function registerUnblindingCompletion(
       p_analysis_artifact_sha256: analysisArtifactSha256,
       p_analysis_artifact_byte_length: analysisArtifactByteLength,
       p_unblinding_receipt_sha256: unblindingReceiptSha256,
-    },
-  );
+  };
+  const { data, error } = schemaVersion === "0.4"
+    ? await supabase.rpc("register_multi_unblinding_completion", {
+        ...commonCompletionMetadata,
+        p_selected_columns: selectedColumns,
+      })
+    : await supabase.rpc("register_unblinding_completion", {
+        ...commonCompletionMetadata,
+        p_selected_column: selectedColumn,
+      });
 
   if (error) {
     return {

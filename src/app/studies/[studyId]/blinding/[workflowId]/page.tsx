@@ -217,7 +217,8 @@ export default async function BlindingWorkflowPage({
   let transformation:
     | {
         transformation_id: string;
-        selected_column: string;
+        selected_column: string | null;
+        selected_columns: { column: string; categoryCount: number }[] | null;
         source_artifact_sha256: string;
         blinded_artifact_sha256: string;
         public_receipt_sha256: string;
@@ -232,7 +233,7 @@ export default async function BlindingWorkflowPage({
     const { data, error } = await supabase
       .from("blinding_transformations")
       .select(
-        "transformation_id, selected_column, source_artifact_sha256, blinded_artifact_sha256, public_receipt_sha256, public_receipt_text, receipt_created_at, registered_at, plan_version_id",
+        "transformation_id, selected_column, selected_columns, source_artifact_sha256, blinded_artifact_sha256, public_receipt_sha256, public_receipt_text, receipt_created_at, registered_at, plan_version_id",
       )
       .eq("workflow_id", workflow.id)
       .eq("study_id", study.id)
@@ -1385,7 +1386,7 @@ export default async function BlindingWorkflowPage({
                   <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
                     Blinded variable
                   </dt>
-                  <dd className="mt-1 text-sm">{transformation.selected_column}</dd>
+                  <dd className="mt-1 text-sm">{transformation.selected_columns?.map((item) => item.column).join(", ") ?? transformation.selected_column}</dd>
                 </div>
                 <div>
                   <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
@@ -1720,7 +1721,7 @@ export default async function BlindingWorkflowPage({
                     <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
                       Blinded variable
                     </dt>
-                    <dd className="mt-1 text-sm">{transformation.selected_column}</dd>
+                    <dd className="mt-1 text-sm">{transformation.selected_columns?.map((item) => item.column).join(", ") ?? transformation.selected_column}</dd>
                   </div>
                   <div>
                     <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">

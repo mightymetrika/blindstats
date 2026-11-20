@@ -18,6 +18,7 @@ import {
   type BlindedPackage,
 } from "@/lib/blinding/blinding-package";
 
+import { createMultiBlindedPackage } from "@/lib/blinding/multi-blinding";
 import { BlindingWorkspace } from "./BlindingWorkspace";
 
 const routerMocks = vi.hoisted(() => ({
@@ -30,6 +31,9 @@ vi.mock("next/navigation", () => ({
 
 vi.mock("@/lib/blinding/blinding-package", () => ({
   createBlindedPackage: vi.fn(),
+}));
+vi.mock("@/lib/blinding/multi-blinding", () => ({
+  createMultiBlindedPackage: vi.fn(),
 }));
 
 const SOURCE_TEXT = [
@@ -51,6 +55,7 @@ const BLINDED_HASH = "b".repeat(64);
 const TRANSFORMATION_ID = "123e4567-e89b-42d3-a456-426614174000";
 
 const mockedCreateBlindedPackage = vi.mocked(createBlindedPackage);
+const mockedCreateMultiBlindedPackage = vi.mocked(createMultiBlindedPackage);
 
 function encode(text: string): Uint8Array {
   return new TextEncoder().encode(text);
@@ -214,6 +219,27 @@ describe("BlindingWorkspace workflow", () => {
     await chooseColumn(user, "group");
 
     expect(generateButton()).toBeEnabled();
+  });
+
+  it("uses v0.4 generation for multiple eligible columns and invalidates old artifacts when selection changes", async () => {
+    const user = userEvent.setup();
+    mockedCreateMultiBlindedPackage.mockResolvedValueOnce(
+      createMockPackage() as unknown as Awaited<ReturnType<typeof createMultiBlindedPackage>>,
+    );
+    render(<BlindingWorkspace />);
+    await uploadCsv(user);
+    await chooseColumn(user, "group");
+    await user.click(screen.getByRole("checkbox", { name: "Also blind alternate" }));
+    await user.click(generateButton());
+    expect(mockedCreateMultiBlindedPackage).toHaveBeenCalledTimes(1);
+    const [sourceBytes, columns] = mockedCreateMultiBlindedPackage.mock.calls[0];
+    expect(new TextDecoder().decode(sourceBytes)).toBe(SOURCE_TEXT);
+    expect(columns).toEqual(["group", "alternate"]);
+    expect(mockedCreateBlindedPackage).not.toHaveBeenCalled();
+    await screen.findByText("Blinded package created successfully.");
+    await user.click(screen.getByRole("checkbox", { name: "Also blind alternate" }));
+    expect(generateButton()).toBeEnabled();
+    downloadButtons().forEach((button) => expect(button).toBeDisabled());
   });
 
   it("keeps package generation blocked for a column with fewer than two categories", async () => {

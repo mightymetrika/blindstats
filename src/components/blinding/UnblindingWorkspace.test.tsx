@@ -14,10 +14,9 @@ import {
 } from "vitest";
 
 import { sha256Hex } from "@/lib/blinding/hashing";
-import {
-  createUnblindingPackage,
-  type UnblindingPackage,
-} from "@/lib/blinding/unblinding";
+import { createSupportedUnblindingPackage } from "@/lib/blinding/supported-unblinding";
+import type { MultiUnblindingReceipt } from "@/lib/blinding/multi-types";
+import type { UnblindingPackage } from "@/lib/blinding/unblinding";
 
 import { UnblindingWorkspace } from "./UnblindingWorkspace";
 
@@ -29,8 +28,8 @@ vi.mock("next/navigation", () => ({
   useRouter: () => routerMocks,
 }));
 
-vi.mock("@/lib/blinding/unblinding", () => ({
-  createUnblindingPackage: vi.fn(),
+vi.mock("@/lib/blinding/supported-unblinding", () => ({
+  createSupportedUnblindingPackage: vi.fn(),
 }));
 
 vi.mock("@/lib/blinding/hashing", () => ({
@@ -48,7 +47,7 @@ const PUBLIC_RECEIPT_HASH = "b".repeat(64);
 const LOCK_RECEIPT_HASH = "e".repeat(64);
 const FINAL_RECEIPT_HASH = "1".repeat(64);
 
-const mockedCreateUnblindingPackage = vi.mocked(createUnblindingPackage);
+const mockedCreateUnblindingPackage = vi.mocked(createSupportedUnblindingPackage);
 const mockedSha256Hex = vi.mocked(sha256Hex);
 
 function encode(text: string): Uint8Array {
@@ -318,6 +317,55 @@ describe("UnblindingWorkspace workflow", () => {
     expect(mockedSha256Hex).toHaveBeenCalledWith(
       createMockPackage().receiptArtifact.bytes,
     );
+  });
+
+  it("registers only selected-column metadata for v0.4 and displays all released column mappings", async () => {
+    const user = userEvent.setup();
+    const registerAction = vi.fn().mockResolvedValue({ ok: true, completionRecordId: "record" });
+    const old = createMockPackage();
+    const multiReceipt: MultiUnblindingReceipt = {
+      schemaVersion: "0.4", receiptType: "unblinding",
+      unblindingId: old.receipt.unblindingId,
+      createdAt: old.receipt.createdAt,
+      transformationId: old.receipt.transformationId,
+      lockId: old.receipt.lockId,
+      selectedColumns: [
+        { column: "group", categoryCount: 2 },
+        { column: "site", categoryCount: 2 },
+      ],
+      artifacts: old.receipt.artifacts,
+      releasedMappings: [
+        { column: "group", mapping: old.receipt.releasedMapping },
+        { column: "site", mapping: [
+          { original: "North", blinded: "Group_A" },
+          { original: "South", blinded: "Group_B" },
+        ] },
+      ],
+    };
+    mockedCreateUnblindingPackage.mockResolvedValueOnce({
+      receipt: multiReceipt,
+      receiptArtifact: {
+        text: old.receiptArtifact.text,
+        // Materialize an ArrayBuffer-backed copy to match the v0.4 return type.
+        bytes: Uint8Array.from(old.receiptArtifact.bytes),
+      },
+    });
+    render(<UnblindingWorkspace registration={persistentRegistration()} registerAction={registerAction} />);
+    await user.upload(screen.getByLabelText("Unblinding secret"), createFile("secret.json", SECRET_TEXT));
+    await user.click(verifyButton());
+    await screen.findByText("Artifact chain verified. Mapping released.");
+    expect(screen.getByText("South")).toBeInTheDocument();
+    await user.click(screen.getByRole("checkbox", { name: /I saved the unblinding receipt/i }));
+    await user.click(screen.getByRole("button", { name: "Register unblinding completion" }));
+    await waitFor(() => expect(registerAction).toHaveBeenCalledTimes(1));
+    const [data] = registerAction.mock.calls[0] as [FormData];
+    expect(data.get("schemaVersion")).toBe("0.4");
+    expect(JSON.parse(data.get("selectedColumns") as string)).toEqual([
+      { column: "group", categoryCount: 2 },
+      { column: "site", categoryCount: 2 },
+    ]);
+    expect(data.get("selectedColumn")).toBeNull();
+    expect(Array.from(data.keys())).not.toContain("releasedMappings");
   });
 
   it("supports persistent authorized unblinding when the plan did not require an analysis lock", async () => {
