@@ -764,8 +764,8 @@ function getSelectedColumnsMetadata(formData: FormData):
     throw new Error("Selected-column metadata must be JSON.");
   }
   const selected = requireArray(value, "Selected columns");
-  if (selected.length < 2 || selected.length > 1024) {
-    throw new Error("Multi-variable completion requires at least two distinct selected columns.");
+  if (selected.length < 1 || selected.length > 1024) {
+    throw new Error("v0.4 completion requires at least one selected column.");
   }
   const names = new Set<string>();
   return selected.map((item) => {

@@ -73,8 +73,8 @@ function validateSelectedColumns(
   selected: readonly SelectedBlindingColumn[],
   columnCount: number,
 ): void {
-  if (selected.length < 2 || selected.length > columnCount) {
-    throw new Error("Multi-variable blinding requires two or more distinct selected columns.");
+  if (selected.length < 1 || selected.length > columnCount) {
+    throw new Error("Blinding requires at least one selected column.");
   }
   const names = new Set<string>();
   for (const { column, categoryCount } of selected) {
@@ -279,8 +279,8 @@ export async function createMultiBlindedPackage(
   createdAt: Date = new Date(),
 ): Promise<MultiBlindedPackage> {
   const parsed = parseCsvBytes(sourceBytes);
-  if (selectedColumns.length < 2 || new Set(selectedColumns).size !== selectedColumns.length) {
-    throw new Error("Select two or more distinct columns for multi-variable blinding.");
+  if (selectedColumns.length < 1 || new Set(selectedColumns).size !== selectedColumns.length) {
+    throw new Error("Select at least one distinct column for blinding.");
   }
   for (const column of selectedColumns) {
     if (!parsed.columns.includes(column)) {

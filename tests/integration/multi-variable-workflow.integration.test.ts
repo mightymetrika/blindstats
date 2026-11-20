@@ -82,7 +82,10 @@ const sourceCsv = [
 ].join("\n");
 
 describe("Development only: complete v0.4 two-account workflow", () => {
-  it("registers the exact multi-column artifact chain and enforces independent authorization", async () => {
+  it.each([
+    { label: "one column", columns: ["treatment"] },
+    { label: "two columns", columns: ["treatment", "site"] },
+  ])("registers the exact v0.4 artifact chain for $label and enforces independent authorization", async ({ columns }) => {
     const config = configuration();
     const options = {
       auth: {
@@ -112,7 +115,7 @@ describe("Development only: complete v0.4 two-account workflow", () => {
     let studyId: string | null = null;
     try {
       const suffix = `${new Date().toISOString()}-${crypto.randomUUID()}`;
-      const studyName = `[INTEGRATION TEST] v0.4 multi-variable ${suffix}`;
+      const studyName = `[INTEGRATION TEST] v0.4 ${columns.length}-column ${suffix}`;
       const insertion = await a.from("studies").insert({
         name: studyName,
         description: "Disposable synthetic v0.4 workflow. Archive after test.",
@@ -180,13 +183,12 @@ describe("Development only: complete v0.4 two-account workflow", () => {
       // blinding receipt; never the dataset, plaintext mapping, or secret.
       const blinded = await createMultiBlindedPackage(
         encode(sourceCsv),
-        ["treatment", "site"],
+        columns,
       );
       expect(blinded.receipt.schemaVersion).toBe("0.4");
-      expect(blinded.receipt.selectedColumns).toEqual([
-        { column: "treatment", categoryCount: 2 },
-        { column: "site", categoryCount: 2 },
-      ]);
+      expect(blinded.receipt.selectedColumns).toEqual(
+        columns.map((column) => ({ column, categoryCount: 2 })),
+      );
       for (const value of ["Active", "Placebo", "North", "South"]) {
         expect(blinded.receiptArtifact.text).not.toContain(value);
       }
@@ -289,11 +291,13 @@ describe("Development only: complete v0.4 two-account workflow", () => {
       expect(released.receipt.schemaVersion).toBe("0.4");
       expect(released.receipt.lockId).toBe(lock.receipt.lockId);
       expect(released.receipt.releasedMappings.map((entry) => entry.column))
-        .toEqual(["treatment", "site"]);
+        .toEqual(columns);
       expect(new Set(released.receipt.releasedMappings[0].mapping.map((entry) => entry.original)))
         .toEqual(new Set(["Active", "Placebo"]));
-      expect(new Set(released.receipt.releasedMappings[1].mapping.map((entry) => entry.original)))
-        .toEqual(new Set(["North", "South"]));
+      if (columns.includes("site")) {
+        expect(new Set(released.receipt.releasedMappings[1].mapping.map((entry) => entry.original)))
+          .toEqual(new Set(["North", "South"]));
+      }
 
       const artifactRefs = released.receipt.artifacts;
       const completionMetadata = {
@@ -326,10 +330,8 @@ describe("Development only: complete v0.4 two-account workflow", () => {
       // Tampered metadata must fail without marking the workflow unblinded.
       const badCompletion = await a.rpc("register_multi_unblinding_completion", {
         ...completionMetadata,
-        p_selected_columns: [
-          { column: "treatment", categoryCount: 2 },
-          { column: "site", categoryCount: 99 },
-        ],
+        p_selected_columns: blinded.receipt.selectedColumns.map((entry, i) =>
+          i === 0 ? { ...entry, categoryCount: 99 } : entry),
       });
       expect(badCompletion.error).not.toBeNull();
       expect(badCompletion.data).toBeNull();

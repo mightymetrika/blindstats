@@ -30,14 +30,23 @@ describe("public receipt registration dispatch", () => {
     expect(registrationRpcForBlindingReceipt(receipt)).toBe("register_multi_blinding_transformation");
   });
 
+  it("routes a single selected column through the v0.4 RPC", async () => {
+    const pkg = await createMultiBlindedPackage(SOURCE, ["treatment"], DATE);
+    const receipt = parseSupportedBlindingReceiptBytes(pkg.receiptArtifact.bytes);
+    expect(receipt.schemaVersion).toBe("0.4");
+    expect(registrationRpcForBlindingReceipt(receipt)).toBe("register_multi_blinding_transformation");
+    if (receipt.schemaVersion !== "0.4") throw new Error("Expected v0.4.");
+    expect(receipt.selectedColumns).toEqual([{ column: "treatment", categoryCount: 2 }]);
+  });
+
   it("rejects unknown versions, malformed 0.4 selection, and secret fields", async () => {
     const pkg = await createMultiBlindedPackage(SOURCE, ["treatment", "site"], DATE);
     expect(() => parseSupportedBlindingReceiptBytes(bytes({
       ...pkg.receipt, schemaVersion: "0.5",
     }))).toThrow("Unsupported");
     expect(() => parseSupportedBlindingReceiptBytes(bytes({
-      ...pkg.receipt, selectedColumns: [pkg.receipt.selectedColumns[0]],
-    }))).toThrow("two or more");
+      ...pkg.receipt, selectedColumns: [],
+    }))).toThrow("at least one");
     expect(() => parseSupportedBlindingReceiptBytes(bytes({
       ...pkg.receipt, keyHex: pkg.secret.keyHex,
     }))).toThrow("unexpected structure");

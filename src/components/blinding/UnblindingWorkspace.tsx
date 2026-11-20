@@ -662,7 +662,7 @@ export function UnblindingWorkspace({
                     Artifact chain verified. Mapping released.
                   </p>
                   <p className="mt-2 text-sm text-emerald-950">
-                    Unblinded {generatedReceipt.schemaVersion === "0.4" ? "variables" : "variable"}:{" "}
+                    Unblinded {generatedReceipt.schemaVersion === "0.4" && generatedReceipt.selectedColumns.length > 1 ? "variables" : "variable"}:{" "}
                     <span className="font-semibold">
                       {generatedReceipt.schemaVersion === "0.4"
                         ? generatedReceipt.selectedColumns.map((item) => item.column).join(", ")

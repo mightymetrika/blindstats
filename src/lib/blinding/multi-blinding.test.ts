@@ -30,7 +30,7 @@ async function multiFixture() {
   return createMultiBlindedPackage(encode(SOURCE), ["site", "treatment"], CREATED_AT);
 }
 
-describe("browser-local v0.4 multi-column blinding", () => {
+describe("browser-local v0.4 one-or-more-column blinding", () => {
   it("blinds selected columns independently and retains all other values, row order, and missingness", async () => {
     const pkg = await multiFixture();
     expect(pkg.receipt.schemaVersion).toBe("0.4");
@@ -64,6 +64,58 @@ describe("browser-local v0.4 multi-column blinding", () => {
     }
   });
 
+  it("uses the exact v0.4 artifact chain for a single selected variable", async () => {
+    const sourceBytes = encode(SOURCE);
+    const pkg = await createMultiBlindedPackage(sourceBytes, ["treatment"], CREATED_AT);
+    expect(pkg.receipt.schemaVersion).toBe("0.4");
+    expect(pkg.receipt.selectedColumns).toEqual([{ column: "treatment", categoryCount: 2 }]);
+    const unblinded = await openMultiBlindingMapping(pkg.receipt, pkg.secret);
+    expect(unblinded).toHaveLength(1);
+    expect(unblinded[0].column).toBe("treatment");
+    const source = parseCsvBytes(sourceBytes);
+    const blinded = parseCsvBytes(pkg.blinded.bytes);
+    const lookup = new Map(unblinded[0].mapping.map((entry) => [entry.original, entry.blinded]));
+    source.rows.forEach((row, index) => {
+      expect(blinded.rows[index].treatment).toBe(lookup.get(row.treatment!));
+      for (const column of ["id", "site", "outcome", "subgroup"]) {
+        expect(blinded.rows[index][column]).toBe(row[column]);
+      }
+    });
+    const lock = await createMultiAnalysisLockPackage(
+      pkg.receiptArtifact.bytes,
+      { filename: "analysis.Rmd", bytes: encode("synthetic blinded analysis") },
+      CREATED_AT,
+    );
+    const released = await createMultiUnblindingPackage(
+      pkg.receiptArtifact.bytes,
+      pkg.secretArtifact.bytes,
+      lock.receiptArtifact.bytes,
+      CREATED_AT,
+    );
+    expect(released.receipt.selectedColumns).toEqual(pkg.receipt.selectedColumns);
+    expect(released.receipt.releasedMappings).toEqual(unblinded);
+    expect(released.receipt.lockId).toBe(lock.receipt.lockId);
+    expect(released.receipt.artifacts.blindingReceiptSha256)
+      .toBe(await sha256Hex(pkg.receiptArtifact.bytes));
+    const noLock = await createMultiUnblindingPackage(
+      pkg.receiptArtifact.bytes, pkg.secretArtifact.bytes, null, CREATED_AT,
+    );
+    expect(noLock.receipt.lockId).toBeNull();
+    expect(noLock.receipt.releasedMappings).toEqual(unblinded);
+  });
+
+  it("supports a CSV with only one categorical column", async () => {
+    const source = encode("arm\nControl\nTreatment\nControl\n");
+    const pkg = await createMultiBlindedPackage(source, ["arm"], CREATED_AT);
+    expect(pkg.receipt.columnCount).toBe(1);
+    expect(pkg.receipt.selectedColumns).toEqual([{ column: "arm", categoryCount: 2 }]);
+    const mappings = await openMultiBlindingMapping(pkg.receipt, pkg.secret);
+    expect(mappings).toHaveLength(1);
+    expect(mappings[0].column).toBe("arm");
+    expect(pkg.blinded.columns).toEqual(["arm"]);
+    expect(pkg.blinded.rows).toHaveLength(3);
+  });
+
   it("keeps plaintext category values and neutral labels out of public receipt and secret", async () => {
     const pkg = await multiFixture();
     for (const label of ["Active", "Placebo", "North", "South", "Group_A", "Group_B"]) {
@@ -75,8 +127,8 @@ describe("browser-local v0.4 multi-column blinding", () => {
     expect(parseMultiUnblindingSecretBytes(pkg.secretArtifact.bytes)).toEqual(pkg.secret);
   });
 
-  it("rejects duplicate, missing, or single-column selections and low-cardinality variables", async () => {
-    await expect(createMultiBlindedPackage(encode(SOURCE), ["site"])).rejects.toThrow("two or more");
+  it("rejects empty, duplicate, unknown, and low-cardinality selections", async () => {
+    await expect(createMultiBlindedPackage(encode(SOURCE), [])).rejects.toThrow("at least one");
     await expect(createMultiBlindedPackage(encode(SOURCE), ["site", "site"])).rejects.toThrow("distinct");
     await expect(createMultiBlindedPackage(encode(SOURCE), ["treatment", "not_found"])).rejects.toThrow("does not exist");
     await expect(createMultiBlindedPackage(encode(SOURCE), ["treatment", "id", "missing"])).rejects.toThrow("does not exist");

@@ -8,10 +8,6 @@ import {
 } from "react";
 
 import {
-  createBlindedPackage,
-  type BlindedPackage,
-} from "@/lib/blinding/blinding-package";
-import {
   parseCsvBytes,
   type ParsedCsvDataset,
 } from "@/lib/blinding/csv";
@@ -137,7 +133,7 @@ export function BlindingWorkspace({
   const [parsed, setParsed] = useState<ParsedCsvDataset | null>(null);
   const [selectedColumn, setSelectedColumn] = useState("");
   const [additionalColumns, setAdditionalColumns] = useState<string[]>([]);
-  const [generation, setGeneration] = useState<BlindedPackage | MultiBlindedPackage | null>(null);
+  const [generation, setGeneration] = useState<MultiBlindedPackage | null>(null);
   const [workspaceError, setWorkspaceError] = useState<WorkspaceError | null>(
     null,
   );
@@ -267,9 +263,7 @@ export function BlindingWorkspace({
     setWorkspaceError(null);
 
     try {
-      const result = selectedColumns.length === 1
-        ? await createBlindedPackage(sourceBytes, selectedColumn)
-        : await createMultiBlindedPackage(sourceBytes, selectedColumns);
+      const result = await createMultiBlindedPackage(sourceBytes, selectedColumns);
 
       setGeneration(result);
     } catch (error) {
@@ -513,7 +507,7 @@ export function BlindingWorkspace({
                   </div>
                   <p className="mt-3 text-xs text-slate-500">
                     {selectedColumns.length} selected. Each column receives its own randomized mapping.
-                    One selected column retains the historical v0.3 format; multiple columns use v0.4.
+                    All newly created packages use the v0.4 receipt format.
                   </p>
                 </fieldset>
               ) : null}

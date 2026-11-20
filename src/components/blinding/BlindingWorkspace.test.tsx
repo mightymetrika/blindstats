@@ -13,12 +13,8 @@ import {
   vi,
 } from "vitest";
 
-import {
-  createBlindedPackage,
-  type BlindedPackage,
-} from "@/lib/blinding/blinding-package";
-
-import { createMultiBlindedPackage } from "@/lib/blinding/multi-blinding";
+import { createBlindedPackage } from "@/lib/blinding/blinding-package";
+import { createMultiBlindedPackage, type MultiBlindedPackage } from "@/lib/blinding/multi-blinding";
 import { BlindingWorkspace } from "./BlindingWorkspace";
 
 const routerMocks = vi.hoisted(() => ({
@@ -78,8 +74,8 @@ function createCsvFile(filename: string, text: string): File {
 }
 
 function createMockPackage(
-  selectedColumn = "group",
-): BlindedPackage {
+  selectedColumns = ["group"],
+): MultiBlindedPackage {
   const blindedText = [
     "id,group",
     "1,Group_A",
@@ -103,12 +99,11 @@ function createMockPackage(
       sha256: BLINDED_HASH,
     },
     receipt: {
-      schemaVersion: "0.3",
+      schemaVersion: "0.4",
       transformationId: TRANSFORMATION_ID,
       createdAt: "2026-09-03T23:00:00.000Z",
       transformationType: "categorical_label_permutation",
-      selectedColumn,
-      categoryCount: 2,
+      selectedColumns: selectedColumns.map((column) => ({ column, categoryCount: 2 })),
       rowCount: 4,
       columnCount: 4,
       sourceArtifact: {
@@ -122,7 +117,7 @@ function createMockPackage(
         keyLength: 256,
         tagLength: 128,
         encoding: "hex",
-        aadScheme: "blindstats_blinding_mapping_aad_v1",
+        aadScheme: "blindstats_blinding_mapping_aad_v2",
         ivHex: "01".repeat(12),
         ciphertextHex: "02".repeat(48),
       },
@@ -132,7 +127,7 @@ function createMockPackage(
       },
     },
     secret: {
-      schemaVersion: "0.3",
+      schemaVersion: "0.4",
       secretType: "unblinding_secret",
       transformationId: TRANSFORMATION_ID,
       keyAlgorithm: "AES-GCM",
@@ -193,7 +188,7 @@ function downloadButtons(): HTMLElement[] {
 }
 
 beforeEach(() => {
-  mockedCreateBlindedPackage.mockResolvedValue(createMockPackage());
+  mockedCreateMultiBlindedPackage.mockResolvedValue(createMockPackage());
 });
 
 afterEach(() => {
@@ -223,9 +218,7 @@ describe("BlindingWorkspace workflow", () => {
 
   it("uses v0.4 generation for multiple eligible columns and invalidates old artifacts when selection changes", async () => {
     const user = userEvent.setup();
-    mockedCreateMultiBlindedPackage.mockResolvedValueOnce(
-      createMockPackage() as unknown as Awaited<ReturnType<typeof createMultiBlindedPackage>>,
-    );
+    mockedCreateMultiBlindedPackage.mockResolvedValueOnce(createMockPackage(["group", "alternate"]));
     render(<BlindingWorkspace />);
     await uploadCsv(user);
     await chooseColumn(user, "group");
@@ -259,9 +252,10 @@ describe("BlindingWorkspace workflow", () => {
 
     expect(generateButton()).toBeDisabled();
     expect(mockedCreateBlindedPackage).not.toHaveBeenCalled();
+    expect(mockedCreateMultiBlindedPackage).not.toHaveBeenCalled();
   });
 
-  it("passes the original uploaded bytes and selected column to the core generation boundary", async () => {
+  it("passes original bytes and a one-column selection to the v0.4 generation boundary", async () => {
     const user = userEvent.setup();
 
     render(<BlindingWorkspace />);
@@ -274,13 +268,14 @@ describe("BlindingWorkspace workflow", () => {
     await chooseColumn(user, "group");
     await user.click(generateButton());
 
-    expect(mockedCreateBlindedPackage).toHaveBeenCalledTimes(1);
+    expect(mockedCreateMultiBlindedPackage).toHaveBeenCalledTimes(1);
+    expect(mockedCreateBlindedPackage).not.toHaveBeenCalled();
 
-    const [sourceBytes, selectedColumn] =
-      mockedCreateBlindedPackage.mock.calls[0];
+    const [sourceBytes, selectedColumns] =
+      mockedCreateMultiBlindedPackage.mock.calls[0];
 
     expect(new TextDecoder().decode(sourceBytes)).toBe(SOURCE_TEXT);
-    expect(selectedColumn).toBe("group");
+    expect(selectedColumns).toEqual(["group"]);
 
     await screen.findByText("Blinded package created successfully.");
 

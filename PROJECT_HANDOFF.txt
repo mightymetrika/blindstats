@@ -1,5 +1,90 @@
 blindstats PROJECT HANDOFF
 ============================
+Updated: 2026-11-20 (v43 local and Development database acceptance verified)
+Status: v43 UNIFIED NEW-WORKFLOW v0.4 — DEVELOPMENT ACCEPTED, PREVIEW PENDING
+
+V43 USER-VERIFIED SOURCE AND DEVELOPMENT ACCEPTANCE
+---------------------------------------------------
+- Starting Git baseline before applying v43: development and origin/development
+  at 0958b95, clean working tree. The user applied the exactly scoped 12-file
+  v43 candidate, including the new additive SQL migration. This patch is
+  currently uncommitted; do not claim a v43 commit or Preview deployment yet.
+- New artifact behavior: all NEW single-column or multi-column blinding flows
+  use schema v0.4; legacy v0.3 parsing/registration support remains for older
+  artifacts. No historical migrations were modified or records deleted.
+- USER-VERIFIED Windows PowerShell LOCAL VALIDATION:
+    npm run build PASSED, including TypeScript and Next.js optimization;
+    npm test PASSED 186/186 (32 files);
+    npm run lint PASSED;
+    git diff --check PASSED (only nonfatal LF/CRLF conversion notices).
+- Development Supabase project explicitly verified: kfrfemqoalzxwzecyjjf.
+  The migration dry-run showed exactly one pending migration:
+    20261120233000_allow_single_column_v04.sql
+  The user confirmed and successfully applied this migration to DEVELOPMENT.
+  Follow-up migration history showed all 19 local/remote versions aligned.
+  supabase db lint --linked --level warning: No schema errors found.
+- USER-VERIFIED authenticated Development integration suite: 3/3 PASSED:
+    * v0.4 single selected column with artifact linkage and independent
+      authorization (including completion);
+    * v0.4 two selected columns with the same protections;
+    * historical two-account independent authorization regression.
+  The integration tests were run using two distinct Development accounts;
+  credentials were not persisted or included in this handoff.
+- This establishes local app and real Development DB acceptance. It does NOT
+  establish that the current v43 browser UI has been checked in Preview.
+- Production Supabase, Vercel Production, and Git main remain outside the
+  current task. Do not assume they have been updated.
+
+NEXT — FINAL BOUNDED v43 CHECKPOINT
+---------------------------------
+1. Update this handoff document in the local repo. Stage ONLY the 12 already
+   locally validated v43 files, check staged scope and whitespace, commit and
+   push to development. Verify origin/development synchronization and clean tree.
+2. Manually deploy EXACT committed development source to protected Vercel
+   Preview (--environment=preview, no --prod), with Development Supabase.
+3. Perform ONE brief synthetic single-column browser smoke check: select only
+   group; generate package locally; download/open the public blinding receipt
+   and confirm schemaVersion 0.4 and exactly one selectedColumns entry. There
+   is no need to repeat registration, two-account authorization or unblinding
+   after the three passing authenticated integration tests.
+4. If Preview smoke passes, close v43 in tracked handoff. Resume the separate
+   small read-only OpenPayables GUI pilot against fixed v0.2.0-alpha.2 source.
+   OpenPayables code and release ownership remain in the other chat/repo.
+
+PREVIOUS HANDOFF — RETAINED BELOW
+--------------------------------
+blindstats PROJECT HANDOFF
+============================
+Updated: 2026-11-20 (v43 ONE-PROTOCOL CONSOLIDATION CANDIDATE, SOURCE ONLY)
+Status: v42 Preview accepted at development/origin/development 0958b95 (clean).
+
+V43 CANDIDATE — NOT YET APPLIED OR TESTED BY USER
+-----------------------------------------------
+- All NEW browser blinding, one or more eligible columns, generates v0.4.
+  v0.3 parser/legacy RPC paths remain available solely for already-created
+  artifacts; no automatic data deletion or destructive schema changes.
+- New additive Development-only migration (NOT APPLIED):
+    supabase/migrations/20261120233000_allow_single_column_v04.sql
+  Extends 0.4 selection constraints and existing security-definer v0.4 RPCs
+  to accept one selected column, keeping their authorization and audit checks.
+  Does NOT edit deployed migrations or touch v0.3 functions.
+- Expanded unit/component tests (including a one-column CSV) and opt-in
+  two-account Development integration to cover one-column AND two-column
+  v0.4 through the artifact chain.
+  Expected integration-test runs: historical v0.3 + two v0.4 scenarios.
+- Next: on clean 0958b95 development apply v43 full-file patch; run npm test,
+  lint, build, and git diff --check; DO NOT commit until checks pass. Then
+  migration list/dry-run and Development-only push after source review; run
+  real database integration suite. Brief protected Preview single-column
+  smoke test only after both database and source acceptance pass.
+- NO PRODUCTION/MAIN CHANGES. A future Production release requires separate
+  explicit approval. After this bounded maintenance checkpoint, resume the
+  read-only fixed-release OpenPayables GUI pilot in BlindStats only.
+
+PREVIOUS VERIFIED HANDOFF — RETAINED BELOW
+-----------------------------------------
+blindstats PROJECT HANDOFF
+============================
 Updated: 2026-11-20 (US Pacific; v42 Preview smoke test accepted)
 Handoff status: MULTI-VARIABLE BLINDING v0.4 COMPLETED AND ACCEPTED IN DEVELOPMENT/PREVIEW
 

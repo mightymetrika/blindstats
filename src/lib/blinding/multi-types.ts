@@ -7,8 +7,8 @@ import type {
   UnblindingSecret,
 } from "./types";
 
-// v0.3 remains the supported single-column artifact format.
-// v0.4 is intentionally separate until persistent registration is upgraded.
+// v0.4 is the canonical format for ALL new blinding: one or more columns.
+// Historical v0.3 artifacts remain readable through version-aware parsers.
 export const MULTI_BLINDING_SCHEMA_VERSION = "0.4" as const;
 export const MULTI_MAPPING_AAD_SCHEME =
   "blindstats_blinding_mapping_aad_v2" as const;

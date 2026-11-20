@@ -74,7 +74,7 @@ For independent authorization, the database requires a genuine two-actor setup: 
 
 ### 3. Create the blinded package locally
 
-The blinding custodian selects a local UTF-8 CSV and one categorical column to blind.
+The blinding custodian selects a local UTF-8 CSV and one or more eligible categorical columns to blind.
 
 The browser creates:
 
@@ -197,7 +197,7 @@ The current release does **not** provide general-purpose research-file storage o
 
 ## Artifact model
 
-The browser-local artifact schema is currently `0.3`. It is pre-release and may change.
+The canonical browser-local artifact schema for new blinding is `0.4` for one or more columns. Historical `0.3` artifacts remain readable for compatibility. Both schemas are pre-release.
 
 - **Blinded CSV:** the source data with the selected categorical values replaced by randomized neutral labels.
 - **Public blinding receipt:** transformation metadata, source/blinded artifact hashes, and an AES-GCM sealed mapping.
@@ -254,7 +254,7 @@ The current implementation supports:
 - persistent Studies;
 - Study membership and capability-based authorization;
 - a versioned immutable Blinding plan;
-- browser-local single-column categorical label blinding;
+- browser-local one-or-more-column categorical label blinding using canonical v0.4 artifacts;
 - persistent transformation registration;
 - persistent analysis locks;
 - persistent unblinding requests and authorizations;
@@ -265,7 +265,7 @@ The current implementation supports:
 
 Important current limitations include:
 
-- one selected categorical variable per blinding transformation;
+- categorical columns must each have at least two nonmissing categories;
 - no general research-file storage;
 - no in-app transfer of the blinded dataset;
 - no in-app transfer or server custody of the plaintext unblinding secret;
