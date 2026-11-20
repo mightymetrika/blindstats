@@ -1,5 +1,66 @@
 blindstats PROJECT HANDOFF
 ============================
+Updated: 2026-11-20 (US Pacific; v42 Preview smoke test accepted)
+Handoff status: MULTI-VARIABLE BLINDING v0.4 COMPLETED AND ACCEPTED IN DEVELOPMENT/PREVIEW
+
+V42 FINAL CHECKPOINT — USER VERIFIED
+-----------------------------------
+- development and origin/development synchronized at a5d2a38;
+  the user verified a clean working tree after committing all eight v42
+  usability changes (Commit: Polish multi-variable blinding Preview usability).
+- Local validation after the TypeScript fixture correction: npm run build,
+  npm run lint, and npm test (183/183 in 32 files) all PASSED.
+- Manual Vercel Preview deployment completed Ready with Vercel Authentication
+  protection enabled (no --prod):
+    https://blindstats-kyhg7hweh-blindstats.vercel.app
+    Inspect: https://vercel.com/blindstats/blindstats/8rA8zX644cwTxkNo5vDTJdH2AJmR
+- User confirmed all THREE requested short Preview smoke checks PASSED:
+  (1) Sign out appears directly on workflow and Study pages;
+  (2) rapid double-submit Create Study does not create two Studies,
+      and the pending/creation UI behaves as intended;
+  (3) additional-variable checkboxes show bare column names, and the
+      expanded category preview displays counts, missingness and category
+      values for both group and site, using synthetic test data.
+  The supplied screenshots directly show workflow Sign out and the
+  two-column preview; duplicate-submit acceptance is user-reported.
+- Earlier protected Preview full browser v0.4 flow PASSED with synthetic data:
+  blinding group and site, analysis lock, distinct-account authorization,
+  decrypted mapping release, completion and audit history. 2/2 real
+  Development two-account integration tests PASSED. All 18 Development
+  migrations synchronized, database lint clean. Existing v0.3 automated
+  regression was included; there was no unnecessary full v0.3 browser rerun.
+- CLOSED: multi-variable blinding Development/Preview implementation and UX
+  acceptance. Do not initiate further point-and-click regression testing
+  without a concrete change or failure that warrants it.
+- This handoff-only update is prepared AFTER commit a5d2a38 and is NOT YET
+  separately committed. To retain these final acceptance facts in the
+  repository, commit/push this one handoff file to development; never amend
+  the already-verified application source commit.
+- No v0.4 Production database migrations, Production Vercel deployment, or
+  merge to main were authorized. A separate release decision is required.
+
+NEXT BLINDSTATS DEVELOPMENT WORKSTREAM (SEPARATE REPOSITORY OWNERSHIP)
+--------------------------------------------------------------------
+- Begin a SMALL, authenticated, project-scoped, READ-ONLY OpenPayables GUI
+  pilot in the BlindStats repo only, against the fixed versioned
+  OpenPayables v0.2.0-alpha.2 prerelease/source (verify tag/release and exact
+  interface before implementation).
+- Integration surfaces may expose project/operator-scoped governance and
+  contribution-compensation information for inspection only. No approvals,
+  point awards, money movement, disbursement, subscriptions, or other writes
+  are in the pilot scope.
+- OpenPayables source changes, alpha.2 release, integration contract changes,
+  Stripe setup and operator concerns remain owned by the separate OpenPayables
+  chat and repository. This BlindStats chat only integrates a fixed published
+  interface into BlindStats. Do not modify the other repository here.
+- Avoid speculative platform planning, repeated full UI tests, or unrelated
+  hardening; establish a fresh clean BlindStats development source baseline
+  and use a fixed tagged OpenPayables release/export for compatibility review.
+
+PREVIOUS HANDOFF — RETAINED BELOW
+--------------------------------
+blindstats PROJECT HANDOFF
+============================
 Updated: 2026-11-20 (US Pacific; v42 UX local validation user-confirmed)
 Handoff status: v0.4 PREVIEW E2E ACCEPTED; v42 UX SOURCE VALIDATED; COMMIT/PREVIEW SMOKE PENDING
 
