@@ -1,5 +1,65 @@
 blindstats PROJECT HANDOFF
 ============================
+Updated: 2026-11-20 (US Pacific; v43 unified v0.4 Preview accepted)
+Status: v43 UNIFIED NEW-WORKFLOW v0.4 COMPLETED AND ACCEPTED IN DEVELOPMENT/PREVIEW
+
+V43 FINAL PREVIEW ACCEPTANCE — USER VERIFIED
+------------------------------------------
+- Git development checkpoint c76a97a (Unify single and multi-variable blinding
+  on v0.4) committed and pushed to origin/development. User-verified both refs
+  synchronized and working tree clean before the Preview deployment.
+- User-verified protected Vercel PREVIEW deployment, explicitly without --prod:
+    https://blindstats-cv4g6fziv-blindstats.vercel.app
+    inspect: https://vercel.com/blindstats/blindstats/8KuJ9dFtjRegjXs9uE4MLHrDGKzp
+  Vercel reported Ready in 12s and Vercel Authentication protection enabled.
+- User uploaded the browser-generated single-column PUBLIC blinding receipt
+  after testing Preview. Inspected receipt confirms:
+    schemaVersion = "0.4"
+    transformationType = "categorical_label_permutation"
+    selectedColumns = [{"column":"group","categoryCount":2}]
+    rowCount = 48, columnCount = 5 (synthetic test CSV)
+    sealedMapping.algorithm = "AES-GCM"
+    sealedMapping.aadScheme = "blindstats_blinding_mapping_aad_v2"
+    sourceArtifact.sha256 and blindedArtifact.sha256 present.
+  This directly verifies new single-column UI generation uses v0.4.
+- Prior v42 protected Preview demonstrated the complete TWO-column browser
+  flow, including lock, independent authorization, release and audit history.
+- User-verified v43 Windows local checks: npm run build, npm run lint, and
+  npm test (186/186 in 32 files) all PASSED.
+- User-verified DEVELOPMENT migration 20261120233000_allow_single_column_v04.sql
+  applied, all 19 migrations aligned, Supabase database lint clean.
+- User-verified three authenticated DEVELOPMENT integration tests PASSED:
+  v0.4 one-column full authorization/completion, v0.4 two-column full
+  authorization/completion, and historical independent-authorization test.
+- CLOSEOUT: v43 unified new-workflow v0.4 consolidation is accepted in
+  Development and protected Preview. No additional browser walkthrough is
+  needed absent a concrete defect. Historical v0.3 artifact readers and RPCs
+  remain for compatibility, but NEW generation uses v0.4 for >=1 column.
+- User's final-preview acceptance is not yet committed to PROJECT_HANDOFF.txt.
+  Commit/push this one documentation-only update separately on development;
+  no Preview redeployment is necessary.
+- The shown commands did not deploy to Production or change main. Any future
+  Production v0.4 migration/deployment or main merge requires a separate
+  explicit release decision; do not assume Production is v0.4-ready.
+
+NEXT DEVELOPMENT WORKSTREAM — READ-ONLY OPENPAYABLES PILOT
+-------------------------------------------------------
+- Start a narrowly scoped, authenticated, project-scoped, READ-ONLY OpenPayables
+  GUI pilot within BlindStats, only after verifying the fixed published
+  OpenPayables v0.2.0-alpha.2 tag/release and reading its exact integration
+  interface. If not yet released, stop and request the owning OpenPayables chat
+  to finish the release; do not bind to a moving development branch.
+- No payment actions, approvals, awards, funding, subscriptions, or writes.
+- The OpenPayables chat/repository exclusively owns OpenPayables source and
+  release; this BlindStats chat/repository owns only the GUI integration.
+- Maintain a clean fresh BlindStats development baseline. Favor quick automated
+  validation and a brief, bounded UI smoke test rather than a full blinding
+  workflow rerun or speculative platform work.
+
+PREVIOUS HANDOFF — RETAINED BELOW
+--------------------------------
+blindstats PROJECT HANDOFF
+============================
 Updated: 2026-11-20 (v43 local and Development database acceptance verified)
 Status: v43 UNIFIED NEW-WORKFLOW v0.4 — DEVELOPMENT ACCEPTED, PREVIEW PENDING
 
