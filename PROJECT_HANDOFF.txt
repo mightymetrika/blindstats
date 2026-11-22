@@ -1,5 +1,70 @@
 blindstats PROJECT HANDOFF
 ============================
+Updated: 2026-11-22 (US Pacific; v45 protected Vercel Preview accepted)
+Status: v45 HOSTED OPENPAYABLES READ-ONLY GUI ACCEPTED IN DEVELOPMENT AND PROTECTED PREVIEW
+
+V45 FINAL HOSTED OPENPAYABLES PREVIEW ACCEPTANCE — USER VERIFIED
+------------------------------------------------------------
+- Accepted BlindStats development source commit b319cbe
+  (Connect read-only OpenPayables GUI to hosted Supabase). User's Git
+  output confirmed origin/development synchronized and working tree clean;
+  eight v45 paths committed and pushed. This closeout is DOCUMENTATION ONLY.
+- Pinned, independently SHA-256-checked OpenPayables v0.2.0-alpha.3
+  prerelease remains unchanged. Existing openpayables/read package API reused.
+  No OpenPayables source, database migration or Stripe change by BlindStats.
+- Before source commit, Windows local validation passed npm test 193/193
+  (34 files), npm run lint, npm run build (Next.js and TypeScript), and
+  git diff --check. Authenticated local manager and contributor browser
+  pages read the hosted synthetic OpenPayables project successfully.
+- Four server-only Vercel PREVIEW environment variables were configured
+  using the corrected Windows PowerShell 5.1 helper and verified present:
+  OPENPAYABLES_DATABASE_URL (Secret), OPENPAYABLES_POOL_MAX (Config),
+  OPENPAYABLES_TLS_CA_BASE64 (Secret), OPENPAYABLES_PILOT_ACCESS_JSON (Secret).
+  No private values, database password, user UUIDs or certificate contents
+  were printed or committed. Existing local .env.local remains Git-ignored.
+- User manually deployed exact accepted development source with
+  npx --yes vercel@65.14.0 deploy --environment=preview --scope blindstats --logs.
+  Vercel reported Ready in 19 seconds; Vercel Authentication / Deployment
+  Protection was ON. Verified protected PREVIEW URL:
+    https://blindstats-85r2pggfh-blindstats.vercel.app
+  Deployment inspect:
+    https://vercel.com/blindstats/blindstats/7CDXnMbdP4vJa2BTeUWBMZQsH5AC
+  No --prod deployment occurred.
+- User supplied screenshots from this PREVIEW /openpayables URL after
+  authenticated sign-in using the existing two Development accounts:
+    MANAGER: synthetic project supabase-smoke-4496fd4f (Supabase synthetic
+      TEST acceptance), two contributors, 11 credits total, Synthetic
+      Alice 8 and Bob 3 credits, zero pending GitHub evidence.
+    CONTRIBUTOR: Synthetic Alice smoke-alice-4496fd4f, 8 credits, one
+      8-credit development event ('Synthetic work'), advisory proposal
+      voting 'yes' at weight 8, one $8.00 USD TEST allocation status 'held'.
+      Contributor screen did not display manager overview, Bob's individual
+      records or payment/write controls.
+- Successful Preview pages demonstrate Vercel server-to-hosted Supabase
+  PostgreSQL reads through dedicated restricted OpenPayables reader and
+  configured TLS for this bounded synthetic TEST dataset. They do NOT
+  establish real contributor earnings, bank settlement, broad production
+  security readiness, or real financial/Stripe capability.
+- Project-specific permissions remain explicit and server-only; Study roles
+  alone are not compensation permissions. Unmapped/invalid access mapping
+  and VERCEL_ENV=production denial remain covered by earlier automated tests;
+  a third independent unmapped account was not browser-tested in Preview.
+- ACCEPTANCE: v45 hosted OpenPayables read-only integration is complete in
+  BlindStats Development and authenticated, protected Vercel Preview.
+  No further v45 source changes, migration, database seeding, full blinding
+  rerun, or Preview deployment is necessary solely for this milestone.
+- NEXT: Commit and push this single updated PROJECT_HANDOFF.txt to the
+  existing clean development branch. Verify the staged scope is ONLY the
+  handoff file and origin/development is synchronized afterward. Because
+  this is documentation-only, do NOT redeploy Preview.
+- No change to Git main, Vercel Production, BlindStats Production Supabase,
+  OpenPayables source/release, or LIVE Stripe. Continue any separate
+  future production-release planning only with explicit authorization.
+
+PREVIOUS HANDOFF — RETAINED BELOW
+--------------------------------
+blindstats PROJECT HANDOFF
+============================
 Updated: 2026-11-22 (US Pacific; v45 hosted OpenPayables local GUI ACCEPTED)
 Status: v45 HOSTED OPENPAYABLES DEVELOPMENT LOCAL GUI ACCEPTED; SOURCE COMMIT/PUSH PENDING
 
