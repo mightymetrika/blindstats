@@ -21,7 +21,7 @@
     "papaparse": "5.7.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "openpayables": "https://github.com/mightymetrika/openpayables/releases/download/v0.2.0-alpha.2/openpayables-0.2.0-alpha.2.tgz"
+    "openpayables": "https://github.com/mightymetrika/openpayables/releases/download/v0.2.0-alpha.3/openpayables-0.2.0-alpha.3.tgz"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

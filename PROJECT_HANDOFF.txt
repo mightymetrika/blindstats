@@ -1,5 +1,107 @@
 blindstats PROJECT HANDOFF
 ============================
+Updated: 2026-11-22 (US Pacific; v45 hosted OpenPayables local GUI ACCEPTED)
+Status: v45 HOSTED OPENPAYABLES DEVELOPMENT LOCAL GUI ACCEPTED; SOURCE COMMIT/PUSH PENDING
+
+V45 HOSTED OPENPAYABLES LOCAL DEVELOPMENT ACCEPTANCE — USER VERIFIED
+------------------------------------------------------------------
+- Initial BlindStats Git development and origin/development synchronized and
+  clean at a84edcd (previous v44 local PostgreSQL read-only GUI milestone).
+  v45 full-file candidate applied to this source; expected change is exactly
+  eight BlindStats files including npm-generated package-lock.json.
+- Published fixed OpenPayables v0.2.0-alpha.3 tarball SHA-256 independently
+  verified by Windows Get-FileHash: 5e0976f32b474371288cde5c9cff1076f598a74232863aceeb666c562ec029fc.
+  Installed package version checked as 0.2.0-alpha.3. OpenPayables source,
+  API and migrations were NOT changed by the BlindStats work.
+- User's Windows PowerShell local validation passed: npm test 193/193 in
+  34 files (including three focused hosted connection tests); npm run lint
+  PASS; npm run build PASS (including Next.js and TypeScript); /openpayables
+  route compiled; git diff --check PASS with nonfatal CRLF notices. Exactly
+  eight expected files inspected, no unrelated code changes.
+- Private configuration script completed successfully after user provided
+  the full local Supabase CA path ending prod-ca-2021.crt and a privately
+  entered read-only database password. Four OPENPAYABLES_* variables stored
+  in ignored .env.local without printing connection credentials or user IDs.
+- OpenPayables-owned Supabase project is aadqozgamybbksrvoivu, independently
+  hosted from BlindStats; fixed read-only role through transaction pooler
+  aws-1-us-west-1.pooler.supabase.com:6543/postgres; CA and verify-full
+  TLS required; OPENPAYABLES_POOL_MAX=1. No operator-writer or admin role.
+- Existing BlindStats Development Supabase authentication and explicit
+  server-side project/user mappings preserved. Existing manager account A
+  maps to the hosted synthetic project supabase-smoke-4496fd4f, contributor
+  account B only to synthetic Alice smoke-alice-4496fd4f. These synthetic
+  credits and TEST allocations do not represent BlindStats contributions.
+- User supplied local browser screenshots at localhost:3000/openpayables:
+  manager saw "Supabase synthetic TEST acceptance", 2 contributors, 11 total
+  credits (Synthetic Alice 8, Bob 3), and 0 unapproved GitHub evidence;
+  contributor saw Alice 8 credits, one 8-credit development event with reason
+  "Synthetic work", advisory governance yes vote weighted 8, and one 8.00
+  USD TEST allocation with status "held". Contributor view showed no manager
+  overview or Bob's records; neither view provided financial write actions.
+- The expected hosted-only data and successful page reads support local
+  application-to-hosted-PostgreSQL connectivity. Browser evidence is bounded
+  acceptance of the configured pilot, not independent Vercel certificate,
+  multi-tenant security, bank payout or Production readiness verification.
+  Existing access tests reject absent/invalid mapping and Production use.
+- No BlindStats Supabase schema migrations, LIVE Stripe operation, real funds,
+  Git main or Production deployment. VERCEL_ENV=production denial retained.
+- NEXT: replace tracked PROJECT_HANDOFF.txt with this documented acceptance;
+  stage only the eight already validated v45 paths, inspect scope and staged
+  whitespace, commit and push development, then verify synchronized/clean.
+- AFTER SOURCE COMMIT: configure exact four server-only OpenPayables settings
+  for authenticated Vercel PREVIEW (never Production) with project CA and
+  private restricted reader password. Manually deploy committed development
+  to protected Preview, verify Vercel Authentication, and briefly test both
+  GUI roles against the existing hosted synthetic project. No new data smoke
+  or full blinded research workflow regression is warranted at this gate.
+
+PREVIOUS HANDOFF — RETAINED BELOW
+--------------------------------
+blindstats PROJECT HANDOFF
+============================
+Updated: 2026-11-22 (US Pacific; v45 hosted OpenPayables GUI candidate)
+Status: v44 LOCAL READ-ONLY PILOT ACCEPTED/PUSHED; v45 HOSTED UPGRADE SOURCE CANDIDATE UNVALIDATED
+
+V45 HOSTED OPENPAYABLES READ-ONLY PILOT — VALIDATION PENDING
+-----------------------------------------------------------
+- USER-VERIFIED current Git development/origin/development synced and clean at
+  a84edcd (v44 Add validated read-only OpenPayables GUI pilot). Ten files were
+  committed/pushed; 190/190 tests, lint/build, and local two-account manager /
+  contributor PostgreSQL GUI acceptance were previously confirmed.
+- OpenPayables separately published fixed v0.2.0-alpha.3 from commit 0e4b150,
+  with unchanged openpayables/read. Supabase hosted TEST acceptance (all 11
+  OpenPayables migrations, restricted app role, TLS, single/double actor 8:3
+  credits, votes, and held TEST allocations) was confirmed by its owning chat.
+- This BLINDSTATS-ONLY source candidate changes the pinned package asset,
+  adds a fail-closed hosted read-only transaction-pooler/TLS CA adapter and
+  focused tests, updates this handoff and the pilot doc, and supplies an
+  optional private PowerShell environment-setup script. npm install on Windows
+  must regenerate package-lock.json; do not commit until local checks pass.
+- Expected dedicated OpenPayables DEV Supabase project: aadqozgamybbksrvoivu;
+  reader-only username openpayables_app_ro.aadqozgamybbksrvoivu, transaction
+  pooler aws-1-us-west-1.pooler.supabase.com:6543/postgres, sslmode=verify-full
+  with authentic Supabase project CA and OPENPAYABLES_POOL_MAX=1.
+- Hosted synthetic project: supabase-smoke-4496fd4f, Alice 8/Bob 3 credits,
+  governance votes yes/no and held TEST allocations $8/$3. The explicit
+  BlindStats Development manager and contributor user UUID mappings remain
+  server-only; account B maps to smoke-alice-4496fd4f. Synthetic credits are
+  NOT evidence of contributions to BlindStats.
+- Do not apply any schema migrations, modify OpenPayables source, re-run its
+  creating-smoke, weaken TLS, grant SQL writer/admin roles, or add payment UI.
+- NEXT (USER): apply candidate on clean a84edcd development, verify fixed
+  alpha.3 SHA-256 asset, npm install, full npm test/lint/build, diff/scope,
+  privately configure ignored .env.local, perform bounded local hosted-data
+  manager/contributor GUI check, then commit/push source to development.
+- AFTER accepted source: configure four Preview-only server variables and
+  manually deploy protected PREVIEW using hosted reader, then smoke-test the
+  two views. VERCEL_ENV=production must remain denied. No main/Production.
+- All output here is preparation, NOT claimed Windows build, DB connection,
+  Git commit or Preview acceptance. The older v44 handoff remains below.
+
+PREVIOUS HANDOFF — RETAINED BELOW
+--------------------------------
+blindstats PROJECT HANDOFF
+============================
 Updated: 2026-11-22 (US Pacific; v44 local OpenPayables GUI acceptance verified)
 Status: v44 OPENPAYABLES READ-ONLY LOCAL PILOT ACCEPTED; DEVELOPMENT GIT COMMIT/PUSH PENDING
 
