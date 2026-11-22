@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { resolveOpenPayablesPilotAccess } from "@/lib/openpayables/access";
 import { CreateStudyForm } from "@/components/studies/CreateStudyForm";
 import { SignOutButton } from "@/components/SignOutButton";
 import { createClient } from "@/lib/supabase/server";
@@ -69,6 +70,9 @@ export default async function StudiesPage({
     throw new Error("Unable to load Study information.");
   }
 
+  const pilotAccess = resolveOpenPayablesPilotAccess(
+    claims.sub, process.env.OPENPAYABLES_PILOT_ACCESS_JSON, process.env.VERCEL_ENV,
+  );
   const email = typeof claims.email === "string" ? claims.email : null;
   const identity = profile.display_name || email || "Signed-in user";
   const showCreateForm = studies.length === 0 || create === "1";
@@ -90,6 +94,7 @@ export default async function StudiesPage({
         </div>
 
         <div className="flex items-center gap-2">
+          {pilotAccess ? <Link href="/openpayables" className="rounded-lg border border-black/15 px-4 py-2 text-sm font-medium dark:border-white/20">OpenPayables</Link> : null}
           {studies.length > 0 && !showCreateForm ? (
             <Link
               className="rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background"

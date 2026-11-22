@@ -1,5 +1,96 @@
 blindstats PROJECT HANDOFF
 ============================
+Updated: 2026-11-22 (US Pacific; v44 local OpenPayables GUI acceptance verified)
+Status: v44 OPENPAYABLES READ-ONLY LOCAL PILOT ACCEPTED; DEVELOPMENT GIT COMMIT/PUSH PENDING
+
+V44 LOCAL AUTHENTICATED GUI ACCEPTANCE — USER VERIFIED
+-----------------------------------------------------
+- Source baseline: BlindStats development/origin/development at 54570fc,
+  initially clean. v44 full-file candidate applied locally but is NOT YET
+  committed; nine candidate paths plus generated package-lock.json comprise
+  the expected ten-file change. No change to OpenPayables source/release.
+- Published pinned OpenPayables v0.2.0-alpha.2 exposes openpayables/read.
+  PostgreSQL connection is a separate Windows-local 127.0.0.1:5432/openpayables
+  instance, never BlindStats Supabase or a publicly exposed service.
+- Local verification after npm install: 190/190 tests passed (33 test files),
+  ESLint passed, Next.js build and TypeScript passed, /openpayables compiled,
+  git diff --check passed. Exactly ten expected files changed.
+- OpenPayables-owned PostgreSQL role blindstats_openpayables_ro verified by
+  user as default_transaction_read_only=on. OpenPayables chat separately
+  reported no project/credits writes, no funding table access and no schema
+  creation privileges. Password and connection string were not shared.
+- Read-only existing synthetic project: openpayables-funding-3f1bfa8a
+  (Funded test project), NOT actual BlindStats work. Two contributors,
+  11 credits: Alice 8, Bob 3. No pending GitHub evidence, as expected.
+- Local ignored .env.local configured privately using authenticated Supabase
+  DEVELOPMENT accounts A and B. Explicit project-scoped server-only mapping:
+  A is manager; B is mapped only to synthetic Alice. No credentials, user UUIDs,
+  or connection strings are recorded here or in Git-tracked source.
+- Programmatic read using the published OpenPayables package succeeded:
+  projectOverview=2 contributors/11 credits; pendingEvidence=0;
+  contributorView=Alice/8 credits/1 credit event/0 votes/1 approved TEST
+  allocation; returned readOnly=true. No write calls were made.
+- Browser GUI acceptance at http://localhost:3000/openpayables:
+  manager page displayed project, Alice 8/Bob 3, zero pending evidence;
+  contributor account displayed Alice 8, development credit event of 8
+  ('Accepted code'), no voting records, and an 8.00 USD TEST allocation
+  with status 'transferred'. UI did not show manager or payment-write
+  controls to contributor. This is TEST ledger data, not proven bank payout.
+- Initial invalid_refresh_token warnings were followed by redirect/login and
+  successful authenticated GET /openpayables 200 for both accounts.
+- Negative authorization logic tested automatically for absent/malformed
+  mapping, outsider UUID and Production; logged-out browser redirected to
+  /login. A separate third-account UNMAPPED browser session was NOT tested.
+  This is adequate for the explicitly bounded local-only pilot, not a claim
+  of production security acceptance or real-client deployment readiness.
+- v44 reads are server-only; VERCEL_ENV=production is denied; the local
+  PostgreSQL server cannot be reached from Vercel. NO Vercel Preview or
+  Production deployment is planned for this local pilot. Do not expose the
+  PostgreSQL port or deploy secrets to Vercel.
+- NEXT: commit/push only the ten verified BlindStats v44 paths to development,
+  after replacing this one handoff file with the accepted record. Verify
+  staged scope/diff, clean worktree and origin/development synchronization.
+  main, Supabase Production, Stripe LIVE and OpenPayables source untouched.
+- STOP at a usable validated read-only manager/contributor pilot. No new
+  financial write features, general framework or unnecessary blinding reruns.
+
+PREVIOUS HANDOFF — RETAINED BELOW
+--------------------------------
+blindstats PROJECT HANDOFF
+============================
+Updated: 2026-11-20 (US Pacific; v44 OpenPayables read-only pilot source candidate)
+Status: v43 unified v0.4 COMPLETED; READ-ONLY OPENPAYABLES GUI PILOT NOT YET LOCAL-VALIDATED
+
+V44 PILOT SOURCE — MUST VALIDATE ON WINDOWS BEFORE COMMIT
+-------------------------------------------------------
+- Verified BlindStats development and origin/development at 54570fc, clean tree
+  from user's PowerShell output; new source export supplied after v43 closeout.
+- Independently verified published OpenPayables v0.2.0-alpha.2 release tag,
+  commit 6c8f864, with installable tarball and openpayables/read.
+- Additive authenticated, one-project, read-only OpenPayables page in BlindStats.
+  Manager and contributor permissions are explicit server-side Supabase UUID
+  mappings in OPENPAYABLES_PILOT_ACCESS_JSON, independent of Study roles.
+  Unmapped users and Vercel Production are denied. No user-supplied project or
+  contributor ID can authorize a request. Dedicated PostgreSQL connection is
+  server-only, using openpayables/read, not BlindStats Supabase.
+- No modification to OpenPayables source, blinding source, Supabase migrations,
+  main, Production, or Stripe actions. No manager write functionality.
+- Depends on installing immutable alpha.2 tarball and updating package-lock.json
+  on user Windows. npm test/lint/build and local authenticated PostgreSQL
+  manager/contributor smoke tests NOT YET PERFORMED for this candidate.
+- Since operator-owned PostgreSQL currently may be Windows-local, Vercel Preview
+  cannot connect to localhost. Do not expose the local PG port; run a local
+  app pilot or separately provision secure hosted DB before protected Preview.
+- README/Docs: docs/OPENPAYABLES_READ_ONLY_PILOT.md.
+- NEXT: Apply reviewed full-file patch on clean development 54570fc, install
+  package, validate tests/build, inspect diff, then commit Development only.
+  Do not claim pilot acceptance until separate authenticated manager and
+  contributor reads succeed against an actual OpenPayables TEST database.
+
+PREVIOUS HANDOFF — RETAINED BELOW
+--------------------------------
+blindstats PROJECT HANDOFF
+============================
 Updated: 2026-11-20 (US Pacific; v43 unified v0.4 Preview accepted)
 Status: v43 UNIFIED NEW-WORKFLOW v0.4 COMPLETED AND ACCEPTED IN DEVELOPMENT/PREVIEW
 
