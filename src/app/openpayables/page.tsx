@@ -18,6 +18,39 @@ function safeOffset(value: string | undefined): number {
 }
 
 export default async function OpenPayablesPage({ searchParams }: Props) {
+  // Production is informational only. Never authenticate against, authorize,
+  // or connect to the Development OpenPayables financial-data pilot here.
+  if (process.env.VERCEL_ENV === "production") {
+    return (
+      <main className="mx-auto min-h-screen w-full max-w-5xl px-6 py-12">
+        <header>
+          <Link className="text-sm underline underline-offset-4" href="/studies">Back to Studies</Link>
+          <h1 className="mt-5 text-3xl font-semibold">OpenPayables</h1>
+          <p className="mt-2 text-sm text-black/60 dark:text-white/60">Open-source contribution governance and compensation tooling</p>
+        </header>
+        <section className="mt-8 space-y-4 rounded-2xl border border-black/10 p-6 dark:border-white/15">
+          <h2 className="text-xl font-semibold">Development pilot</h2>
+          <p className="text-sm text-black/75 dark:text-white/75">
+            OpenPayables is a separate open-source project for tracking contributions,
+            credits, advisory governance and compensation allocations. BlindStats is
+            evaluating a read-only OpenPayables integration in Development using
+            synthetic TEST data.
+          </p>
+          <p className="text-sm text-black/75 dark:text-white/75">
+            The pilot is not available in BlindStats Production. This page does not
+            display contribution balances or provide financial or payment actions.
+          </p>
+          <p className="text-sm">
+            Developers can view the project at{" "}
+            <a className="underline underline-offset-4" href="https://github.com/mightymetrika/openpayables" target="_blank" rel="noopener noreferrer">
+              github.com/mightymetrika/openpayables
+            </a>.
+          </p>
+        </section>
+      </main>
+    );
+  }
+
   const supabase = await createClient();
   const { data, error } = await supabase.auth.getClaims();
   if (error || !data?.claims?.sub) redirect("/login");
@@ -59,6 +92,13 @@ export default async function OpenPayablesPage({ searchParams }: Props) {
           <Link className="text-sm underline underline-offset-4" href="/studies">Back to Studies</Link>
           <h1 className="mt-5 text-3xl font-semibold">OpenPayables</h1>
           <p className="mt-2 text-sm text-black/60 dark:text-white/60">Read-only project pilot · TEST-mode information only</p>
+          <p className="mt-2 max-w-3xl text-sm text-black/60 dark:text-white/60">
+            OpenPayables is an independent, open-source contribution governance tool.
+            This integration is a Development pilot with synthetic TEST data. Developers can visit{" "}
+            <a className="underline underline-offset-4" href="https://github.com/mightymetrika/openpayables" target="_blank" rel="noopener noreferrer">
+              its GitHub repository
+            </a>.
+          </p>
         </div>
         <SignOutButton />
       </header>
