@@ -1,5 +1,104 @@
 blindstats PROJECT HANDOFF
 ============================
+Updated: 2026-11-23 (US Pacific; v43-v45 Production release accepted)
+Status: PRODUCTION RELEASE ACCEPTED (SOURCE, DATABASE, AND BOUNDED BROWSER SMOKE); FINAL DOCUMENTATION-ONLY GIT CLOSEOUT PENDING
+
+V43-V45 PRODUCTION RELEASE ACCEPTANCE — USER VERIFIED
+--------------------------------------------------
+- RELEASE SOURCE: The Development branch accepted the informational-only
+  OpenPayables page as commit 0b69a2e (Document OpenPayables development pilot
+  for Production). The one-file source change passed npm test 193/193 across
+  34 files, npm run lint, npm run build including TypeScript, and staged diff
+  checks. The user fast-forwarded Git main from b8230a7 to 0b69a2e, pushed
+  origin/main, and verified that main, development, both origin tracking refs,
+  and the clean worktree all matched at 0b69a2e. Vercel is not Git-connected;
+  this Git push did not trigger an automatic deployment.
+- PRODUCTION DATABASE: BlindStats Supabase Production project
+  nafujgfnylnvmmhpbpot had 15 historical migrations and a scheduled physical
+  backup dated 2026-11-23 15:35:16 UTC with a Restore action available.
+  The CLI was deliberately linked to this Production ref, dry-run showed
+  exactly four pending migrations, and user explicitly authorized their push:
+    20261119194500_register_multi_column_blinding.sql
+    20261120190000_register_multi_analysis_lock.sql
+    20261120210000_register_multi_unblinding_completion.sql
+    20261120233000_allow_single_column_v04.sql
+  Supabase confirmed all four applied. Migration list then showed 19/19
+  Local/Remote aligned; db lint --linked --level warning: No schema errors
+  found. CLI link restored and verified as Development ref
+  kfrfemqoalzxwzecyjjf. No db reset, migration repair, restore, or
+  OpenPayables schema changes were performed. Backup restore was NOT tested;
+  database backups do not include Supabase Storage object contents.
+- PRODUCTION ENVIRONMENT: Vercel Production contains only the two configured
+  BlindStats Supabase public client variables. User privately verified the
+  Production URL exactly https://nafujgfnylnvmmhpbpot.supabase.co and the
+  matching Production publishable key by comparison with its Supabase API
+  settings. No secrets were supplied in chat. The four restricted OpenPayables
+  database/pilot settings remain Preview-only; no Production financial reader
+  or TEST allocation configuration was added.
+- PRODUCTION DEPLOYMENT: User explicitly deployed accepted local main commit
+  0b69a2e with npx --yes vercel@65.14.0 deploy --prod --scope blindstats
+  --logs; Vercel build, TypeScript, static/dynamic route generation PASSED,
+  Ready in 22s. Vercel aliased this release to https://blindstats.com.
+  Immutable deploy URL: https://blindstats-7yutoimqu-blindstats.vercel.app
+  Inspect: https://vercel.com/blindstats/blindstats/az52sbVSUzHqSKyBuysmrfdb9bJe
+  The user switched the local branch back to development afterward.
+- BOUNDED PRODUCTION BROWSER ACCEPTANCE (2026-11-23): Screenshot at
+  https://blindstats.com/studies confirms authenticated Production account,
+  Studies UI and new-Study form render. Screenshot of blinding workspace
+  confirms two selected categorical columns group and site with v0.4 UI.
+  Production-generated public blinding receipt schemaVersion 0.4 identifies
+  two categories for each selected column, rowCount 48 and columnCount 5.
+  User supplied synthetic blinded CSV, public blinding receipt, unblinding
+  secret, analysis-lock receipt and unblinding receipt. Independently checking
+  the ORIGINAL UPLOADED FILE BYTES established that:
+    * blinded CSV SHA-256 matches public blinding receipt;
+    * analysis lock refers to the matching transformation, blinding receipt
+      SHA-256 and blinded CSV SHA-256;
+    * unblinding receipt refers to the same transformation and lock IDs,
+      and matches the uploaded blinding receipt, secret, analysis-lock receipt
+      and blinded CSV SHA-256 values;
+    * selected columns in public and unblinding receipts match (group/site).
+  Uploaded analysis artifact selected for the smoke was a PDF; the lock
+  establishes the identity of file bytes, NOT the substantive adequacy of
+  statistical analysis. User-uploaded secret and released mappings are
+  synthetic test materials; do NOT publish plaintext secrets for real data.
+- OPENPAYABLES PRODUCTION PAGE: Screenshot at
+  https://blindstats.com/openpayables shows informational-only Development
+  pilot explanation and link to https://github.com/mightymetrika/openpayables.
+  No contributor balances, synthetic governance details, financial controls,
+  or live transactions displayed. Pilot data remain Development/Preview-only.
+- ACCEPTANCE BOUNDARY: This is a successful bounded Production release smoke,
+  not a comprehensive independent security audit or regulated-data approval.
+  The uploaded receipts and browser screenshots do not alone independently
+  establish each Production server-side authorization/audit database row;
+  governed one-/multi-column workflow paths and independent-authorization
+  regression were previously validated against Development Supabase. No
+  additional full researcher pair walkthrough is required solely to close
+  this release absent an observed defect.
+- NO OPEN WORK FOR THESE RELEASE OBJECTIVES: v43 unified single/multiple
+  categorical blinding, v44 read-only pilot, and v45 hosted OpenPayables
+  Development/Preview pilot are implemented and now accounted for in the
+  Production release (OpenPayables informational-only on Production).
+  Main and development application source is synchronized; Production
+  blinding migrations are current; application is deployed and smoke-tested.
+- NEXT — DOCUMENTATION-ONLY SOURCE CLOSEOUT: On clean development at
+  0b69a2e, replace only PROJECT_HANDOFF.txt with this acceptance record;
+  stage/commit/push that single file on development. Then fast-forward main
+  to this documentation commit, push main, verify both branches synchronized
+  and clean, and return to development. Since the Vercel project is not
+  Git-connected and the change is documentation-only, do not redeploy
+  Production or rerun acceptance tests for this closeout.
+- NEXT PRODUCT WORKSTREAM, IN A NEW CHAT: secure research-artifact storage
+  and authorized transfer (v46 candidate). Start from the newest clean Git
+  checkpoint. Retain managed object storage plus a future researcher-owned
+  storage adapter, explicitly authorized roles, strong encryption, and
+  structured PostgreSQL governance/audit metadata. Do not start randomization
+  or data collection implementation as part of the initial storage milestone.
+
+PREVIOUS HANDOFF — RETAINED BELOW
+--------------------------------
+blindstats PROJECT HANDOFF
+============================
 Updated: 2026-11-22 (US Pacific; v45 protected Vercel Preview accepted)
 Status: v45 HOSTED OPENPAYABLES READ-ONLY GUI ACCEPTED IN DEVELOPMENT AND PROTECTED PREVIEW
 
