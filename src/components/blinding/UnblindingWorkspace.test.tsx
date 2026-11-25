@@ -13,12 +13,17 @@ import {
   vi,
 } from "vitest";
 
+import { retrieveAuthorizedSecret, validateSecretForReceipt } from "@/lib/research-transfer/secret-transfer";
 import { sha256Hex } from "@/lib/blinding/hashing";
 import { createSupportedUnblindingPackage } from "@/lib/blinding/supported-unblinding";
 import type { MultiUnblindingReceipt } from "@/lib/blinding/multi-types";
 import type { UnblindingPackage } from "@/lib/blinding/unblinding";
 
 import { UnblindingWorkspace } from "./UnblindingWorkspace";
+
+const secretRpc = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/supabase/client", () => ({ createClient: () => ({ rpc: secretRpc }) }));
+vi.mock("@/lib/research-transfer/secret-transfer", () => ({ retrieveAuthorizedSecret: vi.fn(), validateSecretForReceipt: vi.fn() }));
 
 const routerMocks = vi.hoisted(() => ({
   replace: vi.fn(),
@@ -316,6 +321,33 @@ describe("UnblindingWorkspace workflow", () => {
     expect(new TextDecoder().decode(lockBytes)).toBe(LOCK_TEXT);
     expect(mockedSha256Hex).toHaveBeenCalledWith(
       createMockPackage().receiptArtifact.bytes,
+    );
+  });
+
+  it("loads the shared managed secret without a password or revealing the mapping automatically", async () => {
+    const user = userEvent.setup();
+    const registration = persistentRegistration();
+    const context = { studyId: registration.studyId, workflowId: registration.workflowId,
+      requestId: registration.requestId, transformationId: registration.transformationId, recipientId: "analyst" };
+    const record = { id: "shared-secret", recipient_id: "analyst", plaintext_sha256: "d".repeat(64),
+      transfer_mode: "managed_at_rest_v1" as const, object_sha256: "d".repeat(64), object_byte_length: encode(SECRET_TEXT).length,
+      envelope: { version: "v46-managed-atrest-1" as const }, ready_at: "2026-11-24T00:00:00Z" };
+    vi.mocked(retrieveAuthorizedSecret).mockResolvedValueOnce(new Uint8Array(encode(SECRET_TEXT)));
+    vi.mocked(validateSecretForReceipt).mockResolvedValueOnce(undefined);
+    secretRpc.mockResolvedValueOnce({error:null});
+    render(<UnblindingWorkspace registration={registration} registerAction={vi.fn()}
+      sharedSecret={{context,record,backup:null}} />);
+    expect(screen.queryByLabelText("Recovery passphrase")).not.toBeInTheDocument();
+    expect(verifyButton()).toBeDisabled();
+    await user.click(screen.getByRole("button",{name:"Load shared secret"}));
+    await waitFor(() => expect(verifyButton()).toBeEnabled());
+    expect(mockedCreateUnblindingPackage).not.toHaveBeenCalled();
+    expect(secretRpc).toHaveBeenCalledWith("acknowledge_unblinding_secret_transfer",expect.objectContaining({p_transfer_id:record.id}));
+    await user.click(verifyButton());
+    await waitFor(() => expect(mockedCreateUnblindingPackage).toHaveBeenCalled());
+    // Compare exact byte values rather than typed-array prototypes across Node/jsdom realms.
+    expect(Array.from(mockedCreateUnblindingPackage.mock.calls[0][1])).toEqual(
+      Array.from(encode(SECRET_TEXT)),
     );
   });
 

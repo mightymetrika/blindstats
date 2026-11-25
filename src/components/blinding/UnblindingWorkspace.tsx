@@ -9,6 +9,9 @@ import {
   type SetStateAction,
 } from "react";
 
+import { createClient } from "@/lib/supabase/client";
+import { retrieveAuthorizedSecret, validateSecretForReceipt, type SecretTransferRecord, type SecretTransferContext, type SecretBackup } from "@/lib/research-transfer/secret-transfer";
+
 import { sha256Hex } from "@/lib/blinding/hashing";
 import { createSupportedUnblindingPackage } from "@/lib/blinding/supported-unblinding";
 import type { UnblindingPackage } from "@/lib/blinding/unblinding";
@@ -57,6 +60,8 @@ type UnblindingRegistrationContext = {
 
 type UnblindingWorkspaceProps = {
   registration?: UnblindingRegistrationContext;
+  waitingForSharedSecret?: boolean;
+  sharedSecret?: { record: SecretTransferRecord; context: SecretTransferContext; backup: SecretBackup | null };
   registerAction?: (
     formData: FormData,
   ) => Promise<RegisterUnblindingCompletionResult>;
@@ -150,6 +155,8 @@ async function readFileBytes(file: File): Promise<Uint8Array> {
 export function UnblindingWorkspace({
   registration,
   registerAction,
+  sharedSecret,
+  waitingForSharedSecret,
 }: UnblindingWorkspaceProps = {}) {
   const router = useRouter();
   const [receipt, setReceipt] = useState<LoadedArtifact | null>(null);
@@ -162,6 +169,8 @@ export function UnblindingWorkspace({
     null,
   );
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isRetrieving, setIsRetrieving] = useState(false);
+  const [secretPassphrase, setSecretPassphrase] = useState("");
   const [isRegistering, setIsRegistering] = useState(false);
   const [acknowledgedCustody, setAcknowledgedCustody] = useState(false);
 
@@ -195,7 +204,7 @@ export function UnblindingWorkspace({
     : Boolean(lockReceipt);
 
   const canGenerate =
-    Boolean(receiptReady && secret && lockReady) && !isGenerating;
+    Boolean(receiptReady && secret && lockReady) && !isGenerating && !isRetrieving;
 
   function invalidateGeneration(): void {
     setGeneration(null);
@@ -229,6 +238,26 @@ export function UnblindingWorkspace({
         message: getErrorMessage(error),
       });
     }
+  }
+
+  async function loadSharedSecret(): Promise<void> {
+    if (!sharedSecret || !registration || !effectiveReceiptBytes || isRetrieving) return;
+    setIsRetrieving(true);
+    setSecret(null);
+    invalidateGeneration();
+    try {
+      const supabase = createClient();
+      const bytes = await retrieveAuthorizedSecret(sharedSecret.record, sharedSecret.context, sharedSecret.backup, secretPassphrase);
+      await validateSecretForReceipt(bytes, effectiveReceiptBytes, registration.transformationId);
+      const { error } = await supabase.rpc("acknowledge_unblinding_secret_transfer", {
+        p_transfer_id: sharedSecret.record.id, p_plaintext_sha256: await sha256Hex(bytes),
+      });
+      if (error) throw new Error("Unable to record secret verification.");
+      setSecret({ file: new File([new Uint8Array(bytes).buffer], "unblinding-secret.json", { type: "application/json" }), bytes });
+      setSecretPassphrase("");
+    } catch (error) {
+      setWorkspaceError({ stage: "secret", message: getErrorMessage(error) });
+    } finally { setIsRetrieving(false); }
   }
 
   async function handleGenerate(): Promise<void> {
@@ -433,7 +462,7 @@ export function UnblindingWorkspace({
               Unblinding releases protected information.
             </span>{" "}
             {registrationEnabled
-              ? "The secret and released mapping stay in this browser; blindstats records safe completion metadata only."
+              ? "Unblinding happens in this browser; completion registration records safe metadata only."
               : "A successful unblinding receipt contains the original-to-blinded mapping and should be treated as unblinded material."}
           </p>
         </section>
@@ -534,18 +563,25 @@ export function UnblindingWorkspace({
             <StageHeading
               number={registrationEnabled ? 1 : 2}
               title="Select unblinding secret"
-              description="Choose the local secret released after authorization."
+              description={sharedSecret ? "Load the secret shared by the custodian." : waitingForSharedSecret ? "Waiting for the custodian to share the secret." : "Choose the local secret released after authorization."}
             />
 
             <div className="mt-6">
+              {sharedSecret ? <div className="mb-4 space-y-3">
+                {sharedSecret.record.transfer_mode === "recipient_e2ee_v1" ? <label className="block text-sm">Recovery passphrase
+                  <input type="password" autoComplete="current-password" value={secretPassphrase} onChange={e => setSecretPassphrase(e.target.value)} className="mt-2 block w-full max-w-lg rounded-lg border p-3" />
+                </label> : null}
+                <button type="button" disabled={isRetrieving || isGenerating || isRegistering || (sharedSecret.record.transfer_mode === "recipient_e2ee_v1" && !secretPassphrase)} onClick={() => void loadSharedSecret()} className="rounded-lg bg-slate-950 px-4 py-3 text-sm font-medium text-white disabled:opacity-50">{isRetrieving ? "Loading…" : secret ? "Reload shared secret" : "Load shared secret"}</button>
+              </div> : null}
               <label
                 htmlFor="unblind-secret"
                 className="block text-sm font-medium text-slate-800"
               >
-                Unblinding secret
+                {sharedSecret || waitingForSharedSecret ? "Or choose a local secret" : "Unblinding secret"}
               </label>
               <input
                 id="unblind-secret"
+                disabled={isRetrieving || isGenerating || isRegistering}
                 type="file"
                 accept=".json,application/json"
                 onChange={(event) =>
@@ -804,9 +840,7 @@ export function UnblindingWorkspace({
                     }
                   />
                   <span>
-                    I saved the unblinding receipt and understand that blindstats
-                    does not store the secret, released mapping, or final
-                    receipt text.
+                    I saved the unblinding receipt. Registration does not upload the released mapping or final receipt text.
                   </span>
                 </label>
 

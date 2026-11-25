@@ -1,3 +1,383 @@
+# v46 — Study file protection browser checkpoint (2026-11-24 Pacific)
+
+USER-CONFIRMED: Study file protection candidate passes 236/236 application
+checks, six standalone cleanup tests, lint, TypeScript and Next.js 16.4.6
+build, both npm audits zero, migration 20261124234500 applied to verified
+Development (kfrfemqoalzxwzecyjjf), 25/25 migrations synchronized, DB lint
+clean, both extended live integration tests PASS. Earlier managed end-to-end
+browser workflow and independent cleanup verification passed. Latest user
+reports the new recipient-only workflow worked overall; screenshots show
+policy selection, blocked send while awaiting analyst key, verified CSV
+download and local multi-variable mapping release. No need to reproduce
+all screenshots. Latest managed-mode browser regression and explicit
+registered completion / post-completion secret denial are not separately
+confirmed by the screenshots; check these if not already performed. Database
+integration includes post-completion denial. User requests removal of the
+extra sentence beneath the protection choices.
+
+FINAL UI overlay: remove standalone fixed-policy sentence; retain concise
+immutability disclosure in the fieldset legend (File protection (fixed at
+creation)) so the irreversible choice is communicated once, before selection.
+No schema, crypto, authorization, dependencies or runtime logic changes.
+Full Windows regression checks of this copy-only overlay pending. HEAD remains
+uncommitted development at 5ce58ba. Preserve locally upgraded package.json
+and package-lock.json; OpenPayables unchanged. No Production changes.
+
+NEXT: apply final UI overlay; npm test (236), lint, build; verify the Study
+creation UI and perform only any outstanding browser checks (managed policy
+sender-first download and registered completion / no further secret retrieval).
+Then review staged source including dependency lockfile and handoff, commit
+and push development; protected Vercel Preview with Development project
+credentials, synthetic data only; separate controlled Production decision.
+Manual cleanup, 4 MiB file limit, immutable Study policy, prior analyst key
+setup for recipient-only delivery, and institutional retention/backup/privacy
+review remain documented constraints. No real participant or client data until
+appropriate review and approval. Previous entries below are historical.
+
+---
+
+# v46 — Study-level file protection candidate (2026-11-24)
+
+USER-CONFIRMED: Release Hardening 2 accepted. 234/234 application tests, six
+cleanup tests, lint, Next.js 16.4.6 build and both audits zero; 24/24 Development
+migrations synchronized, DB lint clean, both extended integrations PASS.
+Synthetic managed secret eb1d1c7f-12a4-440f-a11f-cb6eddf3cbfc deleted via Storage
+API; cleanup attempt 7b44b74f-7b73-43ae-91af-2363557c14a7 confirmed; independent
+read-only SQL returned six true checks (secret metadata retained, object absent,
+ready dataset 3e4b4363-b0b2-4783-918c-ddd8464e7833 and object retained, audit
+confirmed and matches). No provider-backup deletion claim. HEAD development
+5ce58ba, uncommitted working tree. Preserve Windows dependency updates.
+
+USER-APPROVED revision: creator chooses immutable Study file protection at
+creation. Managed default retains sender-first behavior; strict recipient-only
+requires a separately generated Study-specific key, available immediately after
+analyst assignment on Study page (before registered transformation). No
+per-transfer encryption toggles; both dataset and authorized secret RPCs enforce
+policy, including retries. Existing ready files preserve original mode. Migration
+backfills strict policy for Studies with historical recipient-encrypted transfers;
+other Studies default managed. Aborts on incompatible pending transfers or
+identical existing public-key material rather than changing/deleting artifacts.
+Keys remain stored (encrypted private backups) if membership is removed; RLS
+continues to deny access during removal. No account-wide key reuse, no key
+rotation, no queued upload or automatic notifications. Existing-account analyst
+assignment remains unchanged. Local external artifact handling is not governed
+by Storage policy; independent authorization still required for hosted secrets.
+
+NEXT: apply Study policy overlay; npm test (236 expected), lint, build, both
+npm audits, cleanup tests; verify Development ref and dry-run only migration
+20261124234500_enforce_study_file_protection.sql. Review before applying. After
+apply expect 25 migrations, clean lint; run two extended integration cases
+(early enrollment, mode downgrade denial, separate key isolation, revocation and
+restoration, existing full transfers and cleanup assertions). Browser acceptance
+strict Study plus managed regression; then update handoff, Git checkpoint,
+protected Preview and separate Production release. Only synthetic data until
+institutional retention/backup/privacy review; no Production or OpenPayables
+changes. Local TypeScript syntax and unchanged standalone cleanup tests passed;
+full Windows and live SQL validation pending. Historical entries follow.
+
+---
+
+# v46 — Release Hardening 2 storage lifecycle candidate (2026-11-24)
+
+USER-CONFIRMED Hardening 1: 234/234 tests, lint, Next.js 16.4.6 build,
+both npm audits zero, migration 20261124194500 applied to verified Development,
+23/23 migrations synchronized, DB lint clean, both strengthened live integration
+tests PASS. User accepted managed browser flow. HEAD development 5ce58ba,
+working tree intentionally uncommitted. Windows updated package.json and
+package-lock.json remain authoritative and are not included in this ZIP.
+Production and OpenPayables unchanged.
+
+Hardening 2 adds operator-only cleanup RPCs and audited one-object Storage API
+CLI. Eligibility: completed secret or pending object in durably completed
+workflow after 24h; ready datasets never selected. Active stale pending rows
+review-only; no automatic cancellation, recovery, deletion scheduler or archive
+service. Operator labels self-reported; historical actor events unchanged.
+Migration performs no deletions. Development-only synthetic immediate override
+requires explicitly selected named integration fixture and exact project. CLI
+has explicit separately configured Production target, not to be used before
+approval. Local Node 22 built-in mock tests PASS 6/6; full Windows Node 24
+validation and real SQL/API behavior pending. See docs/research-transfer-v46.md.
+
+NEXT: apply overlay; node --test scripts/lib/research-storage-cleanup.test.mjs;
+npm test (234), lint, build, both audits; Development ref check and dry run
+only: 20261124223000_add_research_storage_cleanup.sql. Stop before migration.
+Then apply to Development, expect 24 migrations and clean lint, run both
+integration tests; preview and explicitly delete one disposable completed
+synthetic secret, verify ready dataset excluded and audit/history preserved.
+Final recipient-only browser acceptance and disclosure styling check, protected
+Preview and separate Production decision remain. Managed storage is synthetic
+pilot only until retention/backup/privacy policy and operational review are
+accepted. No real data; no Production or OpenPayables changes.
+
+---
+
+# v46 — release hardening source candidate (2026-11-24)
+
+USER-CONFIRMED: Candidate 4 + test fix PASS 232/232 tests, lint, build; 22/22
+Development migrations synchronized and schema lint clean. Both live integration
+cases pass. User reports smooth end-to-end managed browser workflow, screenshots
+show secret delivery and two-variable mapping release. Explicit completion /
+post-completion negative checks still to validate. User requested uniform Study
+files disclosure arrows. Dependency updates PASS: Next.js and eslint-config-next
+16.4.6, Vitest 4.1.12; both npm audits 0 vulnerabilities; regression 232/232,
+lint, build PASS. Preserve Windows package.json and package-lock.json (not in
+this overlay); OpenPayables pin unchanged. HEAD development 5ce58ba, changes
+uncommitted, no Production changes.
+
+Source hardening overlay: dataset bucket restrictive guards, exact requested
+transfer ID path check before privileged read, 4 MiB stored dataset cap for
+Vercel buffered downloads (migration fails if any existing object exceeds cap),
+uniform Study files disclosure arrows, two new route tests and extended live
+integration checks (signed URL denial, actual completion and post-completion
+secret denial). No cleanup/deletion in this overlay. Full local/DB validation
+pending. NEXT: apply overlay, npm test (234 expected), lint, build, both audits;
+Development ref check and dry run only: 20261124194500_harden_research_transfer_storage.sql.
+Review before applying. Retention and cleanup, separate-account recipient-key
+browser acceptance, live policy review and protected Preview still outstanding.
+No real data or Production changes; Production project nafujgfnylnvmmhpbpot,
+Development kfrfemqoalzxwzecyjjf. Prior handoff entries below historical.
+
+---
+
+# v46 Candidate 4 — shared-secret component test correction (2026-11-24)
+
+USER-CONFIRMED: Candidate 4 overlay on uncommitted development at 5ce58ba; git whitespace check, ESLint, TypeScript and full Next.js production build PASS. 231/232 unit/component tests PASS; only the new shared managed secret component test failed at line 348 comparing two Uint8Array objects with no visual difference. All 10 secret download route tests and 4 secret-transfer tests PASS. Development remains at 21 migrations; Candidate 4 migration not yet applied in supplied output.
+
+Correction: compare exact numeric byte arrays via Array.from on both operands, avoiding cross-realm typed-array prototype equality. Independent Node vm smoke reproduced the general cross-realm comparison problem and verified identical bytes pass and changed bytes fail; full Vitest confirmation still pending. Earlier assertions covering no required password, no automatic mapping reveal and verification acknowledgement remain unchanged. No runtime code, SQL, crypto, or authorization changes.
+
+NEXT: overlay test-fix ZIP; npm test (232 expected), lint, build, then verify linked Development project and run migration dry run. Exactly 20261124183000_add_authorized_secret_transfer.sql should be pending. Stop and report before applying. No Git commit/push or Production changes. Synthetic data only. Prior handoff below historical.
+
+---
+
+# v46 Candidate 4 — authorization-gated secret delivery (2026-11-24)
+
+User-confirmed Candidate 3: 217/217 tests, lint, build, 21/21 Development migrations, DB lint and both live integration tests PASS. User accepted browser behavior and requested matching collapsible panel formatting. HEAD remains uncommitted development at 5ce58ba. Production and main unchanged.
+
+Candidate 4 source adds request-specific secret transfer after independent authorization only, separate private bucket/table/RPC, managed and optional recipient-only delivery (mandatory if previous dataset was recipient-only), local validation and direct load into the existing unblinding workspace. Request, authorization, loading and actual local reveal/completion stay separate. Managed mode gives privileged infrastructure access only after upload after authorization. No preauthorization staging. Original custodian and requesting analyst only; no direct Storage reads or signed URLs. Existing standalone/local fallback retained. No retention/cleanup UI yet; pending errors may require operator intervention. No real data. The two formatting changes are included. New migration pending Development validation: 20261124183000_add_authorized_secret_transfer.sql. Existing credential reused. See docs/research-transfer-v46.md first section.
+
+NEXT: overlay Candidate 4 ZIP; run npm test, lint, build; migration dry run, stop and report. Do not apply migration until checks reviewed. Then apply to Development and run existing two extended integration tests and two-browser end-to-end unblinding acceptance. Security/dependency review and protected Preview required before Production. Prior entries below historical.
+
+---
+
+# v46 Candidate 3 — focused interface follow-up (2026-11-24)
+
+USER-CONFIRMED CHECKPOINT: uncommitted development at 5ce58ba. Candidate 3
+UUID hotfix: 217/217 tests, lint, full Next.js build PASS. Development-only
+migration 20261123235500 applied, 21/21 synchronized, DB lint clean. Both
+synthetic Development transfer integration tests PASS (recipient-key and
+sender-first managed). Browser screenshot confirms the assigned analyst sees
+a ready managed CSV without enrolling a recipient key. Actual managed browser
+download and verified receipt not yet explicitly evidenced in this report.
+
+Focused UX revision (pending local validation): remove repetitive prose;
+show current delivery mode plus an explicit unchecked recipient-only checkbox;
+show missing-key guidance only when selected; mount analyst key setup only
+on explicit request (future files), and permit cancellation. Technical help
+remains available below primary tasks, including managed-mode operator access.
+Development-only synthetic-data warning retained. Error cleanup guidance is
+shown only after a confirmed transfer initiation. No schema, authorization,
+crypto protocol or download route changes. Login hydration log shows unexpected
+fdprocessedid attributes on inputs/buttons, consistent with external DOM
+mutation; test clean browser profile before considering source changes.
+
+NEXT: overlay this ZIP on Candidate 3 plus UUID hotfix; run npm test (217
+expected), lint and build. Check the existing managed test file downloads,
+verifies, and produces audit events without passphrase. Confirm checkbox state
+and optional setup. Do not send duplicate transfers of the same transformation
+and recipient. Next functional increment: authorization-gated unblinding-secret
+delivery, preserving request/authorization/reveal separation. No real data.
+No Git commit/push or Production changes yet. No new migration in this ZIP.
+Prior handoff entries below are historical, superseded by this checkpoint.
+
+---
+
+# v46 Candidate 3 download-route UUID hotfix — UNVALIDATED
+
+**User validation (2026-11-23, 16:42 Pacific):** Candidate 3 `npm test`
+FAILED 7/215 tests (208 pass) in the HTTP download-route test file;
+`npm run lint` PASSED; `npm run build` PASSED including TypeScript. All
+seven failing calls returned HTTP 404 at the initial transfer-ID check, so
+they did not exercise authentication, authorization, Storage or integrity.
+
+**Confirmed root cause:** Candidate 3 accidentally omitted the final
+UUID separator and its preceding three-hex-character group from
+the regular expression in
+`src/app/api/research-transfers/[transferId]/download/route.ts`.
+The valid version/variant UUIDs used by the API and tests were always
+rejected as invalid. Restore the standard UUID separator positions. This
+is an input-validation correction, NOT a relaxation of recipient checks.
+A successful `npm run build` alone cannot establish route behavior.
+
+**Hotfix contents:** Complete `route.ts` with the corrected UUID regex,
+complete `route.test.ts` with regression checks for malformed IDs and
+unsafe object paths (plus realistic Study/object path in fixtures), and this
+handoff. No SQL, Study permissions, encryption mode, database objects,
+Storage policy or production environment is modified.
+
+**Next:** Apply the hotfix ZIP on TOP of Candidate 3 (the uncommitted
+`development` working tree at `5ce58ba`), then run `npm test`,
+`npm run lint`, `npm run build`. Do NOT apply the pending Candidate 3
+`20261123235500` migration until all checks pass and the Development-only
+dry run has been reviewed. Production and main remain untouched. The
+Development database still has the already-applied Candidate 1 migration,
+not Candidate 3's sender-first migration.
+
+---
+
+# v46 Candidate 3 — SOURCE PREVIEW ONLY, NOT YET ACCEPTED
+
+**Latest verified user checkpoint (2026-11-23):** Candidate 2 navigation
+build fix validated on Windows: 211/211 Vitest tests, ESLint, full Next.js
+production build and TypeScript PASS. Git remains `development` at `5ce58ba`
+with uncommitted v46 source. BlindStats Development migration
+`20261123193000` has been applied and validated 20/20. Existing two-user
+synthetic encrypted transfer via localhost succeeded with registered SHA-256
+and four audit events. Production, main, and OpenPayables are unchanged.
+
+**Next functionality, Candidate 3 (unvalidated source ZIP):** A sender-first
+managed-at-rest transfer replaces mandatory analyst-first encryption key
+setup for normal blinded datasets. The custodian sends to an assigned analyst
+immediately. The analyst can log in later and download without a separate
+passphrase or link. Private Supabase bucket, server-only download endpoint,
+recipient-only authorization and four audit events remain. File bytes are
+verified locally before upload and server-side+browser on retrieval.
+
+**Security tradeoff:** managed-at-rest means file content is visible to the
+BlindStats operator/backend and provider infrastructure; it is NOT
+browser-encrypted/end-to-end. Advanced recipient-key mode still uses the
+original browser ECDH/AES-GCM and passphrase-encrypted private key; legacy
+transfers remain readable. `transfer_mode` discriminates between modes.
+No unblinding secret transfers or final unblinded-dataset storage yet.
+
+**Migration:** New `20261123235500_add_sender_first_managed_research_transfer.sql`.
+Apply ONLY after local npm tests/lint/build pass, verifying linked Development
+ref `kfrfemqoalzxwzecyjjf` and reviewing dry-run. Do not rerun migration
+`20261123193000`. New synthetic Development integration checks both modes.
+No real research data. Do not commit or push until Development and browser
+validation pass; do not touch Production or main.
+
+See `docs/research-transfer-v46.md` for detailed validation and limits.
+
+---
+
+blindstats PROJECT HANDOFF — v46 CANDIDATE 2 NAVIGATION BUILD FIX (NOT YET REVALIDATED)
+===================================================================================
+Updated: 2026-11-23 (US Pacific)
+Baseline: Candidate 1 and Candidate 2 UX applied to uncommitted development at Git HEAD 5ce58ba.
+
+CANDIDATE 2 USER VALIDATION AND PATCH
+-------------------------------------
+- User ran npm test: 211/211 PASSED; npm run lint: PASSED.
+- npm run build FAILED during TypeScript checking at blinding/[workflowId]/page.tsx:574:
+  TS2339 Property 'href' does not exist on setup-nav item type.
+- This hotfix changes ONE complete page source file. The Setup nav correctly
+  links to its workflow views without reading a nonexistent href property.
+  The Post-setup nav respects an explicit href for Study files, so the link
+  navigates to the actual /transfer page instead of ?view=transfer.
+- No database, crypto, API, key delivery, permissions, or migrations changed.
+- NEXT: apply this small full-file ZIP ON TOP OF Candidate 2; run npm test,
+  npm run lint, npm run build, and test the Study files navigation locally.
+  Do not commit, push, or touch Production until the test passes.
+
+USER-DEFINED NEXT FUNCTIONAL GOAL — NOT YET IMPLEMENTED
+-------------------------------------------------------
+- Custodian uploads a blinded file to the Study BEFORE the analyst prepares
+  an encryption key. The authorized analyst sees the available file after
+  verified account sign-in and can retrieve it immediately, without email or
+  a secret-bearing link sent by the custodian. Optional notifications only.
+- With no recipient public key at upload time, browser end-to-end encryption
+  as currently implemented CANNOT provide this flow without a different
+  trusted key custodian/recovery arrangement. A managed-key or key-wrapping
+  service can enable inbox delivery, but introduces operator-level key access.
+- Protect unblinding secret with independent authorization gate; never infer
+  permission to reveal it from ordinary blinded-data access. Design and test
+  a separate release path; no v46 source has implemented that yet.
+- Email-based analyst assignment currently expects an existing account;
+  pending invitation/verified registration is a separate onboarding change.
+
+USER-VERIFIED v46 CANDIDATE 1 RESULTS
+-------------------------------------
+- npm test 204/204, ESLint, Next production build/TypeScript PASSED.
+- Development Supabase ref kfrfemqoalzxwzecyjjf independently verified.
+- Migration 20261123193000_create_encrypted_research_transfer.sql applied to
+  Development. Local/remote 20/20 synchronized, db lint found no schema errors.
+- Two-account synthetic integration passed; both users denied direct Storage
+  downloads, analyst authorization and audit events were verified.
+- Local browser-to-browser synthetic transfer PASSED: custodian sent registered
+  blinded CSV, analyst downloaded and SHA-256-verified it; four audit events
+  recorded (upload_initiated, upload_completed, download_granted,
+  download_verified). No Production changes and no Git commit yet.
+
+CANDIDATE 2 CHANGESET
+---------------------
+- PRESENTATION ONLY: moves Study files link into workflow navigation directly
+  after Blinded package. Simplifies file selection with a visible labeled file
+  picker, safe automatic filename normalization (preserves CSV bytes), labels/actions, readiness messages, recipient selection for the
+  usual one-analyst case, and file activity. Moves crypto details, hashes,
+  transfer IDs, and audit records into optional expandable sections.
+- Does NOT alter cryptography, SQL/RLS, server download route, transfer secrets,
+  analyst-first key prerequisite, or the Development migration already applied.
+- Adds small UI tests for the change. No additional migrations in Candidate 2.
+- NEXT: apply scoped complete-file Candidate 2 ZIP on existing uncommitted
+  Candidate 1 checkout (not 5ce58ba alone); run 204 existing tests + new UI
+  tests, lint, build, and one synthetic browser review. Do NOT reapply the
+  already-applied migration or relink Supabase. No main/Production changes.
+
+REMAINING v46 DESIGN GOALS (NOT CLAIMED COMPLETE)
+------------------------------------------------
+- Sender-first transfer before analyst key enrollment requires a distinct key
+  delivery design: either authenticated capability-bearing invite link with a
+  client-only secret, or server-managed key escrow with explicit confidentiality
+  tradeoffs. Do not silently convert the current end-to-end encrypted model.
+- Unblinding secret delivery must be independently gated on completed approval;
+  the current v46 file feature intentionally DOES NOT handle secret transfer.
+- Post-unblinding dataset export/sharing is a separate option, not a precondition
+  to accepting the initial blinded CSV delivery flow.
+- Production acceptance requires a security review, protected Preview test,
+  and a separate explicit release decision.
+
+PREVIOUS v46 SOURCE HANDOFF (HISTORICAL)
+--------------------------------------
+blindstats PROJECT HANDOFF — v46 SOURCE CANDIDATE 1 (UNVALIDATED)
+================================================================
+Updated: 2026-11-23 (US Pacific)
+Baseline: accepted clean main/development checkpoint 5ce58ba, supplied as source ZIP.
+Status: SOURCE CANDIDATE FOR USER VALIDATION. NO DATABASE MIGRATION APPLIED.
+
+- Completed v43-v45 release remains accepted and unchanged; v46 does not touch
+  OpenPayables source, main, Production Supabase, or Vercel Production.
+- Proposed new development-only migration:
+  20261123193000_create_encrypted_research_transfer.sql.
+- v46 adds a private Supabase managed Storage bucket, two-party recipient
+  encryption (ECDH P-256 / HKDF-SHA-256 / AES-256-GCM), passphrase-wrapped
+  analyst key recovery, bounded registered blinded CSV upload/retrieval,
+  server-enforced role checks, and persistent transfer events.
+- Downloads use a server-only Supabase service-role key AFTER a validated
+  analyst-only RPC and its audit event; clients get no direct Storage SELECT.
+  The service role key is NOT present in the repository or public env config.
+- The unblinding mapping and secret remain browser-local. Existing registered
+  transformation/public receipt and unblinding governance are unchanged.
+- New transfer page is linked from the active blinding workflow; the managed
+  backend is isolated in a small storage adapter. No general plugin framework,
+  randomization or data collection implementation.
+- Independent smoke using Node Web Crypto passed the encrypted roundtrip,
+  encrypted recovery, tamper, incorrect passphrase, context and source SHA-256
+  checks. TypeScript parsing of changed TS/TSX files passed; isolated strict
+  TypeScript check for browser crypto and hashing passed. This environment
+  cannot run npm ci/full Vitest/ESLint/Next build (npm registry EAI_AGAIN,
+  installed Node 22 vs required Node 24) or DB/Storage integration.
+- See docs/research-transfer-v46.md for security boundaries, material limitations,
+  exact Development migration gate, opt-in two-account integration helper,
+  server-secret configuration and Preview verification instructions.
+- NEXT: apply only the scoped full-file ZIP to clean 5ce58ba on development.
+  Run npm ci, npm test, lint, build; review migration and dry-run on verified
+  Development ref kfrfemqoalzxwzecyjjf. Await explicit user approval before
+  pushing the migration to Development. Run synthetic integration and paired
+  browser/Preview smoke before source commit/push. Never deploy Production
+  without a separate release decision.
+
+PREVIOUS ACCEPTED RELEASE HANDOFF (HISTORICAL)
+---------------------------------------------
 blindstats PROJECT HANDOFF
 ============================
 Updated: 2026-11-23 (US Pacific; v43-v45 Production release accepted)

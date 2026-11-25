@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
+import { StudyEncryptionSetup } from "@/components/research-transfer/StudyEncryptionSetup";
 import { SignOutButton } from "@/components/SignOutButton";
 import { createClient } from "@/lib/supabase/server";
 
@@ -58,7 +59,7 @@ export default async function StudyPage({ params }: StudyPageProps) {
   ] = await Promise.all([
     supabase
       .from("studies")
-      .select("id, name, description, lifecycle, created_at, updated_at")
+      .select("id, name, description, lifecycle, created_at, updated_at, file_protection")
       .eq("id", studyId)
       .maybeSingle(),
     supabase
@@ -110,6 +111,7 @@ export default async function StudyPage({ params }: StudyPageProps) {
     canRequestUnblinding &&
     canReceiveUnblinded &&
     !canCreateBlinding &&
+    !canConfigureBlinding &&
     !canAuthorizeUnblinding;
 
   const isBlindingCustodian =
@@ -119,6 +121,35 @@ export default async function StudyPage({ params }: StudyPageProps) {
     !canLockAnalysis &&
     !canRequestUnblinding &&
     !canReceiveUnblinded;
+
+  const strictProtection = study.file_protection === "recipient_e2ee_v1";
+  let encryptionReady = false;
+  let analystCount = 0;
+  let readyCount = 0;
+  if (strictProtection && isBlindedAnalyst) {
+    const key = await supabase.from("research_transfer_key_backups").select("user_id")
+      .eq("study_id", studyId).eq("user_id", currentUserId).maybeSingle();
+    if (key.error) throw new Error("Unable to load Study encryption readiness.");
+    encryptionReady = Boolean(key.data);
+  }
+  if (strictProtection && isBlindingCustodian) {
+    const [roles, keys] = await Promise.all([
+      supabase.from("study_capabilities").select("user_id, capability").eq("study_id", studyId),
+      supabase.from("research_transfer_public_keys").select("user_id").eq("study_id", studyId),
+    ]);
+    if (roles.error || keys.error) throw new Error("Unable to load analyst encryption readiness.");
+    const byUser = new Map<string, Set<string>>();
+    for (const row of roles.data ?? []) {
+      const capabilities = byUser.get(row.user_id) ?? new Set<string>();
+      capabilities.add(row.capability); byUser.set(row.user_id, capabilities);
+    }
+    const analysts = [...byUser].filter(([, capabilities]) =>
+      ["analysis.lock", "unblinding.request", "unblinded.receive"].every(c => capabilities.has(c)) &&
+      ["blinding.create", "blinding.configure", "unblinding.authorize"].every(c => !capabilities.has(c)));
+    const ready = new Set((keys.data ?? []).map(k => k.user_id));
+    analystCount = analysts.length;
+    readyCount = analysts.filter(([id]) => ready.has(id)).length;
+  }
 
   const roleLabel = workflow
     ? isBlindedAnalyst
@@ -154,6 +185,15 @@ export default async function StudyPage({ params }: StudyPageProps) {
           </p>
         ) : null}
       </header>
+
+      <section className="mt-6 rounded-2xl border border-black/10 p-5 dark:border-white/15">
+        <h2 className="text-lg font-semibold">File protection</h2>
+        <p className="mt-2 text-sm">{strictProtection ? "Recipient-only encryption required" : "Managed secure storage (not end-to-end encrypted)"}</p>
+        {strictProtection && isBlindedAnalyst ? <div className="mt-3">
+          {encryptionReady ? <p className="text-sm">Encryption ready</p> : <StudyEncryptionSetup studyId={studyId} userId={currentUserId} />}
+        </div> : null}
+        {strictProtection && isBlindingCustodian ? <p className="mt-2 text-sm">{!analystCount ? "Assign a blinded analyst" : readyCount === analystCount ? "Ready to send" : `Waiting for analyst encryption setup (${readyCount}/${analystCount} ready)`}</p> : null}
+      </section>
 
       <section className="mt-10">
         <div>

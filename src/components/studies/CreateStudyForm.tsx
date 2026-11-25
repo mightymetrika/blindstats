@@ -65,6 +65,17 @@ export function CreateStudyForm({ action }: CreateStudyFormProps) {
           maxLength={2000}
         />
       </div>
+      <fieldset className="space-y-3 rounded-lg border border-black/15 p-4 dark:border-white/20">
+        <legend className="px-1 text-sm font-medium">File protection (fixed at creation)</legend>
+        <label className="flex items-start gap-2 text-sm">
+          <input className="mt-1" type="radio" name="fileProtection" value="managed_at_rest_v1" defaultChecked />
+          <span>Managed secure storage <span className="block text-black/65 dark:text-white/65">Send immediately. Not end-to-end encrypted.</span></span>
+        </label>
+        <label className="flex items-start gap-2 text-sm">
+          <input className="mt-1" type="radio" name="fileProtection" value="recipient_e2ee_v1" />
+          <span>Require recipient-only encryption <span className="block text-black/65 dark:text-white/65">Each analyst sets up a Study-specific key before files can be sent.</span></span>
+        </label>
+      </fieldset>
       <CreateStudySubmitButton />
     </form>
   );

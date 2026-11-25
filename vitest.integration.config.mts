@@ -16,6 +16,7 @@ export default defineConfig({
     include: [
       "tests/integration/independent-authorization.integration.test.ts",
       "tests/integration/multi-variable-workflow.integration.test.ts",
+      "tests/integration/research-transfer.integration.test.ts",
     ],
     fileParallelism: false,
     maxWorkers: 1,

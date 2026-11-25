@@ -7,6 +7,9 @@ import { AnalysisLockWorkspace } from "@/components/blinding/AnalysisLockWorkspa
 import { AuthorizationPolicyField } from "@/components/blinding/AuthorizationPolicyField";
 import { BlindingWorkspace } from "@/components/blinding/BlindingWorkspace";
 import { UnblindingWorkspace } from "@/components/blinding/UnblindingWorkspace";
+import { UnblindingSecretSend } from "@/components/research-transfer/UnblindingSecretSend";
+import type { SecretTransferContext, SecretTransferRecord, SecretBackup } from "@/lib/research-transfer/secret-transfer";
+import type { PublicKeyJwk } from "@/lib/research-transfer/crypto";
 import { SignOutButton } from "@/components/SignOutButton";
 import { createClient } from "@/lib/supabase/server";
 
@@ -120,7 +123,7 @@ export default async function BlindingWorkflowPage({
   ] = await Promise.all([
     supabase
       .from("studies")
-      .select("id, name")
+      .select("id, name, file_protection")
       .eq("id", studyId)
       .maybeSingle(),
     supabase
@@ -225,6 +228,7 @@ export default async function BlindingWorkflowPage({
         public_receipt_sha256: string;
         receipt_created_at: string;
         registered_at: string;
+        registered_by: string;
         plan_version_id: string;
         public_receipt_text: string;
       }
@@ -234,7 +238,7 @@ export default async function BlindingWorkflowPage({
     const { data, error } = await supabase
       .from("blinding_transformations")
       .select(
-        "transformation_id, selected_column, selected_columns, source_artifact_sha256, blinded_artifact_sha256, public_receipt_sha256, public_receipt_text, receipt_created_at, registered_at, plan_version_id",
+        "transformation_id, selected_column, selected_columns, source_artifact_sha256, blinded_artifact_sha256, public_receipt_sha256, public_receipt_text, receipt_created_at, registered_at, registered_by, plan_version_id",
       )
       .eq("workflow_id", workflow.id)
       .eq("study_id", study.id)
@@ -537,6 +541,9 @@ export default async function BlindingWorkflowPage({
             <p className="mt-2 text-sm font-medium">Role: Blinded analyst</p>
           ) : isBlindingCustodian ? (
             <p className="mt-2 text-sm font-medium">Role: Blinding custodian</p>
+          ) : null}
+          {study.file_protection === "recipient_e2ee_v1" && (isBlindedAnalyst || isBlindingCustodian) ? (
+            <Link href={`/studies/${study.id}`} className="mt-2 inline-block text-sm underline">Study encryption setup and readiness</Link>
           ) : null}
         </header>
 
@@ -1100,6 +1107,45 @@ export default async function BlindingWorkflowPage({
       ? requestedPostSetupView
       : recommendedPostSetupView;
 
+  // Only metadata is fetched here; secret bytes are never server-rendered.
+  const secretContext: SecretTransferContext | null = unblindingRequest && unblindingAuthorization && roleSeparationUsed
+    ? { studyId: study.id, workflowId: workflow.id, transformationId: transformation.transformation_id,
+        requestId: unblindingRequest.id, recipientId: unblindingRequest.requested_by } : null;
+  const maySendSecret = Boolean(secretContext && isBlindingCustodian && transformation.registered_by === currentUserId);
+  const mayLoadSecret = Boolean(secretContext && isBlindedAnalyst && secretContext.recipientId === currentUserId);
+  let secretRecord: SecretTransferRecord | null = null;
+  let secretPublicKey: PublicKeyJwk | null = null;
+  let secretBackup: SecretBackup | null = null;
+  let requireRecipientOnly = study.file_protection === "recipient_e2ee_v1";
+  let secretEvents: { actor_id: string; event_type: string; occurred_at: string }[] = [];
+  if (secretContext && (maySendSecret || mayLoadSecret)) {
+    const record = await supabase.from("unblinding_secret_transfers")
+      .select("id, recipient_id, plaintext_sha256, transfer_mode, object_sha256, object_byte_length, envelope, ready_at")
+      .eq("request_id", secretContext.requestId).maybeSingle();
+    if (record.error) throw new Error("Unable to load secret transfer metadata.");
+    secretRecord = record.data as SecretTransferRecord | null;
+    if (secretRecord) {
+      const events = await supabase.from("unblinding_secret_transfer_events").select("actor_id, event_type, occurred_at")
+        .eq("transfer_id", secretRecord.id).order("occurred_at", { ascending: false }).limit(100);
+      if (events.error) throw new Error("Unable to load secret transfer audit history.");
+      secretEvents = events.data ?? [];
+    }
+    if (workflow.state === "unblinding_authorized" && maySendSecret) {
+      const [key, previous] = await Promise.all([
+        supabase.from("research_transfer_public_keys").select("public_jwk").eq("study_id", study.id).eq("user_id", secretContext.recipientId).maybeSingle(),
+        supabase.from("research_transfers").select("transfer_mode").eq("workflow_id", workflow.id).eq("recipient_id", secretContext.recipientId).maybeSingle(),
+      ]);
+      if (key.error || previous.error) throw new Error("Unable to load secret delivery options.");
+      secretPublicKey = (key.data?.public_jwk as PublicKeyJwk | undefined) ?? null;
+      requireRecipientOnly = requireRecipientOnly || previous.data?.transfer_mode === "recipient_e2ee_v1" || secretRecord?.transfer_mode === "recipient_e2ee_v1";
+    }
+    if (workflow.state === "unblinding_authorized" && mayLoadSecret && secretRecord?.transfer_mode === "recipient_e2ee_v1") {
+      const key = await supabase.from("research_transfer_key_backups").select("wrapped_private_key, salt, iv").eq("study_id", study.id).eq("user_id", currentUserId).maybeSingle();
+      if (key.error) throw new Error("Unable to load your encrypted key backup.");
+      secretBackup = key.data ? { wrappedPrivateKey: key.data.wrapped_private_key, salt: key.data.salt, iv: key.data.iv } : null;
+    }
+  }
+
   const analysisStatus = activePlan.require_analysis_lock
     ? analysisLocks.length > 0
       ? "Locked"
@@ -1119,10 +1165,11 @@ export default async function BlindingWorkflowPage({
           : "Locked";
 
   const postSetupNavItems: {
-    id: PostSetupView;
+    id: PostSetupView | "transfer";
     label: string;
     status: string;
     available: boolean;
+    href?: string;
   }[] = [
     {
       id: "plan",
@@ -1148,6 +1195,13 @@ export default async function BlindingWorkflowPage({
       status: "Registered",
       available: true,
     },
+    ...((isBlindedAnalyst || isBlindingCustodian) ? [{
+      id: "transfer" as const,
+      label: "Study files",
+      status: "Secure transfer",
+      available: true,
+      href: `${workflowHref}/transfer`,
+    }] : []),
     {
       id: "analysis",
       label: "Analysis lock",
@@ -1236,7 +1290,7 @@ export default async function BlindingWorkflowPage({
                       ? "border-black bg-black text-white dark:border-white dark:bg-white dark:text-black"
                       : "border-black/10 hover:border-black/30 dark:border-white/15 dark:hover:border-white/35"
                   }`}
-                  href={`${workflowHref}?view=${item.id}`}
+                  href={item.href ?? `${workflowHref}?view=${item.id}`}
                   key={item.id}
                 >
                   <div className="text-sm font-medium">{item.label}</div>
@@ -1409,7 +1463,7 @@ export default async function BlindingWorkflowPage({
               </dl>
 
               <p className="mt-6 text-sm text-black/60 dark:text-white/60">
-                Dataset contents and the unblinding secret are not stored by blindstats.
+                Registration stores the public receipt and metadata. Use Study files to share the blinded CSV.
               </p>
             </section>
           ) : null}
@@ -1623,18 +1677,21 @@ export default async function BlindingWorkflowPage({
                 unblindingRequest &&
                 unblindingAuthorization &&
                 !unblindingCompletion &&
-                !canReceiveUnblinded ? (
+                !canReceiveUnblinded && !maySendSecret ? (
                   <div className="mt-6 rounded-xl border border-black/10 p-4 dark:border-white/15">
                     <p className="text-sm font-medium">Secret handoff</p>
                     <p className="mt-1 text-sm text-black/60 dark:text-white/60">
-                      {isBlindingCustodian || canAuthorizeUnblinding
-                        ? "Send the saved unblinding secret to the blinded analyst through the approved secure file-transfer channel. Do not upload the secret to blindstats."
-                        : "Waiting for the authorized recipient to complete local unblinding."}
+                      Waiting for the authorized recipient to complete local unblinding.
                     </p>
                   </div>
                 ) : null}
               </div>
 
+              {workflow.state === "unblinding_authorized" && maySendSecret && secretContext ? (
+                <UnblindingSecretSend key={secretContext.requestId} context={secretContext}
+                  publicReceiptBase64={Buffer.from(transformation.public_receipt_text, "utf8").toString("base64")}
+                  record={secretRecord} publicKey={secretPublicKey} requireRecipientOnly={requireRecipientOnly} />
+              ) : null}
               {workflow.state === "unblinding_authorized" &&
               unblindingRequest &&
               unblindingAuthorization &&
@@ -1649,6 +1706,7 @@ export default async function BlindingWorkflowPage({
                   </div>
                 ) : (
                   <UnblindingWorkspace
+                    waitingForSharedSecret={mayLoadSecret && !secretRecord?.ready_at}
                     registration={{
                       studyId: study.id,
                       workflowId: workflow.id,
@@ -1670,10 +1728,15 @@ export default async function BlindingWorkflowPage({
                           ).toString("base64")
                         : null,
                     }}
+                    sharedSecret={mayLoadSecret && secretContext && secretRecord?.ready_at ? { context: secretContext, record: secretRecord, backup: secretBackup } : undefined}
                     registerAction={registerUnblindingCompletion}
                   />
                 )
               ) : null}
+              {secretEvents.length ? <details className="mt-6 rounded-2xl border border-black/15 p-5 text-sm dark:border-white/20">
+                <summary className="cursor-pointer font-medium">Secret transfer audit history</summary>
+                <ul className="mt-3 space-y-2 text-xs">{secretEvents.map((event, i) => <li key={`${event.occurred_at}-${i}`}>{new Date(event.occurred_at).toLocaleString("en-US")} — {event.event_type} — actor {event.actor_id.slice(0,8)}…</li>)}</ul>
+              </details> : null}
             </section>
           ) : null}
 
@@ -1964,7 +2027,7 @@ export default async function BlindingWorkflowPage({
                           </div>
                         </dl>
                         <p className="mt-3 text-xs text-black/50 dark:text-white/50">
-                          The secret, plaintext mapping, and final receipt text were not uploaded.
+                          Completion registration does not upload the plaintext mapping or final receipt text.
                         </p>
                       </div>
                     ) : null}

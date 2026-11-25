@@ -48,12 +48,17 @@ export async function createStudy(formData: FormData) {
 
   const name = getRequiredStudyName(formData);
   const description = getStudyDescription(formData);
+  const fileProtection = formData.get("fileProtection");
+  if (fileProtection !== "managed_at_rest_v1" && fileProtection !== "recipient_e2ee_v1") {
+    throw new Error("Select a valid Study file protection policy.");
+  }
 
 const { error } = await supabase
   .from("studies")
   .insert({
     name,
     description,
+    file_protection: fileProtection,
   });
 
 if (error) {

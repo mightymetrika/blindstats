@@ -400,7 +400,7 @@ export function BlindingWorkspace({
           <p className="text-sm text-sky-950">
             <span className="font-semibold">Browser-local files.</span>{" "}
             {registrationEnabled
-              ? "Dataset contents and the unblinding secret stay in this browser; blindstats registers only the public receipt and safe metadata."
+              ? "Registration saves only the public receipt and metadata. Keep your secret until authorization."
               : "Dataset contents and the unblinding secret stay in this browser session."}
           </p>
         </section>
@@ -738,7 +738,7 @@ export function BlindingWorkspace({
                     className="mt-1"
                   />
                   <span>
-                    I have saved the blinded CSV, public receipt, and unblinding secret, and I understand that blindstats does not store the unblinding secret.
+                    I have saved the blinded CSV, public receipt, and unblinding secret.
                   </span>
                 </label>
 
@@ -765,7 +765,7 @@ export function BlindingWorkspace({
                     What is registered?
                   </summary>
                   <p className="mt-2">
-                    blindstats stores the exact public receipt and safe artifact metadata. It does not upload the source CSV, blinded CSV, or unblinding secret.
+                    Registration stores the public receipt and metadata only.
                   </p>
                 </details>
               </div>
