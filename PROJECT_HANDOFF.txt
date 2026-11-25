@@ -1,3 +1,63 @@
+# November 24, 2026 - v46 Production release CLOSED
+
+CURRENT STATUS: v46 deployed and accepted for controlled pilot.
+Production: https://blindstats.com
+Source commit: 5a095bef0588f4349874ca5752c56c9e5099a83a
+Production deployment: dpl_8eHGPB1DHbKPDiCDKjRw2zTynrjn
+Production deployment URL:
+https://blindstats-rd3cdsv1q-blindstats.vercel.app
+
+Delivered:
+- Managed sender-first secure dataset delivery.
+- Study-level recipient-only encryption option.
+- Study-specific analyst encryption keys.
+- Authorization-gated unblinding secret delivery.
+- Storage authorization hardening and audit records.
+- Operator-controlled storage cleanup.
+- Next.js 16.4.6 and dependency security updates.
+
+Acceptance:
+- 236/236 application tests passed.
+- 6/6 storage cleanup tests passed.
+- 2/2 live Development integration tests passed.
+- 6/6 independent cleanup verification checks passed.
+- ESLint, TypeScript and build passed.
+- Latest dependency audits reported zero vulnerabilities.
+- Managed and recipient-only browser workflows accepted.
+- Development and Production migrations: 25/25 synchronized.
+- Database lint passed in both environments.
+- Separate server-only credentials configured.
+- Protected Preview deployed and smoke tested.
+- Temporary Preview automation bypass revoked.
+- Production deployed successfully on November 24, 2026.
+- Production login HTTP 200.
+- Both unauthenticated download endpoints HTTP 401.
+- Development database link restored.
+
+Limitations:
+- Hosted authenticated file retrieval was not independently
+  exercised; local browser and live integration coverage passed.
+- Managed storage is not end-to-end encrypted.
+- Study protection policy is immutable at creation.
+- Recipient-only delivery requires preliminary analyst key setup.
+- No cross-Study encryption key reuse.
+- Storage cleanup is operator-controlled, not scheduled.
+- Controlled pilot with synthetic data only.
+- No claim of regulatory or institutional compliance.
+
+NEXT:
+No outstanding v46 implementation or release tasks.
+Await researcher feedback before selecting the next milestone.
+Prefer automated validation and shell-based operations.
+Minimize manual browser testing and avoid redundant work.
+
+OpenPayables source was not modified.
+
+Earlier handoff entries below are historical and are superseded
+where their status differs from this release closeout.
+
+------------------------------------------------------------
+
 # v46 — Study file protection browser checkpoint (2026-11-24 Pacific)
 
 USER-CONFIRMED: Study file protection candidate passes 236/236 application
