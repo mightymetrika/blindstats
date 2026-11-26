@@ -1,3 +1,336 @@
+# November 26, 2026 - v47 Development storage acceptance PASSED
+
+All v47 feature implementation and local/live Development checks passed.
+- Application: 48 test files, 281 tests passed.
+- Live Development integration: 13/13 passed.
+- Storage cleanup unit tests: 7/7 passed.
+- TypeScript, ESLint and Next.js build passed.
+- Both dependency audits: zero vulnerabilities.
+- Development: 28/28 migrations synchronized; database lint clean.
+- Production remains at the v46 release with 25 migrations.
+
+Independent storage verification PASSED:
+- 8/8 retained objects matched registered SHA-256 and byte length.
+- 2/2 abandoned objects independently confirmed absent.
+- Both cleanup audit records retained.
+- Both Study protection policies validated.
+- Authenticated custodian metadata access separated from operator access.
+
+NEXT: commit and push development, validate protected Vercel Preview,
+perform targeted browser acceptance, and close release documentation.
+No further feature development or repeated regression testing is needed
+unless subsequent acceptance reveals a specific defect.
+Production deployment requires explicit authorization.
+
+------------------------------------------------------------
+
+# November 26, 2026 - v47 independent storage verifier correction (PENDING)
+
+The operator cleanup and all prior v47 local/Development validations remain
+accepted. The first read-only verifier stopped at the first abandoned transfer
+identity check. It bundled a Data API query error and metadata assertions in
+one message. Repository grants explicitly permit authenticated Study members to
+read transfer metadata; no corresponding service_role SELECT is explicitly
+granted for research_transfers. Exact live error was not captured.
+
+This corrective patch uses the original synthetic custodian's authenticated
+session for Study/transfer metadata and the separate Development operator key
+for Storage and confirmed cleanup audit reads. It reports safe error codes and
+checks exact synthetic Study names, archived lifecycle, sender identity,
+protection, purpose, stored bytes and cleanup records. No database grants,
+RLS, application source, dependency, migration or Storage changes. Credentials
+are entered locally via PowerShell and not saved in the repo. No repeated
+cleanup or integration run necessary. Independent verification is still
+pending; do not commit/push or deploy until it passes. Then resume the Git
+source checkpoint and protected Preview acceptance described below.
+
+------------------------------------------------------------
+
+# November 26, 2026 - v47a and v47b accepted in Development; Preview pending
+
+BASELINE: v46 closeout 1a13f52, deployed v46 source 5a095be. All v47a
+patches through Implementation_04 and v47b Implementation_01 applied.
+Windows Node 24 validation: 48/48 Vitest files, 281/281 tests; TypeScript,
+ESLint and Next build passed; 7/7 storage cleanup tests. Both npm audits
+reported zero vulnerabilities. Development kfrfemqoalzxwzecyjjf has 28/28
+synchronized migrations and no schema errors; 13/13 live integration tests
+in 3 files passed. Production remains v46 with 25 migrations. Preserve exact
+locally generated npm manifests with @zip.js/zip.js@2.25.0.
+
+OPERATOR CLEANUP ACCEPTED: both synthetic abandoned supporting-file objects
+were present, eligible and removed; confirmation audit attempts
+ a958e4f3-38f9-46ee-8c91-c7265f4dff7a (managed)
+ ead778ed-4719-4c8b-b121-ff57203015ca (recipient-only).
+Both post-cleanup inventories empty; all 8 ready v47 file fixtures excluded
+from cleanup. Transfer and workflow records retained. User log establishes
+these results; independent stored-byte verification still pending.
+
+NEXT: run scripts/verify-v47-storage-acceptance.mjs on Development only.
+It reads exact synthetic fixtures, independently checks stored object hashes
+and sizes (ciphertext for recipient-only), and checks absence plus confirmed
+cleanup records for the two abandoned files. It writes nothing and prints no
+research contents or credentials. No application source or migration changes
+in this acceptance patch. Script syntax checked; live execution pending.
+Then record Development source commit, protected Vercel Preview configured
+for Development, and targeted authenticated browser acceptance under both
+Study protection policies. Close documentation with actual source SHA, Preview
+URL, browser results and storage verification evidence. Do not repeat local
+or live integration suites unless source/dependencies change. Production
+requires separate explicit authorization. No OpenPayables source changes.
+
+------------------------------------------------------------
+
+# November 26, 2026 - v47a ACCEPTED; v47b multi-file delivery (VALIDATION PENDING)
+
+ACCEPTED v47a: all patches through Implementation_04 on development baseline
+1a13f52. User Windows PowerShell logs: 46/46 Vitest files, 271/271 tests;
+TypeScript, ESLint, Next build, 6/6 storage cleanup tests passed. Development
+migration 20261126180000 applied; 27/27 synchronized and database lint found
+no schema errors. 11/11 live Development integration tests in 3 files passed,
+including historical multi-file locks, required/optional package locks,
+independent authorization, both protection policies and v0.5 secret delivery.
+Prior dependency audits clean. Production remains v46 (25 migrations).
+Source is intentionally uncommitted; preserve locally generated npm manifests
+including @zip.js/zip.js@2.25.0. No dependency changes in v47b.
+
+v47b adds per-dataset registered manifest delivery and Study-level supporting
+files (independent of transformations/workflows), batch selection and per-file
+results, new file-purpose/identity and v47 encryption domain, irreversible
+pending abandonment and fresh retry identity, retained original v46 delivery
+and secret pathways, operator-only incomplete-file cleanup. All use existing
+private bucket, download endpoint, Study keys and capability boundaries. New
+migration 20261126200000_multi_file_research_delivery.sql; forward only. No
+source change to OpenPayables. No direct storage or database operations here.
+Known secret artifacts are blocked by browser JSON checks and safe filename
+rules; arbitrary document contents cannot be classified reliably. Supporting
+files are shared as-is; custodian explicitly reviews them. See
+ docs/research-file-delivery-v47b.md for restrictions and contract.
+
+VALIDATION HERE: strict TypeScript 5.8.3 core check with temporary Supabase
+API declaration, 11 changed TS/TSX syntax checks, five independent Node 22
+transfer smoke tests, four actual baseline v46/new v47 cross-version dataset
+and secret decryptions, seven storage cleanup tests passed. Full repository
+npm dependencies and PostgreSQL unavailable here; Windows and live Dev
+validation pending. Acceptance targets: 281 application tests (48 files),
+7 cleanup tests, 13 live integration tests (3 files), 28 synchronized Dev
+migrations and clean DB lint. Two new synthetic integration scenarios print
+abandoned cleanup and ready file fixture IDs for operator verification.
+
+NEXT: apply v47b source ZIP on top of accepted Implementation_04; local
+TypeScript/test/lint/build/cleanup; Dev-only dry-run/push/lint; consolidated
+live tests; targeted operator cleanup and final Preview/browser acceptance.
+Keep Production untouched and do not modify package.json/package-lock.json
+from this ZIP. No intermediate planning or release needed. See new docs.
+
+------------------------------------------------------------
+
+# November 26, 2026 - v47a implementation 04 (REGISTERED PACKAGES; VALIDATION PENDING)
+
+BASELINE: v46 closeout 1a13f52 plus all accepted v47a patches through
+Implementation_03_Fix2. Windows validation: 265/265 tests in 45 files;
+19/19 targeted regression tests after fixture type corrections; ESLint,
+TypeScript, Next build pass. Development migration 20261126003000 applied,
+26/26 migrations synchronized, database lint no schema errors. Previous
+6/6 cleanup tests and both npm audits passed. Live integration deferred.
+Local development working tree intentionally uncommitted; preserve user-
+generated npm manifests including exact @zip.js/zip.js@2.25.0.
+
+Implementation 04 connects v0.5 package generation, registration, local
+verification, analysis locking, authorized secret delivery and completion to
+the existing Study workflow. Preserve single-CSV v0.4 option and historical
+receipts. New forward-only migration 20261126180000 validates complete public
+manifest, independently recomputes canonical hash, binds request/lock/plan
+and permissions, and rejects v0.5 through legacy dataset-transfer RPCs.
+Managed dataset delivery for v0.5 is intentionally unavailable until v47b;
+use Study-policy-compliant external delivery meanwhile. Existing authorized
+secret delivery supports both protection policies. No plaintext research
+files, mappings or secrets are submitted during registration or completion.
+
+VALIDATION HERE: strict TypeScript check of package release core and five
+independent Node 22 synthetic-adapter checks passed (required/optional locks,
+wrong secret, mismatched lock and exact file set). Full npm dependencies and
+PostgreSQL unavailable here, so full application and database checks remain
+pending. Expected 271 tests in 46 files, then Development-only migration
+push (27 synchronized), database lint and 11 synthetic live integration
+scenarios with existing two-account launcher. Do not deploy or change
+Production; no dependency or OpenPayables changes. See docs/research-package-
+v47a.md for registration contract and remaining v47b scope.
+
+NEXT: validate locally, then apply only the new migration to verified Dev;
+run live authorization and transfer suite. Address actual failures before
+closing v47a. Keep changes uncommitted until accepted. No manual browser
+acceptance required at this intermediate stage.
+
+------------------------------------------------------------
+
+# November 25, 2026 - v47a implementation 03 follow-up fixture correction
+
+Windows validation after Implementation_03_Fix: 45/45 test files and 265/265
+application tests passed, ESLint passed. TypeScript then failed on three
+fixture type errors: ArrayBufferLike versus ArrayBuffer in the new lock mock,
+and a nullable lockId inherited by both the release and completion fixtures.
+The build was not reached, and Development migration is not applied by the
+validation block. Fix the lock mock using TextEncoder directly and set the
+existing LOCK_ID on the completion fixture before spreading into the final
+receipt. No casts, assertion changes, application source, migration or npm
+manifest changes. Extracted fixture expressions type-checked against the real
+return types with TypeScript 5.8.3 and a temporary Papa Parse declaration;
+changed test files transpile successfully. Full local tests/build remain
+pending in the user's actual environment. Re-run local validation, then the
+previous Development-only migration dry-run/push/lint sequence. Live
+integration remains pending. Keep changes uncommitted; no Production changes.
+
+------------------------------------------------------------
+
+# November 25, 2026 - v47a implementation 03 test correction (VALIDATION PENDING)
+
+Windows validation of Implementation 03: 264/265 application tests passed
+(44/45 files). Only the new multi-file AnalysisLockWorkspace test failed:
+Vitest reported identical-looking arguments in its mock comparison. The
+correction compares exact receipt bytes and exact ordered file names and
+bytes as plain arrays, avoiding typed-array realm/prototype differences.
+The call-count, legacy-path exclusion and exact registered receipt/form-data
+assertions remain intact. No application source, migration or dependency
+changes. Expected 265 tests in 45 files. Full tests, lint, TypeScript and
+build must pass before the Development-only migration dry run/push/lint.
+The user's previous block stopped on the test failure; no migration was
+applied by that block. Live authorization tests remain pending. Keep changes
+uncommitted. No Production or OpenPayables changes.
+
+------------------------------------------------------------
+
+# November 25, 2026 - v47a implementation 03 (REGISTERED LOCKS; VALIDATION PENDING)
+
+BASELINE: v46 closeout 1a13f52 plus Implementation_01, Implementation_02 and
+Implementation_02_Fix accepted on Windows Node 24.19.0: 44 Vitest files,
+259 tests (10 XLSX), ESLint, TypeScript and Next build passed; earlier 6/6
+storage cleanup and both npm audits (0 vulnerabilities) passed. Local npm
+manifests include exact @zip.js/zip.js@2.25.0 generated by user. Preserve them.
+
+This patch integrates local multi-file locking for existing v0.3/v0.4 Study
+transformations. Single nonempty file continues generating its original lock
+version. Multiple files (or an empty file) generate v0.5 lock with exact file
+set. The new authenticated RPC checks workflow/Study capability, blinded state,
+active plan, transformation protocol, receipt and dataset commitment, all
+member metadata, duplicate identities and idempotency. New generated column
+preserves historical version FK while allowing independently versioned locks.
+Existing request, authorization, secret delivery and completion RPCs stay
+unchanged. A v0.5 final release artifact references the historical receipt
+and exact authorized v0.5 lock, including every member. Existing completion
+RPC's artifact fields identify the exact lock manifest receipt (not a member);
+the completion row schema_version remains the referenced transformation
+protocol and the selected analysis_locks row records actual lock version.
+No secret, mapping, or analysis file bytes are submitted. Registered Study
+history shows individual file hashes. A v0.5 transformation remains disabled
+in registered Studies; the Development-only workspace remains local only.
+
+NEW MIGRATION: 20261126003000_register_package_analysis_locks.sql. Expected
+26 migrations after applying to verified Development kfrfemqoalzxwzecyjjf ONLY.
+Do not modify existing 25 migrations. Production remains at 25 until expressly
+approved. Local tests expected 45 files / 265 tests; 6 cleanup tests unchanged.
+Added two live scenarios to the existing opt-in suite (v0.3 and v0.4 with v0.5
+locks), retaining prior cases. No live DB/CLI, full Vitest, build or lint run in
+implementation environment (dependencies/registry and PostgreSQL unavailable).
+Strict core TypeScript 5.8.3 ES2017 checking and six independent Node 22 checks
+passed using synthetic legacy sealed receipts, with actual Web Crypto release
+and no CSV parsing. Syntax transpilation of changed files passed. Local and
+Development integration validation required before accepting. No changes to npm
+manifests, storage policy, secret transfer code, GitHub, Vercel or OpenPayables.
+
+NEXT: register new v0.5 multi-dataset transformations, integrate authorized
+package release (including optional lock), integrate Study package generation
+and verification UI, and add authorization/integrity regression checks. Then
+v47b multi-file secure delivery and release validation. Keep changes uncommitted
+on development until coherent validated checkpoint. Synthetic data only.
+
+------------------------------------------------------------
+
+# November 25, 2026 - v47a implementation 02 corrective patch (VALIDATION PENDING)
+
+Windows validation of Implementation 02 confirmed zip.js 2.25.0 installed,
+zero vulnerabilities in both audits, ESLint and 6/6 cleanup tests passed.
+257/258 Vitest cases passed. The independent plain XLSX fixture failed on
+its empty workbookProtection placeholder. TypeScript and Next build failed
+on the test ZIP helper accessing getData without narrowing Entry.
+
+This surgical correction accepts only an empty, unique workbookProtection
+placeholder; active protection settings and duplicate/nonempty placeholders
+remain rejected. It narrows test entries using !entry.directory, matching
+existing production code, and adds one positive/negative regression case.
+No dependency, registered workflow, database, deployment or OpenPayables
+changes. Expected 259 application tests across 44 files after correction.
+Run full local validation before acceptance; actual runtime validation of
+this correction remains pending in the user's Windows environment.
+Keep changes uncommitted on development. Next: registered Study integration.
+
+------------------------------------------------------------
+
+# November 25, 2026 - v47a implementation 02 (INCOMPLETE; LOCAL VALIDATION PENDING)
+
+BASELINE: v46 closeout 1a13f52, plus Implementation_01 accepted locally by
+user: 43 Vitest files / 249 tests passed; ESLint, TypeScript, Next build,
+6 storage cleanup tests passed (Node 24.19.0). Keep changes uncommitted.
+
+This source patch adds a restricted XLSX adapter (zip.js and browser DOMParser),
+9 new XLSX tests including independently generated synthetic workbook fixture,
+and a reusable local multi-dataset/analysis-lock/verification workspace.
+The only new route is /development/research-package, authenticated and
+available only under NODE_ENV=development. It does not register anything,
+release mappings, authorize unblinding, upload files, or alter Study state.
+Do not treat it as a production feature or a registered Study workflow.
+
+DEPENDENCY: install exact @zip.js/zip.js@2.25.0 on the user's Windows repo
+with npm install --save-exact; npm must generate package.json and package-lock
+updates there. Registry DNS still failed in implementation environment. No
+npm manifests included in the ZIP. Audit both dependency trees and stop on
+vulnerabilities or failed tests. Only TypeScript syntax/transpile checks and
+strict XLSX source checking against a temporary API declaration stub were
+possible here; actual zip.js API, XLSX runtime, UI, full tests/build pending.
+Synthetic fixture generated and reopened with openpyxl successfully; no real
+research data. Expected Vitest total 258 (249 prior + 9 XLSX).
+
+NEXT: complete registered v0.5 package and lock workflows, authorization-
+gated unblinding (including legacy transformations with v0.5 locks and
+optional-lock policy), safe completion metadata, migrations/RPCs, integrated
+UI and authorization regression tests. Then v47b secure multi-file delivery.
+Do not apply any v0.5 receipts to historical single-file RPCs. No database,
+GitHub, Vercel, Production, OpenPayables or live Study changes in this patch.
+
+See docs/research-package-v47a.md for scope and limitations.
+
+------------------------------------------------------------
+
+# November 25, 2026 - v47a local protocol implementation (INCOMPLETE)
+
+BASELINE: accepted v46 Production closeout 1a13f52; deployed source 5a095be.
+Development branch only. This patch adds a dependency-free multi-dataset
+mapping/receipt core, CSV/TSV adapters using existing Papa Parse, v0.5
+manifest and AES-GCM mapping authentication, multi-artifact local analysis
+locks (including references to historical receipt versions), exact file-set
+verification and a local v0.5 unblinding receipt primitive. It is not yet
+wired into the registered Study workflow. Existing application registration,
+authorization, transfer, storage and legacy protocol paths remain unchanged.
+No database migration, dependency change, OpenPayables change or deployment.
+
+VALIDATION: strict TypeScript 5.8.3 compilation (ES2017 target) of the
+independent core passed; six independent Node 22 smoke tests passed using a
+synthetic typed adapter. 13 new Vitest test cases are supplied. Full Vitest,
+CSV/TSV integration and historical lock tests, lint, repository TypeScript,
+Next build and audits are pending on the user's Node 24 environment. npm DNS
+failed in the implementation environment; no node_modules were available.
+
+NEXT: apply this source-only patch to clean development baseline 1a13f52 and
+run full local checks. Continue directly with the safe XLSX adapter and the
+registered Study v0.5 workflow integration (database/RPCs, UI, authorization,
+completion and tests). No v0.5 feature is yet enabled for researchers; do not
+register these draft receipts via v0.3/v0.4 pathways. See
+docs/research-package-v47a.md for implemented contracts and remaining work.
+No Production changes without explicit authorization. Synthetic data only.
+
+Previous v46 closeout and earlier handoffs follow.
+
+------------------------------------------------------------
+
 # November 24, 2026 - v46 Production release CLOSED
 
 CURRENT STATUS: v46 deployed and accepted for controlled pilot.

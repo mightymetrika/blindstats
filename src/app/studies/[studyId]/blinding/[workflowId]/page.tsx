@@ -1,3 +1,4 @@
+import { parsePackageAnalysisLock } from "@/lib/blinding/package-v05/analysis-lock";
 import { Buffer } from "node:buffer";
 
 import Link from "next/link";
@@ -5,6 +6,8 @@ import { notFound, redirect } from "next/navigation";
 
 import { AnalysisLockWorkspace } from "@/components/blinding/AnalysisLockWorkspace";
 import { AuthorizationPolicyField } from "@/components/blinding/AuthorizationPolicyField";
+import { ResearchPackageWorkspace, RegisteredPackageVerification } from "@/components/blinding/ResearchPackageWorkspace";
+import { parsePackageReceipt } from "@/lib/blinding/package-v05/receipt";
 import { BlindingWorkspace } from "@/components/blinding/BlindingWorkspace";
 import { UnblindingWorkspace } from "@/components/blinding/UnblindingWorkspace";
 import { UnblindingSecretSend } from "@/components/research-transfer/UnblindingSecretSend";
@@ -44,6 +47,16 @@ type BlindingWorkflowPageProps = {
     view?: string;
   }>;
 };
+
+function packageLockFiles(lock: { schema_version: string; analysis_lock_receipt_text: string }) {
+  return lock.schema_version === "0.5"
+    ? parsePackageAnalysisLock(new TextEncoder().encode(lock.analysis_lock_receipt_text)).analysisArtifacts
+    : null;
+}
+function analysisLockLabel(lock: { schema_version: string; analysis_lock_receipt_text: string; analysis_artifact_filename: string }) {
+  const files = packageLockFiles(lock);
+  return files ? `${files.length} analysis ${files.length === 1 ? "artifact" : "artifacts"}` : lock.analysis_artifact_filename;
+}
 
 function formatAuthorizationPolicy(policy: string) {
   return policy === "independent"
@@ -221,6 +234,7 @@ export default async function BlindingWorkflowPage({
   let transformation:
     | {
         transformation_id: string;
+        schema_version: string;
         selected_column: string | null;
         selected_columns: { column: string; categoryCount: number }[] | null;
         source_artifact_sha256: string;
@@ -238,7 +252,7 @@ export default async function BlindingWorkflowPage({
     const { data, error } = await supabase
       .from("blinding_transformations")
       .select(
-        "transformation_id, selected_column, selected_columns, source_artifact_sha256, blinded_artifact_sha256, public_receipt_sha256, public_receipt_text, receipt_created_at, registered_at, registered_by, plan_version_id",
+        "transformation_id, schema_version, selected_column, selected_columns, source_artifact_sha256, blinded_artifact_sha256, public_receipt_sha256, public_receipt_text, receipt_created_at, registered_at, registered_by, plan_version_id",
       )
       .eq("workflow_id", workflow.id)
       .eq("study_id", study.id)
@@ -257,6 +271,8 @@ export default async function BlindingWorkflowPage({
     id: string;
     lock_id: string;
     receipt_created_at: string;
+    schema_version: string;
+    analysis_lock_receipt_text: string;
     analysis_artifact_filename: string;
     analysis_artifact_sha256: string;
     analysis_artifact_byte_length: number;
@@ -268,7 +284,7 @@ export default async function BlindingWorkflowPage({
     const { data, error } = await supabase
       .from("analysis_locks")
       .select(
-        "id, lock_id, receipt_created_at, analysis_artifact_filename, analysis_artifact_sha256, analysis_artifact_byte_length, analysis_lock_receipt_sha256, registered_at",
+        "id, lock_id, schema_version, analysis_lock_receipt_text, receipt_created_at, analysis_artifact_filename, analysis_artifact_sha256, analysis_artifact_byte_length, analysis_lock_receipt_sha256, registered_at",
       )
       .eq("workflow_id", workflow.id)
       .eq("study_id", study.id)
@@ -1009,12 +1025,16 @@ export default async function BlindingWorkflowPage({
                       Create blinded package
                     </h2>
                     <p className="mt-2 text-sm text-black/60 dark:text-white/60">
-                      Generate the blinded dataset and register its safe metadata.
+                      Generate blinded datasets and register their safe metadata.
                     </p>
                   </div>
                 </div>
 
                 {canCreateBlinding ? (
+                  <div className="space-y-6">
+                  <p className="text-sm text-black/60 dark:text-white/60">Generate and register a coordinated package, then use Study files to send the blinded datasets. The historical single-CSV workflow remains available below.</p>
+                  <ResearchPackageWorkspace registration={{ studyId: study.id, workflowId: workflow.id, registerAction: registerBlindingTransformation }}/>
+                  <details className="rounded-xl border p-4"><summary className="cursor-pointer text-sm font-medium">Single CSV workflow (historical receipt format)</summary>
                   <BlindingWorkspace
                     registration={{
                       studyId: study.id,
@@ -1022,7 +1042,7 @@ export default async function BlindingWorkflowPage({
                       planVersionNumber: activePlan.version_number,
                     }}
                     registerAction={registerBlindingTransformation}
-                  />
+                  /></details></div>
                 ) : (
                   <div className="rounded-2xl border border-black/10 p-6 dark:border-white/15">
                     <p className="text-sm text-black/60 dark:text-white/60">
@@ -1133,11 +1153,11 @@ export default async function BlindingWorkflowPage({
     if (workflow.state === "unblinding_authorized" && maySendSecret) {
       const [key, previous] = await Promise.all([
         supabase.from("research_transfer_public_keys").select("public_jwk").eq("study_id", study.id).eq("user_id", secretContext.recipientId).maybeSingle(),
-        supabase.from("research_transfers").select("transfer_mode").eq("workflow_id", workflow.id).eq("recipient_id", secretContext.recipientId).maybeSingle(),
+        supabase.from("research_transfers").select("transfer_mode").eq("workflow_id", workflow.id).eq("recipient_id", secretContext.recipientId),
       ]);
       if (key.error || previous.error) throw new Error("Unable to load secret delivery options.");
       secretPublicKey = (key.data?.public_jwk as PublicKeyJwk | undefined) ?? null;
-      requireRecipientOnly = requireRecipientOnly || previous.data?.transfer_mode === "recipient_e2ee_v1" || secretRecord?.transfer_mode === "recipient_e2ee_v1";
+      requireRecipientOnly = requireRecipientOnly || previous.data?.some((transfer) => transfer.transfer_mode === "recipient_e2ee_v1") === true || secretRecord?.transfer_mode === "recipient_e2ee_v1";
     }
     if (workflow.state === "unblinding_authorized" && mayLoadSecret && secretRecord?.transfer_mode === "recipient_e2ee_v1") {
       const key = await supabase.from("research_transfer_key_backups").select("wrapped_private_key, salt, iv").eq("study_id", study.id).eq("user_id", currentUserId).maybeSingle();
@@ -1164,6 +1184,7 @@ export default async function BlindingWorkflowPage({
           ? "Ready"
           : "Locked";
 
+  const packageReceipt = transformation.schema_version === "0.5" ? await parsePackageReceipt(new TextEncoder().encode(transformation.public_receipt_text)) : null;
   const postSetupNavItems: {
     id: PostSetupView | "transfer";
     label: string;
@@ -1450,7 +1471,7 @@ export default async function BlindingWorkflowPage({
                   <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
                     Blinded variable
                   </dt>
-                  <dd className="mt-1 text-sm">{transformation.selected_columns?.map((item) => item.column).join(", ") ?? transformation.selected_column}</dd>
+                  <dd className="mt-1 text-sm">{packageReceipt ? packageReceipt.manifest.datasets.map((d) => `${d.datasetId}: ${d.selectedVariables.map((v) => v.name).join(", ")}`).join("; ") : transformation.selected_columns?.map((item) => item.column).join(", ") ?? transformation.selected_column}</dd>
                 </div>
                 <div>
                   <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
@@ -1463,8 +1484,9 @@ export default async function BlindingWorkflowPage({
               </dl>
 
               <p className="mt-6 text-sm text-black/60 dark:text-white/60">
-                Registration stores the public receipt and metadata. Use Study files to share the blinded CSV.
+                {packageReceipt ? "Registration stores the public manifest and metadata. Use Study files to send the registered blinded datasets, or transfer them externally in accordance with the Study protection policy." : "Registration stores the public receipt and metadata. Use Study files to share the blinded CSV."}
               </p>
+              {packageReceipt && <RegisteredPackageVerification receiptBase64={Buffer.from(transformation.public_receipt_text, "utf8").toString("base64")} receiptSha256={transformation.public_receipt_sha256}/>}
             </section>
           ) : null}
 
@@ -1476,7 +1498,7 @@ export default async function BlindingWorkflowPage({
                     <h2 className="text-xl font-semibold">Analysis lock</h2>
                     <p className="mt-2 text-sm text-black/60 dark:text-white/60">
                       {activePlan.require_analysis_lock
-                        ? "Register the exact analysis artifact finalized before unblinding."
+                        ? "Register the exact analysis files finalized before unblinding."
                         : "An analysis lock is optional under this plan."}
                     </p>
                   </div>
@@ -1493,11 +1515,12 @@ export default async function BlindingWorkflowPage({
                         key={lock.id}
                       >
                         <p className="text-sm font-medium">
-                          Analysis lock {analysisLocks.length - index}: {lock.analysis_artifact_filename}
+                          Analysis lock {analysisLocks.length - index}: {analysisLockLabel(lock)}
                         </p>
                         <p className="mt-1 text-xs text-black/50 dark:text-white/50">
                           Registered {new Date(lock.registered_at).toLocaleString("en-US")}
                         </p>
+                        {lock.schema_version === "0.5" && <details className="mt-3"><summary className="cursor-pointer text-sm font-medium">Verify locked files locally</summary><RegisteredPackageVerification receiptBase64={Buffer.from(transformation.public_receipt_text, "utf8").toString("base64")} receiptSha256={transformation.public_receipt_sha256} lock={{receiptBase64:Buffer.from(lock.analysis_lock_receipt_text,"utf8").toString("base64"),receiptSha256:lock.analysis_lock_receipt_sha256}}/></details>}
                       </div>
                     ))}
                   </div>
@@ -1597,7 +1620,7 @@ export default async function BlindingWorkflowPage({
                           </option>
                           {analysisLocks.map((lock, index) => (
                             <option key={lock.id} value={lock.id}>
-                              Analysis lock {analysisLocks.length - index}: {lock.analysis_artifact_filename}
+                              Analysis lock {analysisLocks.length - index}: {analysisLockLabel(lock)}
                             </option>
                           ))}
                         </select>
@@ -1794,11 +1817,11 @@ export default async function BlindingWorkflowPage({
                     <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
                       Blinded variable
                     </dt>
-                    <dd className="mt-1 text-sm">{transformation.selected_columns?.map((item) => item.column).join(", ") ?? transformation.selected_column}</dd>
+                    <dd className="mt-1 text-sm">{packageReceipt ? packageReceipt.manifest.datasets.map((d) => `${d.datasetId}: ${d.selectedVariables.map((v) => v.name).join(", ")}`).join("; ") : transformation.selected_columns?.map((item) => item.column).join(", ") ?? transformation.selected_column}</dd>
                   </div>
                   <div>
                     <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
-                      Source SHA-256
+                      {packageReceipt ? "Package manifest SHA-256 (source and blinded files)" : "Source SHA-256"}
                     </dt>
                     <dd className="mt-1 break-all font-mono text-xs">
                       {transformation.source_artifact_sha256}
@@ -1806,7 +1829,7 @@ export default async function BlindingWorkflowPage({
                   </div>
                   <div>
                     <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
-                      Blinded SHA-256
+                      {packageReceipt ? "Package manifest SHA-256" : "Blinded SHA-256"}
                     </dt>
                     <dd className="mt-1 break-all font-mono text-xs">
                       {transformation.blinded_artifact_sha256}
@@ -1843,7 +1866,7 @@ export default async function BlindingWorkflowPage({
                         key={lock.id}
                       >
                         <summary className="cursor-pointer text-sm font-medium">
-                          Analysis lock {analysisLocks.length - index}: {lock.analysis_artifact_filename}
+                          Analysis lock {analysisLocks.length - index}: {analysisLockLabel(lock)}
                         </summary>
                         <dl className="mt-4 grid gap-4 sm:grid-cols-2">
                           <div>
@@ -1864,7 +1887,7 @@ export default async function BlindingWorkflowPage({
                           </div>
                           <div>
                             <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
-                              Analysis SHA-256
+                              {lock.schema_version === "0.5" ? "Lock manifest SHA-256" : "Analysis SHA-256"}
                             </dt>
                             <dd className="mt-1 break-all font-mono text-xs">
                               {lock.analysis_artifact_sha256}
@@ -1880,7 +1903,7 @@ export default async function BlindingWorkflowPage({
                           </div>
                           <div>
                             <dt className="text-xs font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
-                              Byte length
+                              {lock.schema_version === "0.5" ? "Lock manifest byte length" : "Byte length"}
                             </dt>
                             <dd className="mt-1 text-sm">
                               {lock.analysis_artifact_byte_length.toLocaleString()}
@@ -1895,6 +1918,7 @@ export default async function BlindingWorkflowPage({
                             </dd>
                           </div>
                         </dl>
+                        {lock.schema_version === "0.5" ? <ul className="mt-4 space-y-2 text-xs">{packageLockFiles(lock)?.map((file) => <li key={file.artifactId} className="break-all"><span className="font-medium">{file.filename}</span> · {file.byteLength.toLocaleString()} bytes<br/><code>{file.sha256}</code></li>)}</ul> : null}
                       </details>
                     ))}
                   </div>
@@ -1942,7 +1966,7 @@ export default async function BlindingWorkflowPage({
                           </dt>
                           <dd className="mt-1 text-sm">
                             {selectedRequestLock
-                              ? `Analysis lock ${analysisLocks.length - selectedRequestLockIndex}: ${selectedRequestLock.analysis_artifact_filename}`
+                              ? `Analysis lock ${analysisLocks.length - selectedRequestLockIndex}: ${analysisLockLabel(selectedRequestLock)}`
                               : "No analysis lock selected"}
                           </dd>
                         </div>

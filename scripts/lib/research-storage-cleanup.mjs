@@ -1,6 +1,6 @@
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const reasons = {
-  'blindstats-research-v1': ['incomplete_dataset'],
+  'blindstats-research-v1': ['incomplete_dataset', 'incomplete_research_file'],
   'blindstats-secret-v1': ['completed_secret', 'incomplete_secret'],
 };
 

@@ -18,6 +18,8 @@ import {
   type AnalysisLockPackage,
 } from "@/lib/blinding/analysis-lock";
 
+import { createResearchAnalysisLock } from "@/lib/blinding/package-v05/legacy-lock";
+
 import { AnalysisLockWorkspace } from "./AnalysisLockWorkspace";
 
 const routerMocks = vi.hoisted(() => ({
@@ -31,6 +33,8 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/lib/blinding/analysis-lock", () => ({
   createAnalysisLockPackage: vi.fn(),
 }));
+
+vi.mock("@/lib/blinding/package-v05/legacy-lock", () => ({ createResearchAnalysisLock: vi.fn() }));
 
 const RECEIPT_TEXT = '{"kind":"public-receipt"}\n';
 const ANALYSIS_TEXT = "Methods and results drafted under blinding.\n";
@@ -319,6 +323,44 @@ describe("AnalysisLockWorkspace workflow", () => {
     expect(routerMocks.replace).toHaveBeenCalledWith(
       "/studies/study-id/blinding/workflow-id?locked=1",
     );
+  });
+
+  it("commits multiple locally selected files in one v0.5 registered lock", async () => {
+    const user = userEvent.setup();
+    const registerAction = vi.fn().mockResolvedValue({ ok: true, lockRecordId: "multi-lock" });
+    const receipt = {
+      schemaVersion: "0.5" as const, receiptType: "analysis_lock" as const, lockId: LOCK_ID,
+      createdAt: "2026-09-08T23:30:00.000Z",
+      blinding: { schemaVersion: "0.3" as const, transformationId: TRANSFORMATION_ID, blindingReceiptSha256: PUBLIC_RECEIPT_HASH, datasetCommitmentSha256: BLINDED_HASH },
+      analysisArtifacts: [
+        { artifactId: "a1", filename: "analysis.R", sha256: ANALYSIS_HASH, byteLength: 4 },
+        { artifactId: "a2", filename: "results.txt", sha256: ANALYSIS_HASH, byteLength: 6 },
+      ],
+    };
+    const text = JSON.stringify(receipt);
+    vi.mocked(createResearchAnalysisLock).mockResolvedValue({ receipt, receiptArtifact: { text, bytes: new TextEncoder().encode(text) } });
+    render(<AnalysisLockWorkspace registration={persistentRegistration()} registerAction={registerAction} />);
+    await user.upload(screen.getByLabelText("Analysis artifact"), [createFile("analysis.R", "code"), createFile("results.txt", "result")]);
+    await user.click(createButton());
+    await screen.findByText("Analysis lock created successfully.");
+    const mockedCreateResearchAnalysisLock = vi.mocked(createResearchAnalysisLock);
+    expect(mockedCreateResearchAnalysisLock).toHaveBeenCalledTimes(1);
+    const [receiptBytes, analysisArtifacts] = mockedCreateResearchAnalysisLock.mock.calls[0];
+    // Compare exact byte values rather than typed-array prototypes from different realms.
+    expect(Array.from(receiptBytes)).toEqual(Array.from(encode(RECEIPT_TEXT)));
+    expect(analysisArtifacts.map((artifact) => ({
+      ...artifact,
+      bytes: Array.from(artifact.bytes),
+    }))).toEqual([
+      { filename: "analysis.R", bytes: Array.from(encode("code")) },
+      { filename: "results.txt", bytes: Array.from(encode("result")) },
+    ]);
+    expect(mockedCreateAnalysisLockPackage).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Register analysis lock" }));
+    await waitFor(() => expect(registerAction).toHaveBeenCalledTimes(1));
+    const form = registerAction.mock.calls[0][0] as FormData;
+    expect(form.get("analysisLockReceiptBase64")).toBe(bytesToBase64(encode(text)));
+    expect(Array.from(form.keys()).sort()).toEqual(["analysisLockReceiptBase64", "studyId", "workflowId"]);
   });
 
   it("keeps the generated lock available when persistent registration fails", async () => {

@@ -1,3 +1,6 @@
+import { parseJsonArtifactBytes } from "@/lib/blinding/artifact-validation";
+import { parsePackageReceipt } from "@/lib/blinding/package-v05/receipt";
+import { openDatasetPackageMapping } from "@/lib/blinding/package-v05/package";
 import { sha256Hex } from "@/lib/blinding/hashing";
 import { parseSupportedBlindingReceiptBytes } from "@/lib/blinding/public-receipt-version";
 import { openMultiBlindingMapping, parseMultiUnblindingSecretBytes } from "@/lib/blinding/multi-blinding";
@@ -28,6 +31,12 @@ function cryptoContext(context: SecretTransferContext, plaintextSha256: string):
 // No mapping, secret, or generated unblinding receipt is returned or logged.
 export async function validateSecretForReceipt(bytes: Uint8Array, receiptBytes: Uint8Array, transformationId: string) {
   if (bytes.length < 1 || bytes.length > MAX_SECRET_TRANSFER_BYTES - 16) throw new Error("Choose a valid unblinding secret JSON file (maximum 16 KiB).");
+  if (parseJsonArtifactBytes(receiptBytes, "Public receipt").schemaVersion === "0.5") {
+    const receipt = await parsePackageReceipt(receiptBytes);
+    if (receipt.transformationId !== transformationId) throw new Error("Wrong registered transformation.");
+    await openDatasetPackageMapping(receiptBytes, bytes);
+    return;
+  }
   const receipt = parseSupportedBlindingReceiptBytes(receiptBytes);
   if (receipt.transformationId !== transformationId) throw new Error("Wrong registered transformation.");
   if (receipt.schemaVersion === "0.4") {

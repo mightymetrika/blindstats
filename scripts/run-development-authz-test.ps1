@@ -65,7 +65,7 @@ try {
     $env:BLINDSTATS_IT_B_EMAIL = Read-Host "Existing development account B email (authorizer)"
     $env:BLINDSTATS_IT_B_PASSWORD = Read-TestPassword "Account B password"
 
-    Write-Host "Running one real two-account authorization test against DEVELOPMENT only..."
+    Write-Host "Running synthetic two-account authorization and transfer integration tests against DEVELOPMENT only..."
     & npm run test:integration:authz
     $exitCode = $LASTEXITCODE
 }

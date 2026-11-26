@@ -1,6 +1,13 @@
 import { createClient } from "@supabase/supabase-js";
 import { describe, expect, it } from "vitest";
 
+import { createResearchAnalysisLock } from "@/lib/blinding/package-v05/legacy-lock";
+import { createLegacyReleaseWithPackageLock } from "@/lib/blinding/package-v05/legacy-release";
+import { sha256Hex } from "@/lib/blinding/hashing";
+import { createDatasetPackage } from "@/lib/blinding/package-v05/package";
+import { createPackageUnblindingReceipt } from "@/lib/blinding/package-v05/unblinding";
+import { canonicalBytes } from "@/lib/blinding/package-v05/artifacts";
+import { delimitedAdapter } from "@/lib/datasets/adapters/delimited";
 import { createBlindedPackage } from "@/lib/blinding/blinding-package";
 
 // Intentionally hard-coded: this integration test may ONLY write to the
@@ -80,10 +87,10 @@ function requiredId(value: string | undefined | null, operation: string): string
   return value;
 }
 
-// Intentionally one opt-in test. It performs real RLS/RPC calls with two
+// These opt-in tests perform real RLS/RPC calls with two
 // separate password-authenticated users; it does not use admin credentials.
 describe("development Supabase: independent authorization", () => {
-  it("rejects requester self-authorization and accepts a distinct authorized member", async () => {
+  it.each([{ label: "optional lock omitted", multiLock: false, packageMode: false }, { label: "v0.5 multi-file lock", multiLock: true, packageMode: false }, { label: "v0.5 package with required lock", multiLock: true, packageMode: true }, { label: "v0.5 package with optional lock omitted", multiLock: false, packageMode: true }])("rejects requester self-authorization and accepts a distinct authorized member ($label)", async ({ multiLock, packageMode }) => {
     // Check ALL safeguards before creating clients or issuing network requests.
     const config = getTestConfiguration();
     const clientOptions = {
@@ -178,7 +185,7 @@ describe("development Supabase: independent authorization", () => {
       const draft = await a.from("blinding_plan_drafts")
         .update({
           protection_targets: ["treatment"],
-          require_analysis_lock: false,
+          require_analysis_lock: multiLock,
           authorization_policy: "independent",
         })
         .eq("workflow_id", workflowId)
@@ -189,7 +196,7 @@ describe("development Supabase: independent authorization", () => {
 
       const activation = await a.rpc("activate_blinding_plan", {
         p_workflow_id: workflowId,
-        p_acknowledge_weaker_policies: true, // No lock: separately covered in unit tests.
+        p_acknowledge_weaker_policies: !multiLock,
       });
       checked(activation.error, "Activate independent BlindingPlan");
       expect(activation.data).toBeTruthy();
@@ -199,25 +206,62 @@ describe("development Supabase: independent authorization", () => {
       const syntheticCsv = new TextEncoder().encode(
         "id,treatment,outcome\n1,A,1\n2,B,2\n3,A,3\n",
       );
-      const packageResult = await createBlindedPackage(syntheticCsv, "treatment");
-      const transformation = await a.rpc("register_blinding_transformation", {
+      const coordinated = packageMode ? await createDatasetPackage([
+        { datasetId: "baseline", bytes: syntheticCsv, adapter: delimitedAdapter("csv") },
+        { datasetId: "followup", bytes: new TextEncoder().encode('id\t"bras ""é"""\tscore\n1\tA\t4\n2\tB\t5\n'), adapter: delimitedAdapter("tsv") },
+      ], [{ members: [{ datasetId: "baseline", variableId: "v2" }, { datasetId: "followup", variableId: "v2" }] }]) : null;
+      const packageResult = coordinated ?? await createBlindedPackage(syntheticCsv, "treatment");
+      const registrationRpc = packageMode ? "register_package_blinding_transformation" : "register_blinding_transformation";
+      if (coordinated) {
+        const args = { p_workflow_id: workflowId, p_public_receipt_text: coordinated.receiptArtifact.text };
+        expect((await b.rpc(registrationRpc, args)).error).not.toBeNull();
+        expect((await a.rpc("register_multi_blinding_transformation", args)).error).not.toBeNull();
+        const wrongDigest = { ...coordinated.receipt, manifestSha256: "0".repeat(64) };
+        const uncovered = structuredClone(coordinated.receipt);
+        uncovered.manifest.mappingGroups[0].members.pop();
+        uncovered.manifestSha256 = await sha256Hex(canonicalBytes(uncovered.manifest));
+        const bad = [JSON.stringify(wrongDigest), JSON.stringify(uncovered), JSON.stringify({...coordinated.receipt, secret: "not allowed"}), coordinated.receiptArtifact.text.replace('"schemaVersion": "0.5"', '"schemaVersion": "0.5", "schemaVersion": "0.5"')];
+        for (const text of bad) expect((await a.rpc(registrationRpc, {...args, p_public_receipt_text: text})).error).not.toBeNull();
+      }
+      const transformation = await a.rpc(registrationRpc, {
         p_workflow_id: workflowId,
         p_public_receipt_text: packageResult.receiptArtifact.text,
       });
       checked(transformation.error, "Register synthetic blinded receipt");
       expect(transformation.data).toBeTruthy();
+      if (coordinated) {
+        const stored = await a.from("blinding_transformations").select("schema_version, public_receipt_text, public_receipt_sha256, source_artifact_sha256, blinded_artifact_sha256, selected_columns").eq("workflow_id",workflowId).single();
+        checked(stored.error, "Read registered v0.5 package");
+        expect(stored.data).toMatchObject({schema_version:"0.5", public_receipt_text:coordinated.receiptArtifact.text, public_receipt_sha256:await sha256Hex(coordinated.receiptArtifact.bytes), source_artifact_sha256:coordinated.receipt.manifestSha256, blinded_artifact_sha256:coordinated.receipt.manifestSha256, selected_columns:null});
+      }
+
+      const lock = multiLock ? await createResearchAnalysisLock(packageResult.receiptArtifact.bytes, [
+        { filename: "analysis.R", bytes: new TextEncoder().encode("mean(x)") },
+        { filename: "results.txt", bytes: new TextEncoder().encode("Synthetic results") },
+      ]) : null;
+      let lockRecordId: string | null = null;
+      if (lock) {
+        if (coordinated) {
+          const args = { p_workflow_id: workflowId, p_analysis_lock_receipt_text: lock.receiptArtifact.text };
+          expect((await b.rpc("register_package_analysis_lock", args)).error).not.toBeNull();
+          expect((await a.rpc("register_package_analysis_lock", { ...args, p_analysis_lock_receipt_text: JSON.stringify({...lock.receipt, blinding: {...lock.receipt.blinding, datasetCommitmentSha256: "0".repeat(64)}}) })).error).not.toBeNull();
+        }
+        const lockRegistration = await a.rpc("register_package_analysis_lock", { p_workflow_id: workflowId, p_analysis_lock_receipt_text: lock.receiptArtifact.text });
+        checked(lockRegistration.error, "Register v0.5 lock");
+        lockRecordId = requiredId(lockRegistration.data, "Register multi-artifact lock");
+      }
 
       // A-only ability: B has not been granted unblinding.request.
       const bRequest = await b.rpc("request_unblinding", {
         p_workflow_id: workflowId,
-        p_analysis_lock_id: null,
+        p_analysis_lock_id: lockRecordId,
       });
       expect(bRequest.error).not.toBeNull();
       expect(bRequest.data).toBeNull();
 
       const request = await a.rpc("request_unblinding", {
         p_workflow_id: workflowId,
-        p_analysis_lock_id: null,
+        p_analysis_lock_id: lockRecordId,
       });
       checked(request.error, "Account A requests unblinding");
       const requestId = requiredId(request.data, "Unblinding request");
@@ -250,7 +294,7 @@ describe("development Supabase: independent authorization", () => {
         .single();
       checked(persisted.error, "Read persisted request");
       expect(persisted.data?.requested_by).toBe(aId);
-      expect(persisted.data?.analysis_lock_id).toBeNull();
+      expect(persisted.data?.analysis_lock_id).toBe(lockRecordId);
 
       const approval = await a.from("unblinding_authorizations")
         .select("id, request_id, authorized_by, authorization_policy")
@@ -269,6 +313,60 @@ describe("development Supabase: independent authorization", () => {
         .single();
       checked(finalWorkflow.error, "Read final workflow state");
       expect(finalWorkflow.data?.state).toBe("unblinding_authorized");
+      if (coordinated) {
+        const released = await createPackageUnblindingReceipt(coordinated.receiptArtifact.bytes, coordinated.secretArtifact.bytes, lock?.receiptArtifact.bytes ?? null);
+        const receipt = released.completion;
+        const refs = receipt.artifacts;
+        const metadata = {
+          p_workflow_id: workflowId, p_request_id: requestId, p_unblinding_id: receipt.unblindingId,
+          p_receipt_created_at: receipt.createdAt, p_transformation_id: receipt.transformationId,
+          p_lock_id: receipt.lockId,
+          p_source_artifact_sha256: refs.sourceArtifactSha256, p_blinding_receipt_sha256: refs.blindingReceiptSha256,
+          p_blinded_artifact_sha256: refs.blindedArtifactSha256, p_unblinding_secret_sha256: refs.unblindingSecretSha256,
+          p_analysis_lock_receipt_sha256: refs.analysisLockReceiptSha256,
+          p_analysis_artifact_filename: refs.analysisArtifact?.filename ?? null,
+          p_analysis_artifact_sha256: refs.analysisArtifact?.sha256 ?? null,
+          p_analysis_artifact_byte_length: refs.analysisArtifact?.byteLength ?? null,
+          p_unblinding_receipt_sha256: await sha256Hex(released.receiptArtifact.bytes),
+        };
+        expect((await b.rpc("register_package_unblinding_completion", metadata)).error).not.toBeNull();
+        expect((await a.rpc("register_package_unblinding_completion", {...metadata, p_blinded_artifact_sha256:"0".repeat(64)})).error).not.toBeNull();
+        if (lock) expect((await a.rpc("register_package_unblinding_completion", {...metadata, p_analysis_lock_receipt_sha256:"0".repeat(64)})).error).not.toBeNull();
+        const completed = await a.rpc("register_package_unblinding_completion", metadata);
+        checked(completed.error, "Complete v0.5 package");
+        expect(completed.data).toBeTruthy();
+        const after = await a.from("blinding_workflows").select("state").eq("id",workflowId).single();
+        checked(after.error, "Verify v0.5 completed state");
+        expect(after.data?.state).toBe("unblinded");
+        const stored = await a.from("unblinding_completions").select("schema_version, analysis_lock_id, blinded_artifact_sha256, unblinding_receipt_sha256, selected_columns").eq("id",completed.data).single();
+        checked(stored.error, "Verify v0.5 completion metadata");
+        expect(stored.data).toMatchObject({schema_version:"0.5",analysis_lock_id:lockRecordId,blinded_artifact_sha256:coordinated.receipt.manifestSha256,unblinding_receipt_sha256:metadata.p_unblinding_receipt_sha256,selected_columns:null});
+      } else if (lock) {
+        const released = await createLegacyReleaseWithPackageLock(packageResult.receiptArtifact.bytes, packageResult.secretArtifact.bytes, lock.receiptArtifact.bytes);
+        const receipt = released.completion;
+        if (receipt.schemaVersion !== "0.3" || !receipt.artifacts.analysisArtifact) throw new Error("Expected historical completion metadata.");
+        const refs = receipt.artifacts;
+        const metadata = {
+          p_workflow_id: workflowId, p_request_id: requestId, p_unblinding_id: receipt.unblindingId,
+          p_receipt_created_at: receipt.createdAt, p_transformation_id: receipt.transformationId,
+          p_lock_id: receipt.lockId, p_selected_column: receipt.selectedColumn,
+          p_source_artifact_sha256: refs.sourceArtifactSha256, p_blinding_receipt_sha256: refs.blindingReceiptSha256,
+          p_blinded_artifact_sha256: refs.blindedArtifactSha256, p_unblinding_secret_sha256: refs.unblindingSecretSha256,
+          p_analysis_lock_receipt_sha256: refs.analysisLockReceiptSha256,
+          p_analysis_artifact_filename: refs.analysisArtifact?.filename,
+          p_analysis_artifact_sha256: refs.analysisArtifact?.sha256,
+          p_analysis_artifact_byte_length: refs.analysisArtifact?.byteLength,
+          p_unblinding_receipt_sha256: await sha256Hex(released.receiptArtifact.bytes),
+        };
+        const unauthorized = await b.rpc("register_unblinding_completion", metadata);
+        expect(unauthorized.error).not.toBeNull();
+        const completed = await a.rpc("register_unblinding_completion", metadata);
+        checked(completed.error, "Complete v0.3 transformation with v0.5 lock");
+        expect(completed.data).toBeTruthy();
+        const after = await a.from("blinding_workflows").select("state").eq("id", workflowId).single();
+        checked(after.error, "Verify completed state");
+        expect(after.data?.state).toBe("unblinded");
+      }
     } finally {
       if (studyId) {
         // There is deliberately no client-side Study DELETE permission.

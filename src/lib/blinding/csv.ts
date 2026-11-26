@@ -114,10 +114,14 @@ function validateDatasetForSerialization(
 }
 
 export function parseCsvBytes(bytes: Uint8Array): ParsedCsvDataset {
+  return parseDelimitedBytes(bytes, ",");
+}
+
+export function parseDelimitedBytes(bytes: Uint8Array, delimiter: "," | "\t"): ParsedCsvDataset {
   const sourceText = decodeUtf8(bytes);
 
   const result = Papa.parse<string[]>(sourceText, {
-    delimiter: ",",
+    delimiter,
     dynamicTyping: false,
     header: false,
     skipEmptyLines: false,
@@ -166,6 +170,14 @@ export function serializeCsvDataset(
   columns: readonly string[],
   rows: readonly DatasetRow[],
 ): SerializedCsvArtifact {
+  return serializeDelimitedDataset(columns, rows, ",");
+}
+
+export function serializeDelimitedDataset(
+  columns: readonly string[],
+  rows: readonly DatasetRow[],
+  delimiter: "," | "\t",
+): SerializedCsvArtifact {
   validateDatasetForSerialization(columns, rows);
 
   const records: string[][] = [
@@ -176,7 +188,7 @@ export function serializeCsvDataset(
   ];
 
   const text = Papa.unparse(records, {
-    delimiter: ",",
+    delimiter,
     escapeChar: '"',
     header: false,
     newline: "\n",

@@ -12,9 +12,11 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { retrieveAuthorizedSecret, validateSecretForReceipt, type SecretTransferRecord, type SecretTransferContext, type SecretBackup } from "@/lib/research-transfer/secret-transfer";
 
+import { parseJsonArtifactBytes } from "@/lib/blinding/artifact-validation";
 import { sha256Hex } from "@/lib/blinding/hashing";
 import { createSupportedUnblindingPackage } from "@/lib/blinding/supported-unblinding";
 import type { UnblindingPackage } from "@/lib/blinding/unblinding";
+import { createPackageUnblindingReceipt } from "@/lib/blinding/package-v05/unblinding";
 import type { MultiUnblindingReceipt } from "@/lib/blinding/multi-types";
 
 type InputStage = "receipt" | "secret" | "lock";
@@ -32,7 +34,9 @@ type LoadedArtifact = {
 type ArtifactSetter = Dispatch<SetStateAction<LoadedArtifact | null>>;
 
 type GeneratedUnblinding = {
-  package: { receipt: UnblindingPackage["receipt"] | MultiUnblindingReceipt; receiptArtifact: { text: string; bytes: Uint8Array } };
+  package: { receiptArtifact: { text: string; bytes: Uint8Array } };
+  completion: UnblindingPackage["receipt"] | MultiUnblindingReceipt | Awaited<ReturnType<typeof createPackageUnblindingReceipt>>["completion"];
+  multiArtifactCount?: number;
   receiptSha256: string;
 };
 
@@ -271,7 +275,14 @@ export function UnblindingWorkspace({
     setWorkspaceError(null);
 
     try {
-      const result = await createSupportedUnblindingPackage(
+      const isPackage = parseJsonArtifactBytes(effectiveReceiptBytes, "Public receipt").schemaVersion === "0.5";
+      if (registration && (isPackage || (effectiveLockReceiptBytes && parseJsonArtifactBytes(effectiveLockReceiptBytes, "Analysis lock").schemaVersion === "0.5"))) {
+        if (await sha256Hex(effectiveReceiptBytes) !== registration.publicReceiptSha256 ||
+            (effectiveLockReceiptBytes ? await sha256Hex(effectiveLockReceiptBytes) : null) !== registration.analysisLockReceiptSha256) {
+          throw new Error("The authorized receipt hashes do not match the loaded artifact chain.");
+        }
+      }
+      const result = await (isPackage ? createPackageUnblindingReceipt : createSupportedUnblindingPackage)(
         effectiveReceiptBytes,
         secret.bytes,
         effectiveLockReceiptBytes,
@@ -297,6 +308,8 @@ export function UnblindingWorkspace({
 
       setGeneration({
         package: result,
+        completion: "completion" in result ? result.completion : result.receipt,
+        multiArtifactCount: "completion" in result && result.receipt.lockId !== null ? result.receipt.artifacts.analysisArtifacts.length : undefined,
         receiptSha256,
       });
     } catch (error) {
@@ -332,7 +345,7 @@ export function UnblindingWorkspace({
       return;
     }
 
-    const receipt = generation.package.receipt;
+    const receipt = generation.completion;
     const formData = new FormData();
 
     formData.set("studyId", registration.studyId);
@@ -367,7 +380,7 @@ export function UnblindingWorkspace({
     formData.set("schemaVersion", receipt.schemaVersion);
     if (receipt.schemaVersion === "0.4") {
       formData.set("selectedColumns", JSON.stringify(receipt.selectedColumns));
-    } else {
+    } else if (receipt.schemaVersion === "0.3") {
       formData.set("selectedColumn", receipt.selectedColumn);
     }
     formData.set(
@@ -416,7 +429,7 @@ export function UnblindingWorkspace({
     }
   }
 
-  const generatedReceipt = generation?.package.receipt ?? null;
+  const generatedReceipt = generation?.completion ?? null;
 
   return (
     <div
@@ -697,10 +710,13 @@ export function UnblindingWorkspace({
                   <p className="text-sm font-semibold text-emerald-900">
                     Artifact chain verified. Mapping released.
                   </p>
+                  {generation.multiArtifactCount !== undefined ? <p className="mt-2 text-sm text-emerald-950">Bound to {generation.multiArtifactCount} analysis artifacts in the authorized lock.</p> : null}
                   <p className="mt-2 text-sm text-emerald-950">
-                    Unblinded {generatedReceipt.schemaVersion === "0.4" && generatedReceipt.selectedColumns.length > 1 ? "variables" : "variable"}:{" "}
+                    Unblinded {generatedReceipt.schemaVersion === "0.5" ? "mapping groups" : generatedReceipt.schemaVersion === "0.4" && generatedReceipt.selectedColumns.length > 1 ? "variables" : "variable"}:{" "}
                     <span className="font-semibold">
-                      {generatedReceipt.schemaVersion === "0.4"
+                      {generatedReceipt.schemaVersion === "0.5"
+                        ? generatedReceipt.manifest.mappingGroups.map((group) => `${group.groupId}: ${group.members.map((member) => `${member.datasetId} / ${generatedReceipt.manifest.datasets.find((d) => d.datasetId === member.datasetId)?.selectedVariables.find((v) => v.id === member.variableId)?.name ?? member.variableId}`).join(", ")}`).join("; ")
+                        : generatedReceipt.schemaVersion === "0.4"
                         ? generatedReceipt.selectedColumns.map((item) => item.column).join(", ")
                         : generatedReceipt.selectedColumn}
                     </span>
@@ -717,7 +733,7 @@ export function UnblindingWorkspace({
                       <table className="w-full border-collapse text-left text-sm">
                         <thead>
                           <tr className="border-b border-amber-200 bg-amber-50">
-                            <th className="px-3 py-2 font-semibold text-amber-950">Column</th>
+                            <th className="px-3 py-2 font-semibold text-amber-950">{generatedReceipt.schemaVersion === "0.5" ? "Mapping group" : "Column"}</th>
                             <th className="px-3 py-2 font-semibold text-amber-950">
                               Original value
                             </th>
@@ -727,7 +743,9 @@ export function UnblindingWorkspace({
                           </tr>
                         </thead>
                         <tbody>
-                          {(generatedReceipt.schemaVersion === "0.4"
+                          {(generatedReceipt.schemaVersion === "0.5"
+                            ? generatedReceipt.releasedMappings.flatMap((group) => group.mapping.map((entry) => ({ ...entry, column: group.groupId })))
+                            : generatedReceipt.schemaVersion === "0.4"
                             ? generatedReceipt.releasedMappings.flatMap((column) =>
                                 column.mapping.map((entry) => ({ ...entry, column: column.column })))
                             : generatedReceipt.releasedMapping.map((entry) => ({ ...entry, column: generatedReceipt.selectedColumn }))
@@ -737,7 +755,7 @@ export function UnblindingWorkspace({
                               key={`${entry.column}\u0000${entry.original}\u0000${entry.blinded}`}
                             >
                               <td className="px-3 py-2 text-amber-950">{entry.column}</td>
-                              <td className="px-3 py-2 text-amber-950">{entry.original}</td>
+                              <td className="px-3 py-2 text-amber-950">{String(entry.original)}</td>
                               <td className="px-3 py-2 text-amber-950">{entry.blinded}</td>
                             </tr>
                           ))}

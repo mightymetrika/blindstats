@@ -7,6 +7,7 @@ import { MAX_TRANSFER_OBJECT_BYTES } from "./storage";
 export const MAX_CIPHERTEXT_BYTES = MAX_TRANSFER_OBJECT_BYTES;
 export const PBKDF2_ITERATIONS = 600_000;
 export const TRANSFER_ALGORITHM = "v46-ecdh-hkdf-aes256gcm-1";
+export const RESEARCH_FILE_ALGORITHM = "v47-research-file-ecdh-hkdf-aes256gcm-1";
 
 export type PublicKeyJwk = {
   kty: "EC";
@@ -30,6 +31,23 @@ export type TransferContext = {
   plaintextSha256: string;
   secretRequestId?: string;
 };
+
+// New objects are independently bound to the immutable transfer row. The
+// legacy context and algorithm are unchanged, including authorized secrets.
+export type ResearchFileContext = {
+  studyId: string;
+  workflowId: string | null;
+  transformationId: string | null;
+  recipientId: string;
+  transferId: string;
+  purpose: "package_dataset" | "supporting";
+  artifactId: string | null;
+  filename: string;
+  plaintextSha256: string;
+  plaintextByteLength: number;
+};
+export type ResearchFileEnvelope = Omit<TransferEnvelope, "version"> & { version: typeof RESEARCH_FILE_ALGORITHM };
+type EncryptionContext = TransferContext | ResearchFileContext;
 
 export type AnalystKeyBackup = {
   publicJwk: PublicKeyJwk;
@@ -67,7 +85,15 @@ function asBuffer(bytes: Uint8Array): ArrayBuffer {
   return new Uint8Array(bytes).buffer;
 }
 
-function contextBytes(context: TransferContext): Uint8Array {
+function contextBytes(context: EncryptionContext): Uint8Array {
+  if ("purpose" in context) {
+    return new TextEncoder().encode(JSON.stringify([
+      "blindstats-v47-research-file", context.studyId, context.workflowId,
+      context.transformationId, context.recipientId, context.transferId,
+      context.purpose, context.artifactId, context.filename,
+      context.plaintextSha256, context.plaintextByteLength,
+    ]));
+  }
   return new TextEncoder().encode(JSON.stringify([
     context.secretRequestId ? "blindstats-v46-unblinding-secret" : "blindstats-v46-blinded-dataset", context.studyId, context.workflowId,
     context.transformationId, context.recipientId, context.plaintextSha256,
@@ -154,7 +180,7 @@ async function unlockPrivateKey(
 
 async function sharedEncryptionKey(
   privateKey: CryptoKey, publicKey: CryptoKey,
-  salt: Uint8Array, context: TransferContext,
+  salt: Uint8Array, context: EncryptionContext,
 ): Promise<CryptoKey> {
   const bits = await subtle().deriveBits({ name: "ECDH", public: publicKey }, privateKey, 256);
   let hkdfKey: CryptoKey;
@@ -169,15 +195,16 @@ async function sharedEncryptionKey(
   }, hkdfKey, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
 }
 
-export async function encryptBlindedDataset(
+async function encryptFile<V extends TransferEnvelope["version"] | ResearchFileEnvelope["version"]>(
   plaintext: Uint8Array, recipientPublicJwk: PublicKeyJwk,
-  context: TransferContext,
-): Promise<{ ciphertext: Uint8Array; ciphertextSha256: string; envelope: TransferEnvelope }> {
-  if (await sha256Hex(plaintext) !== context.plaintextSha256) {
-    throw new Error("Selected CSV does not match the registered blinded dataset SHA-256.");
+  context: EncryptionContext, version: V,
+): Promise<{ ciphertext: Uint8Array; ciphertextSha256: string; envelope: Omit<TransferEnvelope, "version"> & { version: V } }> {
+  if (await sha256Hex(plaintext) !== context.plaintextSha256 ||
+      ("purpose" in context && plaintext.length !== context.plaintextByteLength)) {
+    throw new Error("purpose" in context ? "File does not match the registered hash or length." : "Selected CSV does not match the registered blinded dataset SHA-256.");
   }
   if (plaintext.length + 16 > MAX_CIPHERTEXT_BYTES) {
-    throw new Error("Encrypted dataset exceeds the 4 MiB v46 upload limit.");
+    throw new Error("Encrypted file exceeds the 4 MiB stored-object limit.");
   }
   const recipientKey = await subtle().importKey(
     "jwk", publicJwk(recipientPublicJwk),
@@ -200,16 +227,16 @@ export async function encryptBlindedDataset(
     ciphertext,
     ciphertextSha256: await sha256Hex(ciphertext),
     envelope: {
-      version: TRANSFER_ALGORITHM,
+      version,
       ephemeralPublicJwk: publicJwk(await subtle().exportKey("jwk", ephemeral.publicKey)),
       salt: base64(salt), iv: base64(iv),
     },
   };
 }
 
-export async function decryptBlindedDataset(
+async function decryptFile(
   ciphertext: Uint8Array, ciphertextSha256: string,
-  envelope: TransferEnvelope, context: TransferContext,
+  envelope: TransferEnvelope | ResearchFileEnvelope, context: EncryptionContext,
   backup: Pick<AnalystKeyBackup, "wrappedPrivateKey" | "salt" | "iv">,
   userId: string, passphrase: string,
 ): Promise<Uint8Array> {
@@ -217,7 +244,7 @@ export async function decryptBlindedDataset(
       await sha256Hex(ciphertext) !== ciphertextSha256) {
     throw new Error("Downloaded ciphertext failed SHA-256 verification.");
   }
-  if (envelope.version !== TRANSFER_ALGORITHM) {
+  if (envelope.version !== ("purpose" in context ? RESEARCH_FILE_ALGORITHM : TRANSFER_ALGORITHM)) {
     throw new Error("Unsupported transfer encryption version.");
   }
   const privateKey = await unlockPrivateKey(context.studyId, userId, passphrase, backup);
@@ -234,11 +261,30 @@ export async function decryptBlindedDataset(
       additionalData: asBuffer(contextBytes(context)),
     }, encryptionKey, asBuffer(ciphertext));
     const plaintext = new Uint8Array(result);
-    if (await sha256Hex(plaintext) !== context.plaintextSha256) {
-      throw new Error("Decrypted file does not match the registered blinded dataset.");
+    if (await sha256Hex(plaintext) !== context.plaintextSha256 ||
+        ("purpose" in context && plaintext.length !== context.plaintextByteLength)) {
+      throw new Error("Decrypted file does not match the registered hash or length.");
     }
     return plaintext;
   } catch {
     throw new Error("Dataset decryption or registered SHA-256 verification failed.");
   }
+}
+
+export function encryptBlindedDataset(plaintext: Uint8Array, recipientPublicJwk: PublicKeyJwk, context: TransferContext) {
+  return encryptFile(plaintext, recipientPublicJwk, context, TRANSFER_ALGORITHM);
+}
+export function decryptBlindedDataset(ciphertext: Uint8Array, ciphertextSha256: string,
+  envelope: TransferEnvelope, context: TransferContext,
+  backup: Pick<AnalystKeyBackup, "wrappedPrivateKey" | "salt" | "iv">, userId: string, passphrase: string) {
+  return decryptFile(ciphertext, ciphertextSha256, envelope, context, backup, userId, passphrase);
+}
+export function encryptResearchFile(plaintext: Uint8Array, recipientPublicJwk: PublicKeyJwk, context: ResearchFileContext) {
+  return encryptFile(plaintext, recipientPublicJwk, context, RESEARCH_FILE_ALGORITHM);
+}
+export async function decryptResearchFile(ciphertext: Uint8Array, ciphertextSha256: string,
+  envelope: ResearchFileEnvelope, context: ResearchFileContext,
+  backup: Pick<AnalystKeyBackup, "wrappedPrivateKey" | "salt" | "iv">, userId: string, passphrase: string) {
+  if (userId !== context.recipientId) throw new Error("Recipient identity does not match.");
+  return decryptFile(ciphertext, ciphertextSha256, envelope, context, backup, userId, passphrase);
 }

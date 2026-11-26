@@ -54,3 +54,11 @@ test('retry after interrupted removal confirms even when inventory says absent',
   assert.equal(calls[0][1].p_synthetic_immediate,true);
   assert.deepEqual(calls.map(c => c[0]), ['begin_research_storage_cleanup','confirm_research_storage_cleanup']);
 });
+test('accepts only an eligible incomplete v47 research file with exact path', async () => {
+  const { client, calls } = mock();
+  const file = {...candidate,bucket_id:'blindstats-research-v1',reason:'incomplete_research_file'};
+  await assert.rejects(cleanupOne(client,{...file,eligible:false},id,'operator'));
+  assert.equal(calls.length,0);
+  assert.equal(await cleanupOne(client,file,id,'operator'),attempt);
+  assert.deepEqual(calls[1],['remove',file.bucket_id,[file.storage_path]]);
+});

@@ -1,12 +1,19 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState, type ChangeEvent } from "react";
+import { useMemo, useRef, useState, type ChangeEvent } from "react";
 
 import {
   createAnalysisLockPackage,
   type AnalysisLockPackage,
 } from "@/lib/blinding/analysis-lock";
+
+import { createResearchAnalysisLock } from "@/lib/blinding/package-v05/legacy-lock";
+import { sha256Hex } from "@/lib/blinding/hashing";
+import { parseJsonArtifactBytes } from "@/lib/blinding/artifact-validation";
+import type { FileInput } from "@/lib/blinding/package-v05/artifacts";
+
+type LockGeneration = AnalysisLockPackage | Awaited<ReturnType<typeof createResearchAnalysisLock>>;
 
 type WorkspaceError = {
   stage: "receipt" | "analysis" | "generation" | "registration";
@@ -141,9 +148,10 @@ export function AnalysisLockWorkspace({
   const router = useRouter();
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [receiptBytes, setReceiptBytes] = useState<Uint8Array | null>(null);
-  const [analysisFile, setAnalysisFile] = useState<File | null>(null);
-  const [analysisBytes, setAnalysisBytes] = useState<Uint8Array | null>(null);
-  const [generation, setGeneration] = useState<AnalysisLockPackage | null>(null);
+  const [analysisFiles, setAnalysisFiles] = useState<File[]>([]);
+  const [analysisInputs, setAnalysisInputs] = useState<FileInput[]>([]);
+  const selectionSequence = useRef(0);
+  const [generation, setGeneration] = useState<LockGeneration | null>(null);
   const [workspaceError, setWorkspaceError] = useState<WorkspaceError | null>(
     null,
   );
@@ -166,7 +174,7 @@ export function AnalysisLockWorkspace({
     : Boolean(receiptFile && receiptBytes);
 
   const canGenerate =
-    Boolean(receiptReady && analysisFile && analysisBytes) && !isGenerating;
+    Boolean(receiptReady && analysisInputs.length) && !isGenerating && !isRegistering;
 
   const analysisStepNumber = registrationEnabled ? 1 : 2;
   const createStepNumber = registrationEnabled ? 2 : 3;
@@ -205,30 +213,26 @@ export function AnalysisLockWorkspace({
   async function handleAnalysisChange(
     event: ChangeEvent<HTMLInputElement>,
   ): Promise<void> {
-    const file = event.target.files?.[0] ?? null;
-
-    setAnalysisFile(null);
-    setAnalysisBytes(null);
+    const files = Array.from(event.target.files ?? []);
+    const selection = ++selectionSequence.current;
+    setAnalysisFiles([]);
+    setAnalysisInputs([]);
     invalidateGeneration();
-
-    if (!file) {
-      return;
-    }
-
+    if (!files.length) return;
     try {
-      const bytes = await readFileBytes(file);
-      setAnalysisFile(file);
-      setAnalysisBytes(bytes);
+      if (files.length > 100) throw new Error("Select at most 100 analysis artifacts.");
+      const inputs = await Promise.all(files.map(async (file) => ({ filename: file.name, bytes: await readFileBytes(file) })));
+      if (selection !== selectionSequence.current) return;
+      setAnalysisFiles(files);
+      setAnalysisInputs(inputs);
     } catch (error) {
-      setWorkspaceError({
-        stage: "analysis",
-        message: getErrorMessage(error),
-      });
+      if (selection !== selectionSequence.current) return;
+      setWorkspaceError({ stage: "analysis", message: getErrorMessage(error) });
     }
   }
 
   async function handleGenerate(): Promise<void> {
-    if (!effectiveReceiptBytes || !analysisFile || !analysisBytes) {
+    if (!effectiveReceiptBytes || !analysisInputs.length) {
       return;
     }
 
@@ -237,13 +241,12 @@ export function AnalysisLockWorkspace({
     setWorkspaceError(null);
 
     try {
-      const result = await createAnalysisLockPackage(
-        effectiveReceiptBytes,
-        {
-          filename: analysisFile.name,
-          bytes: analysisBytes,
-        },
-      );
+      const isPackage = parseJsonArtifactBytes(effectiveReceiptBytes, "Public receipt").schemaVersion === "0.5";
+      if (isPackage && registration && await sha256Hex(effectiveReceiptBytes) !== registration.publicReceiptSha256) throw new Error("Registered public receipt hash mismatch.");
+      const result = !isPackage && analysisInputs.length === 1 && analysisInputs[0].bytes.length > 0
+        ? await createAnalysisLockPackage(effectiveReceiptBytes, analysisInputs[0])
+        : await createResearchAnalysisLock(effectiveReceiptBytes, analysisInputs);
+      if (result.receiptArtifact.bytes.byteLength > 262144) throw new Error("Analysis-lock receipt exceeds 256 KiB.");
 
       setGeneration(result);
     } catch (error) {
@@ -405,6 +408,7 @@ export function AnalysisLockWorkspace({
                   type="file"
                   accept=".json,application/json"
                   onChange={handleReceiptChange}
+                  disabled={isGenerating || isRegistering}
                   className="mt-2 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 file:mr-4 file:rounded-lg file:border-0 file:bg-slate-950 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-slate-800"
                 />
 
@@ -434,7 +438,7 @@ export function AnalysisLockWorkspace({
             <StageHeading
               number={analysisStepNumber}
               title="Select analysis artifact"
-              description="Choose the exact file you want to identify as locked before unblinding."
+              description="Choose the exact files you want to lock together before unblinding."
             />
 
             <div className="mt-6">
@@ -447,6 +451,8 @@ export function AnalysisLockWorkspace({
               <input
                 id="lock-analysis-artifact"
                 type="file"
+                multiple
+                disabled={isGenerating || isRegistering}
                 onChange={handleAnalysisChange}
                 className="mt-2 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 file:mr-4 file:rounded-lg file:border-0 file:bg-slate-950 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-slate-800"
               />
@@ -465,15 +471,13 @@ export function AnalysisLockWorkspace({
                 </p>
               ) : null}
 
-              {analysisFile ? (
-                <FileSummary file={analysisFile} label="Selected" />
-              ) : null}
+              {analysisFiles.map((file, i) => <FileSummary key={i} file={file} label="Selected" />)}
             </div>
           </section>
 
           <section
             className={`rounded-2xl border bg-white p-6 shadow-sm sm:p-7 ${
-              receiptReady && analysisBytes
+              receiptReady && analysisInputs.length > 0
                 ? "border-slate-200"
                 : "border-slate-200 opacity-60"
             }`}
@@ -481,7 +485,7 @@ export function AnalysisLockWorkspace({
             <StageHeading
               number={createStepNumber}
               title="Create analysis lock"
-              description="Hash the selected file and create its linked lock receipt."
+              description="Hash the selected files and create one linked lock receipt."
             />
 
             <div className="mt-6">
@@ -514,7 +518,7 @@ export function AnalysisLockWorkspace({
                     Analysis lock created successfully.
                   </p>
                   <p className="mt-2 break-all text-sm text-emerald-950">
-                    {generation.receipt.analysisArtifact.filename}
+                    {generation.receipt.schemaVersion === "0.5" ? generation.receipt.analysisArtifacts.map((file) => file.filename).join(", ") : generation.receipt.analysisArtifact.filename}
                   </p>
 
                   <details className="mt-4">
@@ -545,7 +549,7 @@ export function AnalysisLockWorkspace({
                         <dd>
                           <HashValue
                             value={
-                              generation.receipt.blinding.blindedArtifactSha256
+                              generation.receipt.schemaVersion === "0.5" ? generation.receipt.blinding.datasetCommitmentSha256 : generation.receipt.blinding.blindedArtifactSha256
                             }
                           />
                         </dd>
@@ -555,9 +559,7 @@ export function AnalysisLockWorkspace({
                           Analysis SHA-256
                         </dt>
                         <dd>
-                          <HashValue
-                            value={generation.receipt.analysisArtifact.sha256}
-                          />
+                          {generation.receipt.schemaVersion === "0.5" ? generation.receipt.analysisArtifacts.map((file) => <div key={file.artifactId}><span className="text-xs">{file.filename}</span><HashValue value={file.sha256} /></div>) : <HashValue value={generation.receipt.analysisArtifact.sha256} />}
                         </dd>
                       </div>
                     </dl>
@@ -594,7 +596,7 @@ export function AnalysisLockWorkspace({
               <StageHeading
                 number={registerStepNumber}
                 title="Register analysis lock"
-                description="Add this lock to the workflow. The analysis file stays local."
+                description="Add this lock to the workflow. All analysis files stay local."
               />
 
               <div className="mt-6">

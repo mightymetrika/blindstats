@@ -400,6 +400,54 @@ describe("UnblindingWorkspace workflow", () => {
     expect(Array.from(data.keys())).not.toContain("releasedMappings");
   });
 
+  it("registers only the manifest commitment for a historical transformation with a v0.5 lock", async () => {
+    const user = userEvent.setup();
+    const registerAction = vi.fn().mockResolvedValue({ ok: true, completionRecordId: "record" });
+    const old = createMockPackage();
+    const manifest = { filename: "analysis-lock-receipt.json", sha256: LOCK_RECEIPT_HASH, byteLength: 512 };
+    const completion = { ...old.receipt, lockId: LOCK_ID, artifacts: { ...old.receipt.artifacts, analysisLockReceiptSha256: LOCK_RECEIPT_HASH, analysisArtifact: manifest } };
+    const receipt = { ...completion, schemaVersion: "0.5" as const, blindingSchemaVersion: "0.3" as const, artifacts: {
+      sourceArtifactSha256: completion.artifacts.sourceArtifactSha256,
+      blindingReceiptSha256: completion.artifacts.blindingReceiptSha256,
+      blindedArtifactSha256: completion.artifacts.blindedArtifactSha256,
+      unblindingSecretSha256: completion.artifacts.unblindingSecretSha256,
+      analysisLockReceiptSha256: LOCK_RECEIPT_HASH, analysisLockManifest: manifest,
+      analysisArtifacts: [{ artifactId: "a1", filename: "a.R", sha256: "c".repeat(64), byteLength: 2 }, { artifactId: "a2", filename: "b.txt", sha256: "d".repeat(64), byteLength: 3 }],
+    } };
+    mockedCreateUnblindingPackage.mockResolvedValueOnce({ receipt, completion, receiptArtifact: { text: JSON.stringify(receipt), bytes: Uint8Array.from(encode(JSON.stringify(receipt))) } });
+    const registration = { ...persistentRegistration(), analysisLockReceiptBase64: bytesToBase64(encode('{"schemaVersion":"0.5"}')) };
+    mockedSha256Hex.mockResolvedValueOnce(PUBLIC_RECEIPT_HASH).mockResolvedValueOnce(LOCK_RECEIPT_HASH);
+    render(<UnblindingWorkspace registration={registration} registerAction={registerAction} />);
+    await user.upload(screen.getByLabelText("Unblinding secret"), createFile("secret.json", SECRET_TEXT));
+    await user.click(verifyButton());
+    await screen.findByText("Bound to 2 analysis artifacts in the authorized lock.");
+    await user.click(screen.getByRole("checkbox", { name: /I saved the unblinding receipt/i }));
+    await user.click(screen.getByRole("button", { name: "Register unblinding completion" }));
+    await waitFor(() => expect(registerAction).toHaveBeenCalledTimes(1));
+    const [form] = registerAction.mock.calls[0] as [FormData];
+    expect(form.get("schemaVersion")).toBe("0.3");
+    expect(form.get("analysisArtifactFilename")).toBe(manifest.filename);
+    expect(form.get("analysisArtifactSha256")).toBe(LOCK_RECEIPT_HASH);
+    expect(form.get("analysisArtifactByteLength")).toBe("512");
+    expect(form.get("unblindingReceiptSha256")).toBe(FINAL_RECEIPT_HASH);
+    expect(form.get("releasedMapping")).toBeNull();
+    expect(form.get("unblindingReceiptBase64")).toBeNull();
+  });
+
+  it("refuses a modified authorized v0.5 lock before calling the mapping release engine", async () => {
+    const user = userEvent.setup();
+    const registerAction = vi.fn();
+    const registration = { ...persistentRegistration(), analysisLockReceiptBase64: bytesToBase64(encode('{"schemaVersion":"0.5"}')) };
+    mockedSha256Hex.mockResolvedValueOnce(PUBLIC_RECEIPT_HASH).mockResolvedValueOnce("0".repeat(64));
+    render(<UnblindingWorkspace registration={registration} registerAction={registerAction} />);
+    await user.upload(screen.getByLabelText("Unblinding secret"), createFile("secret.json", SECRET_TEXT));
+    await user.click(verifyButton());
+    expect(await screen.findByText("The authorized receipt hashes do not match the loaded artifact chain.")).toBeInTheDocument();
+    expect(mockedCreateUnblindingPackage).not.toHaveBeenCalled();
+    expect(downloadButton()).toBeDisabled();
+    expect(registerAction).not.toHaveBeenCalled();
+  });
+
   it("supports persistent authorized unblinding when the plan did not require an analysis lock", async () => {
     const user = userEvent.setup();
     const registerAction = vi.fn().mockResolvedValue({

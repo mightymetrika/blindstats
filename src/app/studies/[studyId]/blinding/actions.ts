@@ -1,5 +1,9 @@
 "use server";
 
+import { parsePackageReceipt } from "@/lib/blinding/package-v05/receipt";
+import { parsePackageAnalysisLock } from "@/lib/blinding/package-v05/analysis-lock";
+import { parseJsonArtifactBytes } from "@/lib/blinding/artifact-validation";
+
 import { Buffer } from "node:buffer";
 
 import { revalidatePath } from "next/cache";
@@ -407,7 +411,7 @@ export async function registerBlindingTransformation(
     return {
       ok: false,
       error:
-        "Confirm that the blinded CSV, public receipt, and unblinding secret have been saved before registration.",
+        "Confirm that the blinded dataset files, public receipt, and unblinding secret have been saved before registration.",
     };
   }
 
@@ -456,7 +460,7 @@ export async function registerBlindingTransformation(
   }
 
   let publicReceiptText: string;
-  let registrationRpc: "register_blinding_transformation" | "register_multi_blinding_transformation";
+  let registrationRpc: "register_blinding_transformation" | "register_multi_blinding_transformation" | "register_package_blinding_transformation";
 
   try {
     if (
@@ -473,8 +477,14 @@ export async function registerBlindingTransformation(
     }
 
     const publicReceiptBytes = new Uint8Array(decoded);
-    const publicReceipt = parseSupportedBlindingReceiptBytes(publicReceiptBytes);
-    registrationRpc = registrationRpcForBlindingReceipt(publicReceipt);
+    if (parseJsonArtifactBytes(publicReceiptBytes, "Public receipt").schemaVersion === "0.5") {
+      if (publicReceiptBytes.byteLength > 524288 || (publicReceiptBytes[0] === 0xef && publicReceiptBytes[1] === 0xbb && publicReceiptBytes[2] === 0xbf)) throw new Error("Package receipt must be UTF-8 without BOM and at most 512 KiB.");
+      await parsePackageReceipt(publicReceiptBytes);
+      registrationRpc = "register_package_blinding_transformation";
+    } else {
+      const publicReceipt = parseSupportedBlindingReceiptBytes(publicReceiptBytes);
+      registrationRpc = registrationRpcForBlindingReceipt(publicReceipt);
+    }
     publicReceiptText = new TextDecoder("utf-8", { fatal: true }).decode(
       publicReceiptBytes,
     );
@@ -585,7 +595,7 @@ export async function registerAnalysisLock(
   }
 
   let receiptText: string;
-  let registrationRpc: "register_analysis_lock" | "register_multi_analysis_lock";
+  let registrationRpc: "register_analysis_lock" | "register_multi_analysis_lock" | "register_package_analysis_lock";
 
   try {
     if (
@@ -602,8 +612,15 @@ export async function registerAnalysisLock(
     }
 
     const receiptBytes = new Uint8Array(decoded);
-    const receipt = parseSupportedAnalysisLockReceiptBytes(receiptBytes);
-    registrationRpc = registrationRpcForAnalysisLockReceipt(receipt);
+    if (parseJsonArtifactBytes(receiptBytes, "Analysis lock").schemaVersion === "0.5") {
+      if (receiptBytes.byteLength > 262144 || (receiptBytes[0] === 0xef && receiptBytes[1] === 0xbb && receiptBytes[2] === 0xbf)) throw new Error("Package lock receipt must be UTF-8 without BOM and at most 256 KiB.");
+      const lock = parsePackageAnalysisLock(receiptBytes);
+      if (lock.analysisArtifacts.length > 100) throw new Error("Select at most 100 analysis artifacts.");
+      registrationRpc = "register_package_analysis_lock";
+    } else {
+      const receipt = parseSupportedAnalysisLockReceiptBytes(receiptBytes);
+      registrationRpc = registrationRpcForAnalysisLockReceipt(receipt);
+    }
     receiptText = new TextDecoder("utf-8", { fatal: true }).decode(
       receiptBytes,
     );
@@ -811,7 +828,7 @@ export async function registerUnblindingCompletion(
   let lockId: string | null;
   let selectedColumn: string | null;
   let selectedColumns: { column: string; categoryCount: number }[] | null;
-  let schemaVersion: "0.3" | "0.4";
+  let schemaVersion: "0.3" | "0.4" | "0.5";
   let sourceArtifactSha256: string;
   let blindingReceiptSha256: string;
   let blindedArtifactSha256: string;
@@ -831,7 +848,7 @@ export async function registerUnblindingCompletion(
     transformationId = getRequiredString(formData, "transformationId");
     lockId = getOptionalString(formData, "lockId");
     const version = formData.get("schemaVersion") ?? "0.3";
-    if (version !== "0.3" && version !== "0.4") {
+    if (version !== "0.3" && version !== "0.4" && version !== "0.5") {
       throw new Error("Unsupported unblinding receipt version.");
     }
     schemaVersion = version;
@@ -839,6 +856,7 @@ export async function registerUnblindingCompletion(
       ? getRequiredExactString(formData, "selectedColumn") : null;
     selectedColumns = version === "0.4"
       ? getSelectedColumnsMetadata(formData) : null;
+    if (version === "0.5" && (formData.has("selectedColumn") || formData.has("selectedColumns"))) throw new Error("Package completion requires only manifest commitment metadata.");
     if (version === "0.4" && formData.has("selectedColumn")) {
       throw new Error("v0.4 metadata must not include a single selected column.");
     }
@@ -986,7 +1004,9 @@ export async function registerUnblindingCompletion(
       p_analysis_artifact_byte_length: analysisArtifactByteLength,
       p_unblinding_receipt_sha256: unblindingReceiptSha256,
   };
-  const { data, error } = schemaVersion === "0.4"
+  const { data, error } = schemaVersion === "0.5"
+    ? await supabase.rpc("register_package_unblinding_completion", commonCompletionMetadata)
+    : schemaVersion === "0.4"
     ? await supabase.rpc("register_multi_unblinding_completion", {
         ...commonCompletionMetadata,
         p_selected_columns: selectedColumns,

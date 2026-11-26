@@ -189,6 +189,7 @@ export default async function StudyPage({ params }: StudyPageProps) {
       <section className="mt-6 rounded-2xl border border-black/10 p-5 dark:border-white/15">
         <h2 className="text-lg font-semibold">File protection</h2>
         <p className="mt-2 text-sm">{strictProtection ? "Recipient-only encryption required" : "Managed secure storage (not end-to-end encrypted)"}</p>
+        {(isBlindedAnalyst || isBlindingCustodian) && <p className="mt-3 text-sm"><Link href={`/studies/${studyId}/files`} className="underline">Supporting research files</Link></p>}
         {strictProtection && isBlindedAnalyst ? <div className="mt-3">
           {encryptionReady ? <p className="text-sm">Encryption ready</p> : <StudyEncryptionSetup studyId={studyId} userId={currentUserId} />}
         </div> : null}

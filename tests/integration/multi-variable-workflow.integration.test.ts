@@ -2,6 +2,8 @@ import { createClient } from "@supabase/supabase-js";
 import { describe, expect, it } from "vitest";
 
 import { sha256Hex } from "@/lib/blinding/hashing";
+import { createResearchAnalysisLock } from "@/lib/blinding/package-v05/legacy-lock";
+import { createLegacyReleaseWithPackageLock } from "@/lib/blinding/package-v05/legacy-release";
 import { createMultiBlindedPackage } from "@/lib/blinding/multi-blinding";
 import {
   createMultiAnalysisLockPackage,
@@ -83,9 +85,10 @@ const sourceCsv = [
 
 describe("Development only: complete v0.4 two-account workflow", () => {
   it.each([
-    { label: "one column", columns: ["treatment"] },
-    { label: "two columns", columns: ["treatment", "site"] },
-  ])("registers the exact v0.4 artifact chain for $label and enforces independent authorization", async ({ columns }) => {
+    { label: "one column", columns: ["treatment"], packageLock: false },
+    { label: "two columns", columns: ["treatment", "site"], packageLock: false },
+    { label: "two columns with v0.5 multi-file lock", columns: ["treatment", "site"], packageLock: true },
+  ])("registers the exact v0.4 artifact chain for $label and enforces independent authorization", async ({ columns, packageLock }) => {
     const config = configuration();
     const options = {
       auth: {
@@ -221,39 +224,49 @@ describe("Development only: complete v0.4 two-account workflow", () => {
       expect(storedTransformation.data?.public_receipt_sha256)
         .toBe(await sha256Hex(blinded.receiptArtifact.bytes));
 
-      const lock = await createMultiAnalysisLockPackage(
-        blinded.receiptArtifact.bytes,
-        {
-          filename: "synthetic-analysis.txt",
-          bytes: encode("Synthetic blinded analysis: model fixed before unblinding.\n"),
-        },
-      );
-      expect(lock.receipt.schemaVersion).toBe("0.4");
-
-      const unauthorizedLock = await b.rpc("register_multi_analysis_lock", {
-        p_workflow_id: workflowId,
-        p_analysis_lock_receipt_text: lock.receiptArtifact.text,
-      });
+      const analysis = { filename: "synthetic-analysis.txt", bytes: encode("Synthetic blinded analysis: model fixed before unblinding.\n") };
+      const lock = packageLock
+        ? await createResearchAnalysisLock(blinded.receiptArtifact.bytes, [analysis, { filename: "results.txt", bytes: encode("Synthetic results") }])
+        : await createMultiAnalysisLockPackage(blinded.receiptArtifact.bytes, analysis);
+      const lockRpc = packageLock ? "register_package_analysis_lock" : "register_multi_analysis_lock";
+      expect(lock.receipt.schemaVersion).toBe(packageLock ? "0.5" : "0.4");
+      const lockArgs = { p_workflow_id: workflowId, p_analysis_lock_receipt_text: lock.receiptArtifact.text };
+      const unauthorizedLock = await b.rpc(lockRpc, lockArgs);
       expect(unauthorizedLock.error).not.toBeNull();
       expect(unauthorizedLock.data).toBeNull();
 
-      const lockRegistration = await a.rpc("register_multi_analysis_lock", {
-        p_workflow_id: workflowId,
-        p_analysis_lock_receipt_text: lock.receiptArtifact.text,
-      });
-      checked(lockRegistration.error, "Register v0.4 analysis lock");
+      if (lock.receipt.schemaVersion === "0.5") {
+        const invalid = [
+          { ...lock.receipt, blinding: { ...lock.receipt.blinding, schemaVersion: "0.3" } },
+          { ...lock.receipt, blinding: { ...lock.receipt.blinding, datasetCommitmentSha256: "0".repeat(64) } },
+          { ...lock.receipt, analysisArtifacts: [lock.receipt.analysisArtifacts[0], lock.receipt.analysisArtifacts[0]] },
+          { ...lock.receipt, unexpected: "not permitted" },
+        ];
+        for (const receipt of invalid) {
+          const rejected = await a.rpc(lockRpc, { ...lockArgs, p_analysis_lock_receipt_text: JSON.stringify(receipt) });
+          expect(rejected.error).not.toBeNull();
+        }
+      }
+      const lockRegistration = await a.rpc(lockRpc, lockArgs);
+      checked(lockRegistration.error, "Register analysis lock");
       const lockRecordId = id(lockRegistration.data, "Register analysis lock");
-
+      const retryLock = await a.rpc(lockRpc, lockArgs);
+      checked(retryLock.error, "Exact lock registration retry");
+      expect(retryLock.data).toBe(lockRecordId);
       const storedLock = await a.from("analysis_locks")
-        .select("id, schema_version, transformation_record_id, analysis_lock_receipt_sha256")
+        .select("id, schema_version, transformation_schema_version, transformation_record_id, analysis_lock_receipt_sha256, analysis_lock_receipt_text, analysis_artifact_sha256, analysis_artifact_byte_length")
         .eq("id", lockRecordId)
         .single();
       checked(storedLock.error, "Read registered analysis lock");
-      expect(storedLock.data?.schema_version).toBe("0.4");
-      expect(storedLock.data?.transformation_record_id)
-        .toBe(transformationRecordId);
-      expect(storedLock.data?.analysis_lock_receipt_sha256)
-        .toBe(await sha256Hex(lock.receiptArtifact.bytes));
+      expect(storedLock.data?.schema_version).toBe(packageLock ? "0.5" : "0.4");
+      expect(storedLock.data?.transformation_schema_version).toBe("0.4");
+      expect(storedLock.data?.transformation_record_id).toBe(transformationRecordId);
+      expect(storedLock.data?.analysis_lock_receipt_sha256).toBe(await sha256Hex(lock.receiptArtifact.bytes));
+      expect(storedLock.data?.analysis_lock_receipt_text).toBe(lock.receiptArtifact.text);
+      if (packageLock) {
+        expect(storedLock.data?.analysis_artifact_sha256).toBe(await sha256Hex(lock.receiptArtifact.bytes));
+        expect(storedLock.data?.analysis_artifact_byte_length).toBe(lock.receiptArtifact.bytes.length);
+      }
 
       // With a required lock, requesting against null must be rejected.
       const noLockRequest = await a.rpc("request_unblinding", {
@@ -283,20 +296,21 @@ describe("Development only: complete v0.4 two-account workflow", () => {
       const authorizationRecordId = id(authorized.data, "Independent authorization");
       expect(authorizationRecordId).toBeTruthy();
 
-      const released = await createMultiUnblindingPackage(
-        blinded.receiptArtifact.bytes,
-        blinded.secretArtifact.bytes,
-        lock.receiptArtifact.bytes,
-      );
+      const releaseResult = packageLock
+        ? await createLegacyReleaseWithPackageLock(blinded.receiptArtifact.bytes, blinded.secretArtifact.bytes, lock.receiptArtifact.bytes)
+        : await createMultiUnblindingPackage(blinded.receiptArtifact.bytes, blinded.secretArtifact.bytes, lock.receiptArtifact.bytes);
+      const released = { receipt: "completion" in releaseResult ? releaseResult.completion : releaseResult.receipt, receiptArtifact: releaseResult.receiptArtifact };
       expect(released.receipt.schemaVersion).toBe("0.4");
+      if (released.receipt.schemaVersion !== "0.4") throw new Error("Expected v0.4 mapping metadata.");
       expect(released.receipt.lockId).toBe(lock.receipt.lockId);
-      expect(released.receipt.releasedMappings.map((entry) => entry.column))
-        .toEqual(columns);
-      expect(new Set(released.receipt.releasedMappings[0].mapping.map((entry) => entry.original)))
-        .toEqual(new Set(["Active", "Placebo"]));
+      expect(released.receipt.releasedMappings.map((entry) => entry.column)).toEqual(columns);
+      expect(new Set(released.receipt.releasedMappings[0].mapping.map((entry) => entry.original))).toEqual(new Set(["Active", "Placebo"]));
       if (columns.includes("site")) {
-        expect(new Set(released.receipt.releasedMappings[1].mapping.map((entry) => entry.original)))
-          .toEqual(new Set(["North", "South"]));
+        expect(new Set(released.receipt.releasedMappings[1].mapping.map((entry) => entry.original))).toEqual(new Set(["North", "South"]));
+      }
+      if ("completion" in releaseResult) {
+        expect(releaseResult.receipt.schemaVersion).toBe("0.5");
+        expect(releaseResult.receipt.artifacts.analysisArtifacts).toHaveLength(2);
       }
 
       const artifactRefs = released.receipt.artifacts;
@@ -335,6 +349,11 @@ describe("Development only: complete v0.4 two-account workflow", () => {
       });
       expect(badCompletion.error).not.toBeNull();
       expect(badCompletion.data).toBeNull();
+
+      if (packageLock) {
+        const badManifest = await a.rpc("register_multi_unblinding_completion", { ...completionMetadata, p_analysis_artifact_sha256: "0".repeat(64) });
+        expect(badManifest.error).not.toBeNull();
+      }
 
       const stillAuthorized = await a.from("blinding_workflows")
         .select("state")

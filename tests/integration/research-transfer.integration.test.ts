@@ -5,11 +5,18 @@ import { createMultiAnalysisLockPackage, createMultiUnblindingPackage } from "@/
 import { sha256Hex } from "@/lib/blinding/hashing";
 import { SECRET_TRANSFER_BUCKET } from "@/lib/research-transfer/secret-constants";
 import { sendAuthorizedSecret, validateSecretForReceipt } from "@/lib/research-transfer/secret-transfer";
+import { createDatasetPackage } from "@/lib/blinding/package-v05/package";
+import { createPackageAnalysisLock } from "@/lib/blinding/package-v05/analysis-lock";
+import { createPackageUnblindingReceipt } from "@/lib/blinding/package-v05/unblinding";
+import { delimitedAdapter } from "@/lib/datasets/adapters/delimited";
 import { createMultiBlindedPackage } from "@/lib/blinding/multi-blinding";
 import {
-  createAnalystKeyBackup, decryptBlindedDataset, encryptBlindedDataset,
+  createAnalystKeyBackup, decryptBlindedDataset, encryptBlindedDataset, encryptResearchFile,
 } from "@/lib/research-transfer/crypto";
 import { RESEARCH_TRANSFER_BUCKET, transferStoragePath, uploadCiphertext, uploadTransferObject } from "@/lib/research-transfer/storage";
+
+import { MANAGED_FILE_VERSION, prepareResearchFile, researchFileContext, sendResearchFile, verifyDeliveredResearchFile,
+  type FileDeliveryContext, type ResearchFileRecord, type PreparedResearchFile } from "@/lib/research-transfer/research-files";
 
 // OPT-IN: real synthetic Storage/DB writes to DEVELOPMENT only. Never Production.
 const DEVELOPMENT_URL = "https://kfrfemqoalzxwzecyjjf.supabase.co";
@@ -48,13 +55,14 @@ const source = new TextEncoder().encode(
 );
 
 async function exerciseSecretRelease(a: SupabaseClient, b: SupabaseClient, studyId: string, workflowId: string,
-  aId: string, bId: string, packageResult: Awaited<ReturnType<typeof createMultiBlindedPackage>>,
+  aId: string, bId: string, packageResult: Awaited<ReturnType<typeof createMultiBlindedPackage>> | Awaited<ReturnType<typeof createDatasetPackage>>,
   backup: Awaited<ReturnType<typeof createAnalystKeyBackup>> | null) {
   const hash = await sha256Hex(packageResult.secretArtifact.bytes);
   const mode = backup ? "recipient_e2ee_v1" : "managed_at_rest_v1";
-  const lock = await createMultiAnalysisLockPackage(packageResult.receiptArtifact.bytes,
-    { filename: "synthetic-analysis.txt", bytes: new TextEncoder().encode("Synthetic locked analysis") });
-  const registered = await b.rpc("register_multi_analysis_lock", { p_workflow_id: workflowId, p_analysis_lock_receipt_text: lock.receiptArtifact.text });
+  const isPackage = packageResult.receipt.schemaVersion === "0.5";
+  const analysis = { filename: "synthetic-analysis.txt", bytes: new TextEncoder().encode("Synthetic locked analysis") };
+  const lock = isPackage ? await createPackageAnalysisLock(packageResult.receiptArtifact.bytes, [analysis, {filename:"report.txt",bytes:new TextEncoder().encode("Synthetic result")}]) : await createMultiAnalysisLockPackage(packageResult.receiptArtifact.bytes, analysis);
+  const registered = await b.rpc(isPackage ? "register_package_analysis_lock" : "register_multi_analysis_lock", { p_workflow_id: workflowId, p_analysis_lock_receipt_text: lock.receiptArtifact.text });
   checked(registered.error, "Register analyst analysis lock");
   const request = await b.rpc("request_unblinding", { p_workflow_id: workflowId, p_analysis_lock_id: registered.data });
   checked(request.error, "Request unblinding");
@@ -97,15 +105,16 @@ async function exerciseSecretRelease(a: SupabaseClient, b: SupabaseClient, study
   expect(workflow.data?.state).toBe("unblinding_authorized");
   // Complete the existing local protocol, then verify the server refuses any
   // further secret grant or acknowledgement. Only synthetic metadata persists.
-  const released = await createMultiUnblindingPackage(packageResult.receiptArtifact.bytes,
+  const released = await (isPackage ? createPackageUnblindingReceipt : createMultiUnblindingPackage)(packageResult.receiptArtifact.bytes,
     packageResult.secretArtifact.bytes, lock.receiptArtifact.bytes);
-  const refs = released.receipt.artifacts;
-  checked((await b.rpc("register_multi_unblinding_completion", {
+  const receipt = "completion" in released ? released.completion : released.receipt;
+  const refs = receipt.artifacts;
+  checked((await b.rpc(isPackage ? "register_package_unblinding_completion" : "register_multi_unblinding_completion", {
     p_workflow_id: workflowId, p_request_id: requestId,
-    p_unblinding_id: released.receipt.unblindingId,
-    p_receipt_created_at: released.receipt.createdAt,
-    p_transformation_id: released.receipt.transformationId,
-    p_lock_id: released.receipt.lockId, p_selected_columns: released.receipt.selectedColumns,
+    p_unblinding_id: receipt.unblindingId,
+    p_receipt_created_at: receipt.createdAt,
+    p_transformation_id: receipt.transformationId,
+    p_lock_id: receipt.lockId, ...(receipt.schemaVersion === "0.4" ? {p_selected_columns:receipt.selectedColumns} : {}),
     p_source_artifact_sha256: refs.sourceArtifactSha256,
     p_blinding_receipt_sha256: refs.blindingReceiptSha256,
     p_blinded_artifact_sha256: refs.blindedArtifactSha256,
@@ -464,4 +473,167 @@ describe("Development only: v46 encrypted transfer and Storage role separation",
       await b.auth.signOut();
     }
   });
+
+  it.each(["managed_at_rest_v1", "recipient_e2ee_v1"] as const)("preserves v0.5 secret authorization and rejects the legacy dataset transfer path (%s)", async (fileProtection) => {
+    const env = config();
+    const options = { auth: { autoRefreshToken: false, persistSession: false } };
+    const a = createClient(DEVELOPMENT_URL, env.key, options);
+    const b = createClient(DEVELOPMENT_URL, env.key, options);
+    const loginA = await a.auth.signInWithPassword({ email: env.emailA, password: env.passwordA });
+    checked(loginA.error,"Custodian login"); const aId = id(loginA.data.user?.id,"custodian");
+    const loginB = await b.auth.signInWithPassword({ email: env.emailB, password: env.passwordB });
+    checked(loginB.error,"Analyst login"); const bId = id(loginB.data.user?.id,"analyst");
+    let studyId: string | null = null;
+    try {
+      const name = `[INTEGRATION TEST] v47 package secret ${fileProtection} ${crypto.randomUUID()}`;
+      checked((await a.from("studies").insert({name,file_protection:fileProtection})).error,"Create synthetic Study");
+      const study = await a.from("studies").select("id").eq("name",name).eq("created_by",aId).single();
+      checked(study.error,"Read synthetic Study"); studyId = id(study.data?.id,"study");
+      const assignment = await a.rpc("assign_blinded_analyst_by_email",{p_study_id:studyId,p_email:env.emailB});
+      checked(assignment.error,"Assign separated analyst"); expect(assignment.data).toBe(bId);
+      const workflow = await a.from("blinding_workflows").insert({study_id:studyId}).select("id").single();
+      checked(workflow.error,"Create synthetic workflow"); const workflowId = id(workflow.data?.id,"workflow");
+      checked((await a.from("blinding_plan_drafts").update({protection_targets:["Synthetic treatment"],require_analysis_lock:true,authorization_policy:"independent"}).eq("workflow_id",workflowId)).error,"Set plan");
+      checked((await a.rpc("activate_blinding_plan",{p_workflow_id:workflowId,p_acknowledge_weaker_policies:false})).error,"Activate plan");
+      const p = await createDatasetPackage([
+        {datasetId:"d1",bytes:source,adapter:delimitedAdapter("csv")},
+        {datasetId:"d2",bytes:new TextEncoder().encode("arm\tscore\nActive\t1\nPlacebo\t2\n"),adapter:delimitedAdapter("tsv")},
+      ], [{members:[{datasetId:"d1",variableId:"v2"},{datasetId:"d2",variableId:"v1"}]}]);
+      checked((await a.rpc("register_package_blinding_transformation",{p_workflow_id:workflowId,p_public_receipt_text:p.receiptArtifact.text})).error,"Register v0.5 package");
+      const backup = fileProtection === "recipient_e2ee_v1" ? await createAnalystKeyBackup(studyId,bId,"Synthetic v47 Study recovery passphrase") : null;
+      if (backup) checked((await b.rpc("register_research_transfer_key",{p_study_id:studyId,p_public_jwk:backup.publicJwk,p_wrapped_private_key:backup.wrappedPrivateKey,p_salt:backup.salt,p_iv:backup.iv})).error,"Register Study-specific recipient key");
+      const legacyRpc = backup ? "initiate_research_transfer" : "initiate_managed_research_transfer";
+      for (const hash of [p.receipt.manifestSha256,p.receipt.manifest.datasets[0].blinded.sha256]) {
+        const rejected = await a.rpc(legacyRpc,{p_workflow_id:workflowId,p_recipient_id:bId,p_filename:"synthetic.csv",p_plaintext_sha256:hash});
+        expect(rejected.error?.message).toContain("Dataset SHA-256");
+      }
+      await exerciseSecretRelease(a,b,studyId,workflowId,aId,bId,p,backup);
+    } finally {
+      if (studyId) checked((await a.from("studies").update({lifecycle:"archived"}).eq("id",studyId)).error,"Archive synthetic package Study");
+      await a.auth.signOut(); await b.auth.signOut();
+    }
+  });
+
+  it.each(["managed_at_rest_v1", "recipient_e2ee_v1"] as const)("delivers independent supporting files and a complete package, with safe retry (%s)", async (protection) => {
+    const env = config();
+    const options = { auth: { autoRefreshToken: false, persistSession: false } };
+    const a = createClient(DEVELOPMENT_URL, env.key, options);
+    const b = createClient(DEVELOPMENT_URL, env.key, options);
+    const loginA = await a.auth.signInWithPassword({email:env.emailA,password:env.passwordA}); checked(loginA.error,"Custodian login");
+    const loginB = await b.auth.signInWithPassword({email:env.emailB,password:env.passwordB}); checked(loginB.error,"Analyst login");
+    const aId = id(loginA.data.user?.id,"custodian"), bId = id(loginB.data.user?.id,"analyst");
+    let studyId: string | null = null;
+    try {
+      const name = `[INTEGRATION TEST] v47 multi-file delivery ${protection} ${crypto.randomUUID()}`;
+      checked((await a.from("studies").insert({name,file_protection:protection})).error,"Create synthetic Study");
+      const study = await a.from("studies").select("id").eq("name",name).single(); checked(study.error,"Read Study");
+      studyId=id(study.data?.id,"Study");
+      checked((await a.rpc("assign_blinded_analyst_by_email",{p_study_id:studyId,p_email:env.emailB})).error,"Assign analyst before workflow");
+      const passphrase="Synthetic v47 file delivery recovery passphrase";
+      const backup=protection==="recipient_e2ee_v1" ? await createAnalystKeyBackup(studyId,bId,passphrase) : null;
+      const delivery: FileDeliveryContext={studyId,recipientId:bId,protection,packageDelivery:null};
+      const document=await prepareResearchFile("protocol.txt",new TextEncoder().encode("Synthetic protocol"),"supporting",protection,null);
+      function args(file: PreparedResearchFile) {
+        return {p_study_id:delivery.studyId,p_workflow_id:file.purpose==="package_dataset"?delivery.packageDelivery!.workflowId:null,
+          p_recipient_id:bId,p_file_purpose:file.purpose,p_artifact_id:file.artifactId,p_filename:file.filename,
+          p_plaintext_sha256:file.sha256,p_plaintext_byte_length:file.bytes.length,p_transfer_mode:protection};
+      }
+      if (backup) {
+        expect((await a.rpc("initiate_research_file",args(document))).error).not.toBeNull();
+        checked((await b.rpc("register_research_transfer_key",{p_study_id:studyId,p_public_jwk:backup.publicJwk,
+          p_wrapped_private_key:backup.wrappedPrivateKey,p_salt:backup.salt,p_iv:backup.iv})).error,"Register Study key");
+      }
+      expect((await b.rpc("initiate_research_file",args(document))).error).not.toBeNull();
+      expect((await a.rpc("initiate_research_file",{...args(document),p_study_id:crypto.randomUUID()})).error).not.toBeNull();
+      expect((await a.rpc("initiate_research_file",{...args(document),p_transfer_mode:backup?"managed_at_rest_v1":"recipient_e2ee_v1"})).error).not.toBeNull();
+      expect((await a.rpc("initiate_research_file",{...args(document),p_filename:"unblinding-secret.json"})).error).not.toBeNull();
+      expect((await a.rpc("initiate_research_file",{...args(document),p_workflow_id:crypto.randomUUID()})).error).not.toBeNull();
+      expect((await a.rpc("initiate_research_file",{...args(document),p_plaintext_byte_length:4194305})).error).not.toBeNull();
+      async function start(file: PreparedResearchFile) {
+        const result=await a.rpc("initiate_research_file",args(file)); checked(result.error,"Initiate research file");
+        return id(result.data,"transfer ID");
+      }
+      async function payload(file: PreparedResearchFile, transferId: string) {
+        const encrypted=backup?await encryptResearchFile(file.bytes,backup.publicJwk,researchFileContext(delivery,transferId,file,file.bytes.length)):null;
+        const stored=encrypted?.ciphertext??file.bytes;
+        return {stored,complete:{p_transfer_id:transferId,p_object_sha256:encrypted?.ciphertextSha256??file.sha256,
+          p_object_byte_length:stored.length,p_envelope:encrypted?.envelope??{version:MANAGED_FILE_VERSION}}};
+      }
+      async function verifyGrant(transferId: string, file: PreparedResearchFile, stored?: Uint8Array) {
+        const record=await b.from("research_transfers").select("*").eq("id",transferId).single(); checked(record.error,"Read recipient file metadata");
+        const row=record.data as ResearchFileRecord;
+        expect(row).toMatchObject({state:"ready",file_purpose:file.purpose,artifact_id:file.artifactId,plaintext_sha256:file.sha256,plaintext_byte_length:file.bytes.length});
+        const path=transferStoragePath(delivery.studyId,transferId);
+        expect((await a.rpc("authorize_research_transfer_download_v2",{p_transfer_id:transferId})).error).not.toBeNull();
+        expect((await a.storage.from(RESEARCH_TRANSFER_BUCKET).download(path)).error).not.toBeNull();
+        expect((await b.storage.from(RESEARCH_TRANSFER_BUCKET).createSignedUrl(path,60)).error).not.toBeNull();
+        const grant=await b.rpc("authorize_research_transfer_download_v2",{p_transfer_id:transferId}); checked(grant.error,"Authorize recipient download");
+        expect(grant.data).toMatchObject({path,mode:protection,sha256:row.ciphertext_sha256,byteLength:row.ciphertext_byte_length});
+        if(stored) expect(Array.from(await verifyDeliveredResearchFile(row,delivery,stored,backup,passphrase))).toEqual(Array.from(file.bytes));
+        expect((await b.rpc("acknowledge_research_transfer",{p_transfer_id:transferId,p_plaintext_sha256:"0".repeat(64)})).error).not.toBeNull();
+        if (stored) checked((await b.rpc("acknowledge_research_transfer",{p_transfer_id:transferId,p_plaintext_sha256:file.sha256})).error,"Acknowledge verified file");
+        expect((await a.rpc("abandon_research_file",{p_transfer_id:transferId})).error).not.toBeNull();
+        const events=await b.from("research_transfer_events").select("event_type").eq("transfer_id",transferId).order("id"); checked(events.error,"Read audit events");
+        expect(events.data?.map(e=>e.event_type)).toEqual(["upload_initiated","upload_completed","download_granted",...(stored?["download_verified"]:[])]);
+        console.info(`Synthetic ready research file (must be retained): ${transferId}`);
+      }
+      // Support sharing is independent of any workflow or registered transformation.
+      const first=await start(document); expect(await start(document)).toBe(first);
+      const unfinished=await payload(document,first);
+      await uploadTransferObject(a,transferStoragePath(delivery.studyId,first),unfinished.stored);
+      expect((await b.rpc("abandon_research_file",{p_transfer_id:first})).error).not.toBeNull();
+      expect((await b.rpc("complete_research_file",unfinished.complete)).error).not.toBeNull();
+      expect((await a.rpc("initiate_research_file",args(document))).error).not.toBeNull();
+      checked((await a.rpc("abandon_research_file",{p_transfer_id:first})).error,"Abandon pending uploaded file");
+      expect((await a.rpc("complete_research_file",unfinished.complete)).error).not.toBeNull();
+      expect((await b.rpc("authorize_research_transfer_download_v2",{p_transfer_id:first})).error).not.toBeNull();
+      expect((await a.storage.from(RESEARCH_TRANSFER_BUCKET).update(transferStoragePath(delivery.studyId,first),new Blob([Uint8Array.from(unfinished.stored).buffer]))).error).not.toBeNull();
+      console.info(`Synthetic abandoned research file cleanup fixture: ${first}`);
+      const retry=await start(document); expect(retry).not.toBe(first);
+      const docPayload=await payload(document,retry); await uploadTransferObject(a,transferStoragePath(delivery.studyId,retry),docPayload.stored);
+      expect((await a.rpc("complete_research_file",{...docPayload.complete,p_object_byte_length:docPayload.stored.length+1})).error).not.toBeNull();
+      checked((await a.rpc("complete_research_file",docPayload.complete)).error,"Complete retried support file");
+      await verifyGrant(retry,document,docPayload.stored);
+      const support2=await prepareResearchFile("codebook.txt",new TextEncoder().encode("Synthetic codebook"),"supporting",protection,null);
+      const support2Id=await sendResearchFile(a,delivery,support2,backup?.publicJwk??null);
+      await verifyGrant(support2Id,support2);
+      const independent=await b.from("research_transfers").select("workflow_id,transformation_record_id").eq("id",retry).single();
+      checked(independent.error,"Verify independent support identity"); expect(independent.data).toEqual({workflow_id:null,transformation_record_id:null});
+      // Now register two linked datasets and deliver each exact artifact.
+      const workflow=await a.from("blinding_workflows").insert({study_id:studyId}).select("id").single(); checked(workflow.error,"Create workflow");
+      const workflowId=id(workflow.data?.id,"workflow");
+      checked((await a.from("blinding_plan_drafts").update({protection_targets:["Synthetic treatment"],require_analysis_lock:true,authorization_policy:"independent"}).eq("workflow_id",workflowId)).error,"Set plan");
+      checked((await a.rpc("activate_blinding_plan",{p_workflow_id:workflowId,p_acknowledge_weaker_policies:false})).error,"Activate plan");
+      const p=await createDatasetPackage([{datasetId:"d1",bytes:source,adapter:delimitedAdapter("csv")},
+        {datasetId:"d2",bytes:new TextEncoder().encode("arm\tscore\nActive\t1\nPlacebo\t2\n"),adapter:delimitedAdapter("tsv")}],
+        [{members:[{datasetId:"d1",variableId:"v2"},{datasetId:"d2",variableId:"v1"}]}]);
+      checked((await a.rpc("register_package_blinding_transformation",{p_workflow_id:workflowId,p_public_receipt_text:p.receiptArtifact.text})).error,"Register package");
+      delivery.packageDelivery={workflowId,transformationId:p.receipt.transformationId,datasets:p.receipt.manifest.datasets};
+      const readyIds:string[]=[];
+      for (const artifact of p.files) {
+        const file=await prepareResearchFile(artifact.filename,artifact.bytes,"package_dataset",protection,delivery.packageDelivery);
+        for (const invalid of [{p_artifact_id:"unknown"},{p_artifact_id:artifact.datasetId==="d1"?"d2":"d1"},
+          {p_filename:"other.csv"},{p_plaintext_sha256:p.receipt.manifestSha256},{p_plaintext_byte_length:artifact.bytes.length+1},{p_workflow_id:crypto.randomUUID()}]) {
+          expect((await a.rpc("initiate_research_file",{...args(file),...invalid})).error).not.toBeNull();
+        }
+        const transferId=await start(file); const object=await payload(file,transferId);
+        await uploadTransferObject(a,transferStoragePath(delivery.studyId,transferId),object.stored);
+        const legacyComplete=backup?await a.rpc("complete_research_transfer",{p_transfer_id:transferId,p_ciphertext_sha256:object.complete.p_object_sha256,
+          p_ciphertext_byte_length:object.stored.length,p_envelope:{...object.complete.p_envelope,version:"v46-ecdh-hkdf-aes256gcm-1"}}):
+          await a.rpc("complete_managed_research_transfer",{p_transfer_id:transferId,p_object_sha256:file.sha256,p_object_byte_length:object.stored.length});
+        expect(legacyComplete.error).not.toBeNull();
+        checked((await a.rpc("complete_research_file",object.complete)).error,"Complete registered dataset");
+        expect((await a.rpc("initiate_research_file",args(file))).error).not.toBeNull();
+        await verifyGrant(transferId,file,object.stored); readyIds.push(transferId);
+      }
+      expect(new Set(readyIds).size).toBe(2);
+      const ready=await b.from("research_transfers").select("artifact_id,state").eq("study_id",studyId).eq("workflow_id",workflowId).order("artifact_id");
+      checked(ready.error,"Read complete package delivery"); expect(ready.data).toEqual([{artifact_id:"d1",state:"ready"},{artifact_id:"d2",state:"ready"}]);
+      await exerciseSecretRelease(a,b,studyId,workflowId,aId,bId,p,backup);
+    } finally {
+      if(studyId) checked((await a.from("studies").update({lifecycle:"archived"}).eq("id",studyId)).error,"Archive synthetic Study");
+      await a.auth.signOut(); await b.auth.signOut();
+    }
+  });
+
 });
